@@ -1261,6 +1261,7 @@ function clearFlyerCell(btn){
   cell.querySelector('.foot').textContent = 'Plus 10% Added at Checkout.';
   cell.querySelector('.db-badge').style.display = 'none';
   cell.classList.add('is-cleared');
+  scheduleRowAlign();
   markFlyerDirty();
   setStatus(hasItem ? `Removed "${name}" from the flyer. The catalog entry was kept.` : 'Ad slot cleared.');
 }
@@ -1430,7 +1431,10 @@ function buildLayoutDom(layoutId, existingData){
   }
   buildSections(layout.top, topArea);
   buildSections(layout.bottom, bottomArea);
-  requestAnimationFrame(() => document.querySelectorAll('.pname').forEach(autoFitProductName));
+  requestAnimationFrame(() => {
+    document.querySelectorAll('.pname').forEach(autoFitProductName);
+    scheduleRowAlign();
+  });
 }
 
 function switchLayout(layoutId){
@@ -1589,6 +1593,41 @@ function autoFitProductName(nameEl){
   nameEl.style.fontSize = `${Math.round(fitted * 10) / 10}px`;
 }
 
+// Prices sit right after each cell's own name/description block (see .priceline
+// align-self:start), so a row with mixed 1-line and 2-line names would otherwise
+// show prices at different heights. This equalizes .info height within each
+// visual row so every price in that row lines up, without touching the grid CSS.
+let rowAlignRAF = null;
+function scheduleRowAlign(){
+  if(rowAlignRAF) return;
+  rowAlignRAF = requestAnimationFrame(() => { rowAlignRAF = null; alignRowPrices(); });
+}
+function alignRowPrices(){
+  document.querySelectorAll('#topArea > .grid, #bottomArea > .grid').forEach(grid => {
+    const cells = Array.from(grid.children).filter(el => el.classList.contains('cell'));
+    if(cells.length < 2) return;
+    cells.forEach(c => { const info = c.querySelector('.info'); if(info) info.style.minHeight = ''; });
+    const rows = new Map();
+    cells.forEach(c => {
+      const top = c.offsetTop;
+      if(!rows.has(top)) rows.set(top, []);
+      rows.get(top).push(c);
+    });
+    rows.forEach(rowCells => {
+      if(rowCells.length < 2) return;
+      let maxH = 0;
+      rowCells.forEach(c => {
+        const info = c.querySelector('.info');
+        if(info) maxH = Math.max(maxH, info.getBoundingClientRect().height);
+      });
+      rowCells.forEach(c => {
+        const info = c.querySelector('.info');
+        if(info) info.style.minHeight = Math.ceil(maxH) + 'px';
+      });
+    });
+  });
+}
+
 function syncNameSizeInput(menu){
   const input = menu.querySelector('.name-size-input');
   const nameEl = menu.closest('.cell').querySelector('.pname');
@@ -1604,6 +1643,7 @@ function changeProductNameSize(button, direction){
   nameEl.style.fontSize = `${next}px`;
   const input = cell.querySelector('.name-size-input');
   if(input) input.value = Math.round(next);
+  scheduleRowAlign();
   markFlyerDirty();
 }
 
@@ -1614,6 +1654,7 @@ function setProductNameSize(input){
   input.value = size;
   nameEl.dataset.manualSize = String(size);
   nameEl.style.fontSize = `${size}px`;
+  scheduleRowAlign();
   markFlyerDirty();
 }
 
@@ -1625,6 +1666,7 @@ function resetProductNameSize(button){
   autoFitProductName(nameEl);
   const input = cell.querySelector('.name-size-input');
   if(input) input.value = Math.round(parseFloat(getComputedStyle(nameEl).fontSize) || 14);
+  scheduleRowAlign();
   markFlyerDirty();
 }
 
@@ -1646,6 +1688,7 @@ function toggleStoreBoxAlignment(button){
 
 function onNameInput(div){
   autoFitProductName(div);
+  scheduleRowAlign();
   clearTimeout(suggestTimer);
   const q = div.textContent.trim();
   if(q && q !== 'Product Name') div.closest('.cell').classList.remove('is-cleared');
@@ -1756,6 +1799,7 @@ function fillCellFromProduct(cell, p, options = {}){
     updatePhotoActionState(photo);
   }
   cell.querySelector('.db-badge').style.display = 'block';
+  scheduleRowAlign();
   markFlyerDirty();
   return true;
 }
