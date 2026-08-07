@@ -1,0 +1,20 @@
+{
+  "name": "weekly-ad-builder",
+  "version": "1.0.0",
+  "description": "Weekly ad flyer builder with shared-password login, saved flyers, and a searchable product database.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "build:installer": "powershell -ExecutionPolicy Bypass -File packaging/build-release.ps1"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.3.0",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "express-session": "^1.18.0",
+    "nodemailer": "^6.9.14"
+  },
+  "optionalDependencies": {
+    "node-windows": "^1.0.0-beta.8"
+  }
+}

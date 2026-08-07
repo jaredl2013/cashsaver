@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Weekly Ad Builder — Quick How-To</title>
+  <style>
+    :root{--red:#e2231a;--dark:#111827;--muted:#64748b;--line:#e5e7eb;--soft:#f8fafc;}
+    *{box-sizing:border-box}
+    body{margin:0;background:#eef1f5;color:#172033;font-family:Arial,Helvetica,sans-serif;line-height:1.55}
+    .topbar{position:sticky;top:0;z-index:10;background:var(--dark);color:#fff;box-shadow:0 3px 14px rgba(0,0,0,.22)}
+    .topbar-inner{max-width:980px;margin:auto;padding:14px 24px;display:flex;align-items:center;gap:14px}
+    .mark{width:38px;height:38px;display:grid;place-items:center;border-radius:10px;background:var(--red);font-size:20px;font-weight:900}
+    .topbar h1{margin:0;font-size:18px;line-height:1.2}
+    .topbar p{margin:2px 0 0;color:#aeb8c8;font-size:11px;text-transform:uppercase;letter-spacing:.08em}
+    .back{margin-left:auto;color:#fff;text-decoration:none;border:1px solid #475569;border-radius:8px;padding:7px 11px;font-size:12px;font-weight:700}
+    main{max-width:980px;margin:26px auto;padding:0 20px 50px}
+    .hero{background:linear-gradient(135deg,#fff,#fff5f4);border:1px solid #f3c5c1;border-left:6px solid var(--red);border-radius:14px;padding:24px;margin-bottom:18px}
+    .hero h2{margin:0 0 7px;font-size:25px;color:#111827}
+    .hero p{margin:0;color:#526076;max-width:720px}
+    .quick-path{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:20px}
+    .quick-path div{position:relative;background:#fff;border:1px solid var(--line);border-radius:9px;padding:11px 10px;font-size:11px;font-weight:800;text-align:center}
+    .quick-path b{display:block;margin:auto auto 5px;width:24px;height:24px;line-height:24px;border-radius:50%;background:var(--red);color:#fff}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+    section{background:#fff;border:1px solid var(--line);border-radius:13px;padding:20px;box-shadow:0 2px 8px rgba(15,23,42,.04)}
+    section.wide{grid-column:1/-1}
+    h3{margin:0 0 12px;font-size:16px;color:#111827;display:flex;align-items:center;gap:8px}
+    h3 span{width:28px;height:28px;display:grid;place-items:center;border-radius:8px;background:#fee2e2;font-size:14px}
+    ol,ul{margin:0;padding-left:20px}
+    li+li{margin-top:7px}
+    .tip{margin-top:13px;padding:10px 12px;border-radius:8px;background:#eff6ff;color:#1e3a5f;font-size:12px}
+    .warning{background:#fff7ed;color:#7c2d12}
+    .control-list{display:grid;grid-template-columns:auto 1fr;gap:7px 12px;margin:0}
+    .control-list dt{font-weight:900;color:#a32720;white-space:nowrap}
+    .control-list dd{margin:0;color:#445067}
+    footer{text-align:center;color:var(--muted);font-size:11px;padding:24px}
+    footer a{color:#334155;font-weight:800}
+    @media(max-width:760px){.grid{grid-template-columns:1fr}.wide{grid-column:auto!important}.quick-path{grid-template-columns:1fr}.topbar-inner{padding:12px 16px}.hero{padding:18px}}
+    @media print{.topbar{position:static}.back{display:none}body{background:#fff}main{margin-top:14px}.hero,section{box-shadow:none;break-inside:avoid}}
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="mark">%</div>
+      <div><h1>Weekly Ad Builder</h1><p>Quick How-To Guide</p></div>
+      <a class="back" href="/">← Back to builder</a>
+    </div>
+  </header>
+
+  <main>
+    <div class="hero">
+      <h2>Build a weekly ad in five steps</h2>
+      <p>Choose a layout, fill the ad from the Product Catalog, make any adjustments, preview it, then print or save the finished flyer.</p>
+      <div class="quick-path">
+        <div><b>1</b>Choose layout</div><div><b>2</b>Add products</div><div><b>3</b>Adjust photos</div><div><b>4</b>Preview</div><div><b>5</b>Print or share</div>
+      </div>
+    </div>
+
+    <div class="grid">
+      <section>
+        <h3><span>1</span> Start a flyer</h3>
+        <ol>
+          <li>Choose a layout from <b>Template / Layout</b>.</li>
+          <li>Set the effective date under <b>Goes Live</b>.</li>
+          <li>Click <b>New blank flyer</b> when starting from scratch, or <b>Duplicate</b> beside a previous flyer.</li>
+          <li>Click <b>Save</b> and give the flyer a name. After the first save, changes save automatically.</li>
+        </ol>
+      </section>
+
+      <section>
+        <h3><span>2</span> Add products</h3>
+        <ol>
+          <li>Open <b>Product Database</b>.</li>
+          <li>Find the product and click <b>Add to flyer</b>.</li>
+          <li>The product goes into the next open big or small slot based on its catalog setting.</li>
+          <li>You can also type a product name directly on the flyer and choose a matching suggestion.</li>
+        </ol>
+        <div class="tip">The builder prevents the same product from being added to a flyer twice.</div>
+      </section>
+
+      <section>
+        <h3><span>↔</span> Replace or remove an item</h3>
+        <ul>
+          <li>Click <b>↔ replace</b> on the exact ad slot you want to change, then select <b>Replace item</b> in the catalog.</li>
+          <li>Click the small <b>×</b> in the corner of an ad slot to remove it from the flyer.</li>
+          <li>Removing an item from the flyer does not delete it from the Product Catalog.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h3><span>✎</span> Edit text and prices</h3>
+        <ul>
+          <li>Click a product name, description, price, footer message, or store detail to edit it.</li>
+          <li>Use <b>A−</b> and <b>A+</b> to change a product-name size. <b>Auto</b> fits long names automatically.</li>
+          <li>Use <b>Center</b> to center the product name and description; click <b>Left</b> to change it back.</li>
+          <li>Select the correct price unit, such as <b>lb.</b>, <b>each</b>, or a custom unit.</li>
+        </ul>
+      </section>
+
+      <section class="wide">
+        <h3><span>▧</span> Work with photos</h3>
+        <dl class="control-list">
+          <dt>Click image box</dt><dd>Upload a photo from the computer.</dd>
+          <dt>Find photo</dt><dd>Search the configured stock-photo service.</dd>
+          <dt>Crop/resize</dt><dd>Zoom and reposition the photo inside its box.</dd>
+          <dt>Red ↘ handle</dt><dd>Drag to resize the entire image box. The photo stays snapped to the box.</dd>
+          <dt>↶ size</dt><dd>Undo the last image-box resize.</dd>
+          <dt>↶</dt><dd>Undo the last crop or photo change.</dd>
+          <dt>✕ on photo</dt><dd>Remove only the photo while keeping the product information.</dd>
+        </dl>
+      </section>
+
+      <section>
+        <h3><span>☰</span> Manage the Product Catalog</h3>
+        <ul>
+          <li>Add a product at the bottom of the catalog.</li>
+          <li>Use <b>Edit</b> to change a saved product inline.</li>
+          <li>Upload or search for a catalog photo.</li>
+          <li>Choose whether its default placement is a <b>Big ad</b> or <b>Small ad</b>.</li>
+          <li>Use <b>Import Excel / CSV</b> for a product list. Matching names update existing products instead of duplicating them.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h3><span>✓</span> Finish the ad</h3>
+        <ol>
+          <li>Click <b>Ad Preview</b> to see the flyer without editing controls.</li>
+          <li>Click <b>Print / Save as PDF</b> for a full-page printed copy or PDF.</li>
+          <li>Click <b>Share to Facebook / Save Image</b> to create an image.</li>
+          <li>Confirm that the sidebar says <b>Saved ✓</b> before closing the browser.</li>
+        </ol>
+      </section>
+
+      <section class="wide">
+        <h3><span>⤓</span> Backup, restore, or move to another PC</h3>
+        <ol>
+          <li>Click <b>Download full backup</b> under Data Safety.</li>
+          <li>Keep the downloaded JSON file somewhere safe. It contains saved flyers, catalog products, photos, settings, and subscribers.</li>
+          <li>On another installed copy, log in and click <b>Restore from backup</b>.</li>
+          <li>Select the JSON file, review the item counts, and type <b>RESTORE</b> when prompted.</li>
+        </ol>
+        <div class="tip warning"><b>Important:</b> Restoring replaces the saved database currently on that installation. Download a fresh backup first if anything on that PC must be kept.</div>
+      </section>
+
+      <section class="wide">
+        <h3><span>↻</span> Install an update</h3>
+        <ol>
+          <li>When a new version is available, the sidebar shows an <b>Update available</b> message.</li>
+          <li>Click <b>Download update</b>, close the ad builder, and run the downloaded setup file.</li>
+          <li>Install it over the existing copy. Saved flyers, products, photos, and settings stay in place.</li>
+        </ol>
+        <div class="tip"><b>Good practice:</b> Download a full backup before a major update or before moving the app to another PC.</div>
+      </section>
+    </div>
+  </main>
+
+  <footer>Weekly Ad Builder · <a href="https://lockwooditservices.com/" target="_blank" rel="noopener noreferrer">Lockwood IT Services</a></footer>
+</body>
+</html>

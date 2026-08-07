@@ -1,0 +1,3307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Weekly Ad Builder</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="/vendor/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --red:#e2231a;
+    --red-dark:#b91c1c;
+    --black:#141414;
+    --placeholder:#e9e9e9;
+    --sidebar:#111827;
+    --sidebar-soft:#1f2937;
+    --sidebar-line:rgba(255,255,255,.09);
+    --sidebar-muted:#9ca3af;
+  }
+  *{box-sizing:border-box;}
+  body{
+    font-family:Arial, Helvetica, sans-serif;
+    background:#5a5a5a;
+    margin:0;
+    padding:24px 24px 24px 344px;
+    padding-bottom:60px; /* room for the credit bar */
+  }
+
+  /* ---------- Login screen ---------- */
+  #loginScreen{
+    position:fixed; inset:0; background:#2b2b2b; display:flex;
+    align-items:center; justify-content:center; z-index:200;
+  }
+  #loginScreen.hidden{ display:none; }
+
+  #lockScreen{
+    position:fixed; inset:0; background:#2b2b2b; display:none;
+    align-items:center; justify-content:center; z-index:250;
+  }
+  #lockScreen.open{ display:flex; }
+  .lock-box{
+    background:#fff; border-radius:12px; padding:32px 34px; width:380px; text-align:center;
+  }
+  .lock-box .icon{ font-size:34px; margin-bottom:6px; }
+  .lock-box h1{ font-size:19px; margin:0 0 10px 0; color:#8a1410; }
+  .lock-box p{ font-size:13px; color:#555; margin:0 0 18px 0; line-height:1.5; }
+  .lock-box button{
+    padding:10px 16px; background:#444; color:#fff; border:none; border-radius:7px;
+    font-weight:bold; font-size:13px; cursor:pointer;
+  }
+  .login-box{
+    background:#fff; border-radius:12px; padding:32px 34px; width:320px; text-align:center;
+  }
+  .login-box h1{ font-size:20px; margin:0 0 4px 0; color:var(--black); }
+  .login-box p{ font-size:12.5px; color:#777; margin:0 0 18px 0; }
+  .login-box input{
+    width:100%; padding:11px 12px; font-size:15px; border:1px solid #ccc; border-radius:7px;
+    margin-bottom:10px;
+  }
+  .login-box button{
+    width:100%; padding:11px; background:var(--red); color:#fff; border:none; border-radius:7px;
+    font-weight:bold; font-size:14px; cursor:pointer;
+  }
+  .login-error{ color:#c0231a; font-size:12.5px; min-height:16px; margin-top:6px; }
+
+  /* ---------- App (hidden until logged in) ---------- */
+  #app{ display:none; }
+  #app.visible{ display:block; }
+
+  /* ---------- Toolbar ---------- */
+  .toolbar{
+    max-width:850px; margin:0 auto 10px auto; background:#fff; border-radius:10px;
+    padding:14px 18px; box-shadow:0 2px 10px rgba(0,0,0,.25);
+  }
+  .toolbar h1{ font-size:16px; margin:0 0 10px 0; color:var(--black); }
+  .toolbar-row{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:6px 0; }
+  .toolbar-row + .toolbar-row{ border-top:1px solid #eee; }
+  .toolbar label.tlabel{ font-size:12px; font-weight:bold; color:#555; margin-right:2px; }
+  .toolbar select, .toolbar input[type=text], .toolbar input[type=date]{
+    font-size:13px; padding:7px 9px; border-radius:6px; border:1px solid #bbb;
+  }
+  .toolbar button{
+    background:var(--red); color:#fff; border:none; padding:9px 14px; border-radius:6px;
+    font-weight:bold; font-size:13px; cursor:pointer;
+  }
+  .toolbar button.secondary{ background:#fff; color:var(--black); border:1px solid #bbb; }
+  .toolbar button.danger{ background:#8a1410; }
+  .toolbar button:hover{ opacity:.88; }
+  .status{ font-size:12px; color:#2a7a2a; font-weight:bold; min-height:16px; }
+
+  #drawerTab{
+    display:none;
+    position:fixed; top:50%; left:0; transform:translateY(-50%); z-index:60;
+    background:var(--red); color:#fff; border:none; border-radius:0 8px 8px 0; padding:16px 9px;
+    font-weight:bold; font-size:13px; cursor:pointer; writing-mode:vertical-rl; text-orientation:mixed;
+    box-shadow:2px 0 8px rgba(0,0,0,.3); letter-spacing:1px;
+  }
+  #toolsDrawer{
+    position:fixed; top:0; left:0; bottom:0; width:320px; background:var(--sidebar); color:#f9fafb; z-index:70;
+    box-shadow:8px 0 30px rgba(0,0,0,.22); transform:none;
+    display:flex; flex-direction:column; overflow-y:auto;
+    scrollbar-width:thin; scrollbar-color:#4b5563 transparent;
+  }
+  #toolsDrawer.open{ transform:none; }
+  #drawerBackdrop{
+    display:none; position:fixed; inset:0; background:rgba(0,0,0,.25); z-index:65;
+  }
+  #drawerBackdrop.open{ display:block; }
+  .drawer-header{
+    padding:22px 20px 18px; border-bottom:1px solid var(--sidebar-line); display:flex; align-items:flex-start;
+    justify-content:space-between; gap:10px; background:linear-gradient(145deg,#111827,#1f2937);
+  }
+  .drawer-brand{ display:flex; align-items:center; gap:11px; }
+  .drawer-brand-mark{ width:36px; height:36px; display:grid; place-items:center; border-radius:10px; background:var(--red); box-shadow:0 6px 16px rgba(226,35,26,.3); font-size:18px; }
+  .drawer-header h1{ font-size:15px; margin:0; line-height:1.25; }
+  .drawer-header p{ margin:3px 0 0; color:var(--sidebar-muted); font-size:10.5px; letter-spacing:.08em; text-transform:uppercase; }
+  .drawer-close{ display:none; }
+  .drawer-body{ padding:14px 14px 28px; display:flex; flex-direction:column; gap:8px; }
+  .drawer-section{ display:flex; flex-direction:column; gap:8px; padding:13px; border:1px solid var(--sidebar-line); border-radius:12px; background:rgba(255,255,255,.035); }
+  .drawer-section:last-child{ border-bottom:none; }
+  .drawer-section button{ width:100%; }
+  .drawer-section select, .drawer-section input[type=date], .drawer-section input[type=time]{ width:100%; }
+  .drawer-row{ display:flex; gap:6px; }
+  .drawer-row button{ flex:1; }
+  .drawer-section .tlabel{ color:#d1d5db; font-size:10.5px; text-transform:uppercase; letter-spacing:.08em; }
+  .drawer-section button{ border:1px solid transparent; border-radius:8px; padding:9px 10px; background:var(--red); color:#fff; font-weight:700; font-size:12px; cursor:pointer; transition:transform .15s ease, background .15s ease, border-color .15s ease; }
+  .drawer-section button:hover{ background:var(--red-dark); transform:translateY(-1px); }
+  .drawer-section button.secondary{ background:var(--sidebar-soft); border-color:rgba(255,255,255,.12); color:#f3f4f6; }
+  .drawer-section button.secondary:hover{ background:#374151; }
+  .drawer-section button.danger{ background:transparent; border-color:rgba(248,113,113,.35); color:#fca5a5; }
+  .drawer-section select, .drawer-section input[type=date], .drawer-section input[type=time]{ border:1px solid rgba(255,255,255,.14); border-radius:8px; padding:8px 9px; background:#0b1220; color:#f9fafb; font-size:12px; color-scheme:dark; }
+  #currentNameLabel{ color:#fff; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .save-state{ display:block; min-height:15px; margin-top:3px; color:#94a3b8; font-size:10.5px; font-weight:700; }
+  .save-state.dirty{ color:#fbbf24; }
+  .save-state.saving{ color:#93c5fd; }
+  .save-state.saved{ color:#86efac; }
+  .save-state.error{ color:#fca5a5; }
+  #layoutBlurb, #weekPreview{ color:var(--sidebar-muted) !important; line-height:1.45; }
+  #toolsDrawer .status{ color:#86efac; }
+  #toolsDrawer .hint{ color:#cbd5e1 !important; background:#0b1220 !important; border-color:var(--sidebar-line) !important; line-height:1.45; }
+  #toolsDrawer label[style*="color:#555"]{ color:#d1d5db !important; }
+  .saved-flyer-list{ display:flex; flex-direction:column; gap:7px; max-height:245px; overflow-y:auto; padding-right:3px; scrollbar-width:thin; scrollbar-color:#4b5563 transparent; }
+  .flyer-card{ padding:9px; border:1px solid rgba(255,255,255,.12); border-radius:9px; background:#0b1220; transition:border-color .15s,opacity .15s; }
+  .flyer-card.is-editing{ border-color:#60a5fa; box-shadow:0 0 0 1px rgba(96,165,250,.25); }
+  .flyer-card.live{ border-color:rgba(74,222,128,.65); background:rgba(22,101,52,.22); }
+  .flyer-card.past{ opacity:.48; filter:saturate(.55); }
+  .flyer-card-head{ display:flex; align-items:flex-start; gap:7px; }
+  .flyer-card-name{ flex:1; min-width:0; color:#f9fafb; font-size:12px; font-weight:800; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .flyer-status-pill{ flex:none; padding:2px 6px; border-radius:9px; font-size:8px; font-weight:900; text-transform:uppercase; letter-spacing:.04em; }
+  .flyer-status-pill.live{ background:#22c55e; color:#052e16; }
+  .flyer-status-pill.scheduled{ background:#fbbf24; color:#422006; }
+  .flyer-status-pill.past{ background:#4b5563; color:#e5e7eb; }
+  .flyer-status-pill.unscheduled{ background:#374151; color:#d1d5db; }
+  .flyer-card-dates{ margin:3px 0 7px; color:#9ca3af; font-size:9.5px; line-height:1.35; }
+  .flyer-card-actions{ display:flex; gap:4px; }
+  .flyer-card-actions button{ padding:5px 6px; font-size:9px; }
+  .flyer-card-actions .open{ flex:1; background:#374151; }
+  .flyer-card-actions .duplicate{ flex:1; background:#1d4ed8; }
+  .flyer-card-actions .delete{ width:auto; background:transparent; border-color:rgba(248,113,113,.35); color:#fca5a5; }
+  .saved-flyer-empty{ color:#9ca3af; font-size:11px; text-align:center; padding:12px 4px; }
+
+  .hint{
+    max-width:850px; margin:0 auto 18px auto; background:#fff3f2; border:1px solid #f3b9b4;
+    border-radius:8px; padding:10px 14px; font-size:12.5px; color:#5a1410;
+  }
+
+  /* ---------- Page ---------- */
+  .page{
+    width:816px; min-height:1032px; margin:0 auto; background:#fff;
+    box-shadow:0 4px 24px rgba(0,0,0,.35); padding:18px;
+  }
+
+  [contenteditable="true"]{ outline:none; cursor:text; }
+  [contenteditable="true"]:hover{ background:rgba(226,35,26,0.06); }
+  [contenteditable="true"]:focus{ background:rgba(226,35,26,0.10); box-shadow:0 0 0 1px var(--red) inset; }
+
+  .header{ display:flex; gap:14px; margin-bottom:6px; align-items:flex-start; }
+  .logo-photo{
+    flex:0 0 auto; width:530px; min-width:150px; max-width:750px;
+    min-height:60px; max-height:280px; height:94px; background-color:#fff; border-style:dashed;
+    background-size:contain; background-repeat:no-repeat; background-position:center;
+    resize:both; overflow:hidden;
+  }
+  .logo-photo.has-img{ border-style:solid; border-color:var(--black); }
+  .logo-photo input{ position:absolute; top:0; left:0; right:16px; bottom:16px; opacity:0; cursor:pointer; }
+  .store-box{ width:200px; flex:0 0 auto; margin-left:auto; border:2px solid var(--black); padding:10px 14px; font-size:13px; font-weight:bold; line-height:1.5; }
+
+  .tagline{ background:var(--red); color:#fff; text-align:center; padding:8px 10px; margin:8px 0; }
+  .tagline .line1{ font-size:15px; font-weight:900; }
+  .tagline .line2{ font-size:9px; margin-top:2px; }
+
+  .grid{ display:grid; border-top:1px solid var(--black); border-left:1px solid var(--black); }
+  .grid.top{ grid-template-columns: 1fr 1fr; }
+  .grid.three{ grid-template-columns: repeat(3,1fr); }
+  .grid.four{ grid-template-columns: repeat(4,1fr); }
+  .grid.five{ grid-template-columns: repeat(5,1fr); }
+  .grid.one{ grid-template-columns:1fr; }
+
+  .cell{
+    border-right:1px solid var(--black); border-bottom:1px solid var(--black);
+    padding:7px; display:flex; flex-direction:column; min-height:150px; position:relative;
+  }
+  .cell.hero{ min-height:190px; }
+
+  .cell-top{ display:flex; gap:8px; flex:1 1 auto; min-height:0; align-items:flex-start; }
+
+  .photo{
+    flex:0 0 auto; width:40%; background:var(--placeholder); background-size:cover; background-position:center;
+    border:1px dashed #999; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    text-align:center; font-size:10px; color:#888; cursor:pointer; position:relative; min-height:82px; height:82px; gap:4px;
+    overflow:hidden; min-width:50px;
+  }
+  .photo.logo-photo{ width:530px; height:94px; }
+  .cell.hero .photo{ width:48%; min-height:118px; height:118px; }
+  .grid.five .photo{ width:44%; min-height:64px; height:64px; }
+  .photo input{ position:absolute; top:0; left:0; right:16px; bottom:16px; opacity:0; cursor:pointer; }
+  .photo.has-img{ border-style:solid; border-color:transparent; color:transparent; background-size:cover; background-repeat:no-repeat; background-position:center; background-color:#fff; }
+  /* The store logo is a wordmark, not a product photo — it should never be
+     cropped to fill the box, even if its aspect ratio doesn't match. */
+  #logoPhoto.has-img{ background-size:contain; }
+  .photo .lbl{ pointer-events:none; padding:2px; }
+  /* The header logo photo keeps its own always-visible crop/resize button —
+     it lives outside any .cell, so it isn't part of the per-cell hover menu below. */
+  .photo .resize-btn{
+    position:absolute; bottom:3px; left:3px; background:#fff; border:1px solid #999; border-radius:4px;
+    font-size:9px; padding:2px 4px; z-index:2; cursor:pointer; color:#333; display:none;
+  }
+  .photo.has-img .resize-btn{ display:block; }
+  .photo .remove-photo-btn, .photo .undo-photo-btn{
+    position:absolute; top:3px; z-index:7; width:22px; height:22px; padding:0;
+    display:none; place-items:center; border:1px solid rgba(0,0,0,.22); border-radius:5px;
+    background:#fff; color:#333; font-size:12px; line-height:1; cursor:pointer; box-shadow:0 2px 5px rgba(0,0,0,.2);
+  }
+  .photo .remove-photo-btn{ left:auto; top:auto; right:3px; bottom:28px; color:#a32720; }
+  .photo .undo-photo-btn{ left:3px; color:#234d85; }
+  .photo.has-img .remove-photo-btn{ display:grid; }
+  .photo.can-undo .undo-photo-btn{ display:grid; }
+  .photo .undo-container-size-btn{
+    position:absolute; top:3px; right:28px; z-index:7; height:22px; padding:0 6px;
+    display:none; place-items:center; border:1px solid rgba(0,0,0,.22); border-radius:5px;
+    background:#fff; color:#234d85; font-size:10px; font-weight:800; cursor:pointer; box-shadow:0 2px 5px rgba(0,0,0,.2);
+  }
+  .photo.can-undo-size .undo-container-size-btn{ display:grid; }
+  .container-resize-handle{
+    position:absolute; top:3px; right:3px; z-index:6; width:21px; height:21px;
+    display:grid; place-items:center; border-radius:5px; background:var(--red); color:#fff;
+    font-size:13px; font-weight:900; line-height:1; cursor:nwse-resize; user-select:none;
+    box-shadow:0 2px 6px rgba(0,0,0,.28); opacity:.78;
+  }
+  .photo:hover .container-resize-handle{ opacity:1; }
+  .photo.resizing-container{ outline:2px solid var(--red); outline-offset:1px; }
+
+  /* Layout personalities: these change composition, not only item count. */
+  .grid.spotlight-feature{ border:3px solid var(--red); background:#fff7f5; margin-bottom:10px; }
+  .grid.spotlight-feature .cell{ min-height:265px; border:none; padding:14px; }
+  .grid.spotlight-feature .cell-top{ align-items:stretch; }
+  .grid.spotlight-feature .photo{ width:58%; min-height:155px; }
+  .grid.spotlight-feature .pname{ font-size:24px; }
+  .grid.spotlight-feature .price-whole{ font-size:78px; }
+
+  .grid.split-feature .cell{ min-height:220px; background:linear-gradient(135deg,#fff 68%,#fff1ef); }
+  .grid.split-feature .cell:nth-child(even) .cell-top{ flex-direction:row-reverse; }
+  .grid.split-feature .photo{ width:54%; }
+  .grid.deal-strip{ margin-top:9px; border:0; gap:6px; background:#fff; }
+  .grid.deal-strip .cell{ border:1px solid #bbb; border-top:5px solid var(--red); min-height:138px; }
+
+  .grid.tile-cards{ border:0; gap:10px; background:#fff; margin-bottom:12px; }
+  .grid.tile-cards .cell{ border:2px solid var(--black); border-radius:12px; min-height:225px; box-shadow:3px 3px 0 var(--red); }
+  .grid.compact-specials{ border:0; gap:4px; background:#fff4c7; padding:6px; }
+  .grid.compact-specials .cell{ background:#fff; border:1px solid #d6b74f; min-height:132px; }
+
+  .grid.photo-cards{ border:0; gap:9px; background:#fff; }
+  .grid.photo-cards .cell{ border:1px solid #aaa; border-radius:8px; min-height:235px; overflow:hidden; padding:8px; }
+  .grid.photo-cards .cell-top{ flex-direction:column; }
+  .grid.photo-cards .photo{ width:100%; min-height:112px; flex:none; }
+  .grid.photo-cards .info{ flex:none; }
+  .grid.photo-cards .priceline{ border-top:3px solid var(--red); padding-top:5px; }
+
+  .info{ flex:1 1 auto; display:flex; flex-direction:column; min-width:0; }
+  .pname{
+    font-weight:800; font-size:14px; line-height:1.2; word-wrap:break-word; overflow-wrap:break-word;
+    position:relative;
+  }
+  .cell.hero .pname{ font-size:16px; }
+  .cell.text-centered .info{ text-align:center; }
+  .cell.text-centered .suggest-list{ text-align:left; }
+  .psize{ font-size:10px; color:#333; margin-top:2px; word-wrap:break-word; }
+
+  .suggest-list{
+    position:absolute; top:100%; left:0; right:0; background:#fff; border:1px solid #ccc;
+    border-top:none; z-index:10; max-height:130px; overflow-y:auto; box-shadow:0 4px 8px rgba(0,0,0,.15);
+    display:none;
+  }
+  .suggest-list.open{ display:block; }
+  .suggest-item{ padding:5px 8px; font-size:11px; font-weight:normal; cursor:pointer; display:flex; align-items:center; gap:6px; }
+  .suggest-item:hover{ background:#fff0ef; }
+  .suggest-item img{ width:20px; height:20px; object-fit:cover; border-radius:2px; }
+
+  /* Price sits on its own full-width row below the photo/name, like the real ad —
+     not squeezed into a small pill next to other controls. */
+  .priceline{ display:flex; align-items:flex-end; gap:3px; margin-top:6px; flex-wrap:wrap; }
+  .price-wrap{ display:flex; align-items:flex-end; min-width:0; }
+  .price-visual{ display:flex; align-items:flex-start; color:var(--red); font-weight:900; line-height:.86; cursor:text; white-space:nowrap; }
+  .price-visual .dollar-sign{ font-size:22px; align-self:flex-end; line-height:1; margin-right:2px; }
+  .price-whole{ font-size:38px; letter-spacing:-.04em; }
+  .price-cents{ font-size:19px; line-height:1; margin:1px 0 0 2px; letter-spacing:-.03em; }
+  .price-input{
+    border:none; background:transparent; color:var(--red); font-weight:900;
+    font-size:38px; width:3.2ch; height:1.16em; padding:0; margin:0 3px 0 0; outline:none; line-height:1.08; display:none;
+  }
+  .cell.hero .price-visual .dollar-sign{ font-size:34px; }
+  .cell.hero .price-whole{ font-size:66px; }
+  .cell.hero .price-cents{ font-size:30px; margin-top:2px; }
+  .cell.hero .price-input{ font-size:66px; }
+  .rendered-unit{
+    display:inline-block; color:var(--red); font-size:12px; font-weight:bold; padding:0 1px 2px;
+  }
+  .cell.hero .rendered-unit{ font-size:14px; }
+  .render-clean .photo .lbl{ display:none !important; }
+  .render-clean .photo:not(.has-img){ background:#fff !important; border-color:transparent !important; }
+  .unit-select{
+    font-size:12px; font-weight:bold; color:var(--red); border:1px solid transparent;
+    border-radius:4px; background:transparent; padding:0 1px 2px; appearance:none; -webkit-appearance:none; cursor:pointer;
+  }
+  .unit-select:hover, .unit-select:focus{ border-color:#f0b8b3; background:#fff5f4; }
+  .cell.hero .unit-select{ font-size:14px; }
+  .unit-custom{
+    font-size:12px; font-weight:bold; color:var(--red); border:1px solid #f0b8b3;
+    border-radius:5px; background:#fff5f4; padding:3px 5px; width:55px; display:none;
+  }
+  .foot{ font-size:7.5px; color:var(--red); font-weight:bold; margin-top:auto; padding-top:3px; }
+
+  /* Featured / big ads mirror the original printed flyer: the product photo
+     fills the complete left side while the name and price live on the right. */
+  .cell.hero{
+    display:grid;
+    grid-template-columns:minmax(120px,48%) minmax(0,1fr);
+    grid-template-rows:auto 1fr auto;
+    column-gap:9px;
+    align-items:stretch;
+  }
+  .cell.hero .cell-top{ display:contents; }
+  .cell.hero .photo{
+    grid-column:1;
+    grid-row:1 / 4;
+    align-self:stretch;
+    width:100%;
+    height:auto;
+    min-height:174px;
+  }
+  .cell.hero .info{ grid-column:2; grid-row:1; }
+  .cell.hero .priceline{
+    grid-column:2;
+    grid-row:2;
+    align-self:start;
+    margin:7px 0 5px;
+  }
+  .cell.hero .foot{ grid-column:2; grid-row:3; }
+  .grid.split-feature .cell.hero:nth-child(even) .photo{ grid-column:2; }
+  .grid.split-feature .cell.hero:nth-child(even) .info,
+  .grid.split-feature .cell.hero:nth-child(even) .priceline,
+  .grid.split-feature .cell.hero:nth-child(even) .foot{ grid-column:1; }
+
+  /* Regular ads follow the same newspaper-flyer rhythm on a smaller scale:
+     photo on the left, copy at upper right, price at center/lower right. */
+  .cell:not(.hero){
+    display:grid;
+    grid-template-columns:minmax(48px,42%) minmax(0,1fr);
+    grid-template-rows:auto 1fr auto;
+    column-gap:7px;
+    align-items:stretch;
+  }
+  .cell:not(.hero) .cell-top{ display:contents; }
+  .cell:not(.hero) .photo{
+    grid-column:1;
+    grid-row:1 / 3;
+    align-self:stretch;
+    width:100%;
+    height:auto;
+    min-height:122px;
+  }
+  .cell:not(.hero) .info{ grid-column:2; grid-row:1; }
+  .cell:not(.hero) .priceline{
+    grid-column:2;
+    grid-row:2;
+    align-self:start;
+    justify-content:flex-start;
+    margin:4px 0 3px;
+  }
+  .cell:not(.hero) .foot{
+    grid-column:1 / 3;
+    grid-row:3;
+    text-align:center;
+  }
+  .grid.five .cell:not(.hero){ grid-template-columns:minmax(42px,39%) minmax(0,1fr); column-gap:5px; }
+  .grid.five .cell:not(.hero) .photo{ min-height:116px; }
+  .grid.five .price-visual .dollar-sign{ font-size:18px; }
+  .grid.five .price-whole{ font-size:31px; }
+  .grid.five .price-cents{ font-size:16px; }
+
+  .db-badge{
+    position:absolute; top:2px; right:29px; background:#2a7a2a; color:#fff; font-size:8px;
+    font-weight:bold; padding:1px 4px; border-radius:3px; display:none; z-index:3;
+  }
+  /* Per-cell hover menu — all action buttons (photo search, crop/resize, replace,
+     name-size, delete) grouped into one cluster that reveals together on hover,
+     instead of being scattered around the cell's corners. */
+  .cell-hover-menu{
+    position:absolute; top:2px; left:100%; margin-left:6px; z-index:9; width:max-content;
+    display:flex; flex-direction:column; align-items:stretch; gap:3px;
+    background:#fff; border:1px solid #ddd; border-radius:7px; padding:5px;
+    box-shadow:0 2px 8px rgba(0,0,0,.18);
+    opacity:0; pointer-events:none; transition:opacity .15s;
+  }
+  .cell-hover-menu .hover-menu-row{ display:flex; align-items:center; gap:3px; }
+  .cell:hover .cell-hover-menu, .cell-hover-menu:focus-within{ opacity:1; pointer-events:auto; }
+  .cell-hover-menu button{
+    border:1px solid #c7c7c7; border-radius:4px; background:#fff; color:#333;
+    font-size:9px; font-weight:800; padding:3px 5px; height:20px; line-height:1;
+    cursor:pointer; white-space:nowrap;
+  }
+  .cell-hover-menu button:hover{ border-color:var(--red); color:var(--red); }
+  .cell-hover-menu button.remove-item-btn{ color:#a32720; border-color:#d8a29e; }
+  .cell-hover-menu button.remove-item-btn:hover{ background:#a32720; color:#fff; border-color:#a32720; }
+  .name-size-box{ display:flex; align-items:center; gap:2px; }
+  .name-size-box .name-size-btn{ padding:3px 6px; }
+  .name-size-input{
+    width:34px; height:20px; padding:0 2px; border:1px solid #c7c7c7; border-radius:4px;
+    font-size:9px; font-weight:800; color:#333; text-align:center; -moz-appearance:textfield;
+  }
+  .name-size-input::-webkit-inner-spin-button, .name-size-input::-webkit-outer-spin-button{ margin:0; }
+  .render-clean .cell-hover-menu{ display:none !important; }
+  .render-clean .cell.is-cleared > *{ visibility:hidden !important; }
+
+  .drag-handle{
+    position:absolute; top:0; left:4px; width:26px; height:13px;
+    cursor:grab; z-index:4; display:flex; align-items:center; justify-content:center;
+    font-size:11px; color:#ccc; background:#fafafa; border:1px solid #eee; border-top:none;
+    border-radius:0 0 6px 6px; user-select:none; letter-spacing:1px;
+  }
+  .drag-handle:hover{ color:#888; background:#f0f0f0; }
+  .cell.drag-over{ outline:2px dashed var(--red); outline-offset:-2px; }
+  .cell.duplicate-item{ box-shadow:inset 0 0 0 3px #f59e0b; background:#fff7df; }
+  .cell.dragging{ opacity:0.9; }
+  .cell.drag-floating{
+    position:fixed; z-index:200; pointer-events:none; background:#fff;
+    box-shadow:0 10px 30px rgba(0,0,0,.4); border-radius:4px; cursor:grabbing;
+  }
+  .drag-placeholder{
+    border:2px dashed var(--red); background:rgba(226,35,26,0.06); border-radius:2px;
+  }
+
+  .wow-banner{
+    background:var(--red); color:#fff; display:flex; justify-content:space-between; align-items:center;
+    padding:5px 10px; font-weight:900; font-style:italic; font-size:12px;
+  }
+
+  .footer{ background:var(--red); color:#fff; text-align:center; font-weight:900; font-size:15px; padding:9px; margin-top:8px; }
+  .footer [contenteditable]{ display:inline-block; min-width:60px; }
+
+  /* ---------- Modals ---------- */
+  .modal-overlay{
+    display:none; position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:100;
+    align-items:center; justify-content:center;
+  }
+  .modal-overlay.open{ display:flex; }
+  .modal{
+    background:#fff; border-radius:10px; width:640px; max-width:92vw; max-height:82vh;
+    display:flex; flex-direction:column; overflow:hidden;
+  }
+  .modal-head{ padding:14px 18px; border-bottom:1px solid #eee; display:flex; align-items:center; gap:10px; }
+  .modal-head h2{ font-size:15px; margin:0; flex:1; }
+  .modal-head input{ font-size:13px; padding:7px 9px; border-radius:6px; border:1px solid #bbb; width:220px; }
+  .modal-body{ overflow-y:auto; padding:8px 18px; }
+  .preview-modal{ width:1050px; max-width:96vw; max-height:94vh; }
+  .preview-modal .modal-body{ padding:0; background:#374151; }
+  .preview-viewport{ height:calc(94vh - 112px); overflow:auto; padding:18px; }
+  .preview-stage{ position:relative; margin:0 auto; }
+  .preview-page{ position:absolute; top:0; left:0; margin:0; transform-origin:top left; box-shadow:0 8px 30px rgba(0,0,0,.38); }
+  .db-row{ display:flex; align-items:center; flex-wrap:wrap; gap:10px; padding:8px 0; border-bottom:1px solid #f0f0f0; }
+  .db-row .price-history-toggle{
+    flex-basis:100%; text-align:left; margin-top:-4px; padding:2px 0 2px 54px;
+    background:none; border:none; color:#9ca3af; font-size:10px; font-weight:700; cursor:pointer;
+  }
+  .db-row .price-history-toggle:hover{ color:#666; }
+  .price-history-panel{
+    flex-basis:100%; max-height:0; overflow:hidden; margin-left:54px;
+    background:#f4f4f5; border-radius:6px; transition:max-height .22s ease;
+  }
+  .price-history-panel.open{ max-height:220px; overflow-y:auto; }
+  .price-history-panel-inner{ padding:8px 10px; display:flex; flex-direction:column; gap:4px; }
+  .price-history-row{ display:flex; justify-content:space-between; gap:10px; font-size:11px; color:#555; }
+  .price-history-empty{ font-size:11px; color:#999; padding:8px 10px; }
+  .db-row img{ width:44px; height:44px; object-fit:cover; border-radius:4px; border:1px solid #ddd; background:#eee; }
+  .db-row .db-noimg{ width:44px; height:44px; border-radius:4px; border:1px dashed #ccc; background:#f5f5f5; }
+  .db-row .db-name{ font-weight:bold; font-size:13px; flex:1; }
+  .db-row .db-price{ font-size:13px; color:var(--red); font-weight:bold; width:90px; }
+  .db-row .db-updated{ font-size:10px; color:#888; width:110px; }
+  .db-row button{ background:#8a1410; color:#fff; border:none; border-radius:5px; padding:5px 9px; font-size:11px; cursor:pointer; }
+  .catalog-modal{ width:940px; }
+  .db-editor{ margin:8px 0 14px; padding:14px; border:1px solid #e4e4e4; border-radius:10px; background:#fafafa; }
+  .db-editor-head{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px; }
+  .db-editor-head strong{ font-size:13px; }
+  .db-editor-grid{ display:grid; grid-template-columns:1.8fr 1.8fr .7fr .85fr 1fr; gap:8px; align-items:end; }
+  .db-field{ display:flex; flex-direction:column; gap:4px; min-width:0; }
+  .db-field label{ font-size:10px; color:#666; font-weight:bold; text-transform:uppercase; letter-spacing:.05em; }
+  .db-field input, .db-field select{ min-width:0; width:100%; border:1px solid #bbb; border-radius:6px; padding:8px; font-size:12px; background:#fff; }
+  .db-size-options{ display:flex; gap:5px; min-height:33px; align-items:center; }
+  .db-size-options label{ display:flex; align-items:center; gap:4px; padding:7px 8px; border:1px solid #ccc; border-radius:6px; background:#fff; font-size:10px; font-weight:bold; cursor:pointer; white-space:nowrap; }
+  .db-size-options input{ width:auto; margin:0; }
+  .db-editor-lower{ display:flex; align-items:flex-end; gap:18px; margin-top:12px; padding-top:12px; border-top:1px solid #e4e4e4; }
+  .db-photo-editor{ display:flex; align-items:center; gap:9px; }
+  .db-photo-editor > label{ font-size:10px; color:#666; font-weight:bold; text-transform:uppercase; letter-spacing:.05em; }
+  .db-catalog-photo{ width:112px; height:70px; min-width:112px; min-height:70px; flex:none; resize:none; cursor:default; border-radius:6px; }
+  .db-catalog-photo .lbl{ display:block; color:#888; }
+  .db-catalog-photo.has-img .lbl{ display:none; }
+  .db-photo-find{ background:#333; color:#fff; }
+  .db-editor-lower .db-size-field{ margin-left:auto; }
+  .db-editor-lower .db-save{ min-width:130px; min-height:36px; }
+  .db-editor button, .db-action{ border:none; border-radius:6px; padding:8px 10px; font-size:11px; font-weight:bold; cursor:pointer; white-space:nowrap; }
+  .db-save{ background:var(--red); color:#fff; }
+  .db-cancel{ background:#eee; color:#333; }
+  .db-list-head{ display:flex; align-items:center; justify-content:space-between; padding:4px 0 7px; border-bottom:1px solid #eee; }
+  .db-list-head strong{ font-size:12px; }
+  .db-list-tools{ display:flex; align-items:center; gap:7px; flex-wrap:wrap; }
+  .db-import-btn{ border:1px solid #cbd5e1; border-radius:7px; background:#fff; color:#1f2937; padding:7px 10px; font-size:10.5px; font-weight:800; cursor:pointer; text-decoration:none; }
+  .db-import-btn:hover{ background:#f3f4f6; }
+  .db-import-status{ min-height:18px; margin:7px 0 3px; font-size:11px; font-weight:700; color:#287a3d; }
+  .db-import-status.error{ color:#a32720; }
+  .db-replace-banner{ display:none; align-items:center; gap:8px; margin:0 0 9px; padding:9px 11px; border:1px solid #93c5fd; border-radius:8px; background:#eff6ff; color:#1e3a5f; font-size:11px; }
+  .db-replace-banner.open{ display:flex; }
+  .db-replace-banner strong{ flex:1; }
+  .db-replace-banner button{ border:1px solid #9ca3af; border-radius:5px; background:#fff; padding:5px 8px; font-size:10px; font-weight:700; cursor:pointer; }
+  .data-safety-note{ color:#9ca3af; font-size:10px; line-height:1.4; }
+  .update-panel{ display:none; padding:9px; border:1px solid rgba(96,165,250,.48); border-radius:8px; background:rgba(30,64,175,.22); }
+  .update-panel.open{ display:block; }
+  .update-panel strong{ display:block; color:#bfdbfe; font-size:11px; margin-bottom:3px; }
+  .update-panel p{ margin:0 0 7px; color:#dbeafe; font-size:10px; line-height:1.4; }
+  .update-version{ color:#9ca3af; font-size:9.5px; text-align:center; }
+  .db-count{ font-size:11px; color:#888; }
+  .db-row .db-description{ width:150px; font-size:11px; color:#666; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .db-row-actions{ display:flex; gap:5px; }
+  .db-size-badge{ width:58px; text-align:center; padding:3px 7px; border-radius:12px; font-size:9px; font-weight:bold; text-transform:uppercase; }
+  .db-size-badge.big{ background:#fee2e2; color:#a32720; }
+  .db-size-badge.small{ background:#e8eef7; color:#334155; }
+  .db-action.add{ background:#287a3d; color:#fff; }
+  .db-action.edit{ background:#333; color:#fff; }
+  .db-action.delete{ background:#8a1410; color:#fff; }
+  .db-row.db-row-editing{ display:grid; grid-template-columns:76px 1.5fr 1.35fr .65fr .8fr 1.15fr auto; gap:8px; align-items:end; padding:12px 8px; background:#fff8f7; border:1px solid #f2b9b5; border-radius:8px; }
+  .db-inline-field{ display:flex; flex-direction:column; gap:4px; min-width:0; }
+  .db-inline-field label{ font-size:9px; color:#777; font-weight:bold; text-transform:uppercase; }
+  .db-inline-field input, .db-inline-field select{ width:100%; min-width:0; padding:7px; border:1px solid #bbb; border-radius:5px; font-size:11px; background:#fff; }
+  .db-inline-photo-wrap{ display:flex; flex-direction:column; gap:4px; align-items:stretch; }
+  .db-inline-photo{ width:68px; height:48px; min-width:68px; min-height:48px; resize:none; cursor:default; border-radius:5px; }
+  .db-inline-find{ background:#333!important; color:#fff!important; padding:4px!important; font-size:9px!important; }
+  .db-inline-actions{ display:flex; flex-direction:column; gap:5px; }
+  .db-inline-actions .save{ background:var(--red); color:#fff; }
+  .db-inline-actions .cancel{ background:#ddd; color:#333; }
+  .db-inline-size .db-size-options{ gap:3px; }
+  .db-inline-size .db-size-options label{ padding:6px 5px; font-size:9px; }
+  #dbEditorStatus{ min-height:15px; margin-top:8px; font-size:11px; font-weight:bold; color:#287a3d; }
+  @media(max-width:820px){ .db-editor-grid{ grid-template-columns:1fr 1fr; } .db-editor-lower{ align-items:stretch; flex-direction:column; gap:10px; } .db-editor-lower .db-size-field{ margin-left:0; } .db-row .db-description,.db-row .db-updated{ display:none; } .db-row.db-row-editing{ grid-template-columns:1fr 1fr; } }
+  .modal-foot{ padding:12px 18px; border-top:1px solid #eee; text-align:right; }
+  .modal-foot button{ background:#fff; border:1px solid #bbb; border-radius:6px; padding:8px 14px; font-weight:bold; cursor:pointer; }
+  .empty-db{ color:#888; font-size:13px; padding:20px 0; text-align:center; }
+
+  .layout-option{
+    padding:12px; border:1px solid #eee; border-radius:8px; margin-bottom:10px; cursor:pointer;
+  }
+  .layout-option:hover{ border-color:var(--red); background:#fff8f7; }
+  .layout-option.current{ border-color:var(--red); background:#fff5f4; }
+  .layout-name{ font-weight:bold; font-size:14px; margin-bottom:4px; }
+  .layout-current-tag{ color:var(--red); font-size:11px; font-weight:normal; }
+  .layout-blurb{ font-size:12px; color:#666; line-height:1.4; }
+
+  .sched-row{ display:flex; align-items:center; gap:10px; padding:9px 0; border-bottom:1px solid #f0f0f0; }
+  .sched-name{ font-weight:bold; font-size:13px; flex:1; }
+  .sched-dates{ font-size:11.5px; color:#666; width:220px; }
+  .sched-pill{ font-size:10px; font-weight:bold; padding:3px 8px; border-radius:10px; }
+  .sched-pill.scheduled{ background:#fff4d6; color:#8a6d1a; }
+  .sched-pill.live{ background:#e1f6e1; color:#1e6b1e; }
+  .sched-pill.past{ background:#eee; color:#888; }
+  .sched-pill.unscheduled{ background:#f0f0f0; color:#999; }
+
+  .sub-row{ display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid #f0f0f0; font-size:13px; }
+  .sub-type{ font-size:10px; font-weight:bold; padding:2px 7px; border-radius:8px; }
+  .sub-type.email{ background:#e6f0ff; color:#1a4d8a; }
+  .sub-type.sms{ background:#f0e6ff; color:#5a1a8a; }
+  .sub-contact{ flex:1; }
+  .sub-inactive{ opacity:0.45; }
+
+  .photo-results{ display:grid; grid-template-columns:repeat(4,1fr); gap:8px; padding:8px 0; }
+  .photo-result{ cursor:pointer; border:2px solid transparent; border-radius:6px; overflow:hidden; }
+  .photo-result:hover{ border-color:var(--red); }
+  .photo-result img{ width:100%; height:90px; object-fit:cover; display:block; }
+  .photo-search-status{ display:flex; align-items:center; gap:7px; font-size:12px; padding:9px 18px; background:#fafafa; border-bottom:1px solid #eee; color:#666; }
+  .photo-search-status::before{ content:'●'; color:#2a7a2a; font-size:10px; }
+  .photo-search-status.not-configured::before{ color:#c58a16; }
+
+  /* ---------- Credit bar ---------- */
+  #creditBar{
+    position:fixed; bottom:0; left:0; right:0; background:#1a1a1a; color:#ccc; text-align:center;
+    font-size:12px; padding:8px; z-index:50;
+  }
+  #creditBar a{ color:#fff; font-weight:bold; text-decoration:none; }
+  #creditBar a:hover{ text-decoration:underline; }
+
+  /* ---------- Print ---------- */
+  @media print{
+    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
+    html, body{ width:8in; height:10.5in; margin:0; padding:0; background:#fff; overflow:hidden; }
+    .toolbar, .hint, .modal-overlay, #creditBar, #loginScreen, #drawerTab, #toolsDrawer, #drawerBackdrop{ display:none !important; }
+    #app{ display:block !important; width:816px; margin:0; padding:0; }
+    .page{
+      box-shadow:none; margin:0; width:816px; min-height:0;
+      zoom:var(--print-scale, .94);
+      break-inside:avoid; page-break-inside:avoid;
+    }
+    @page{ size:letter; margin:0.25in; }
+    .photo{ border-style:solid; }
+    .price-wrap, .unit-select, .unit-custom{ background:transparent; border-color:transparent; }
+    .db-badge, .cell-hover-menu, .drag-handle, .container-resize-handle, .undo-container-size-btn, .remove-photo-btn, .undo-photo-btn{ display:none !important; }
+  }
+  @media (max-width:1180px){
+    body{ padding-left:304px; }
+    #toolsDrawer{ width:280px; }
+  }
+  /* Touch devices (tablets, phones) have no real hover, so the hover-reveal
+     controls above would otherwise be unreachable — keep them visible. */
+  @media (hover:none){
+    .cell-hover-menu{ opacity:1; pointer-events:auto; }
+  }
+</style>
+</head>
+<body>
+
+  <!-- ---------- Login ---------- -->
+  <div id="loginScreen">
+    <div class="login-box">
+      <h1>Weekly Ad Builder</h1>
+      <p>Enter the shared password to continue.</p>
+      <input type="password" id="loginPassword" placeholder="Password" onkeydown="if(event.key==='Enter') doLogin()">
+      <button onclick="doLogin()">Enter</button>
+      <div class="login-error" id="loginError"></div>
+    </div>
+  </div>
+
+  <!-- ---------- Lock screen (kill switch) ---------- -->
+  <div id="lockScreen">
+    <div class="lock-box">
+      <div class="icon">🔒</div>
+      <h1>This tool isn't available right now</h1>
+      <p id="lockMessage">This tool has been paused. Contact Lockwood IT Services to reactivate.</p>
+      <button onclick="recheckLicense()">Check again</button>
+    </div>
+  </div>
+
+  <!-- ---------- App ---------- -->
+  <div id="app">
+
+    <button id="drawerTab" onclick="toggleDrawer()">☰ Tools</button>
+    <div id="drawerBackdrop" onclick="toggleDrawer()"></div>
+    <div id="toolsDrawer">
+      <div class="drawer-header">
+        <div class="drawer-brand">
+          <div class="drawer-brand-mark">%</div>
+          <div><h1>Weekly Ad Builder</h1><p>Flyer workspace</p></div>
+        </div>
+        <button class="drawer-close" onclick="toggleDrawer()">✕</button>
+      </div>
+      <div class="drawer-body">
+
+        <div class="drawer-section">
+          <label class="tlabel">Goes live:</label>
+          <input type="date" id="weekPicker" onchange="applyWeek()">
+          <input type="time" id="startTime" value="07:00" onchange="applyWeek()">
+          <label style="font-size:12px;color:#555;display:flex;align-items:center;gap:6px;">
+            <input type="checkbox" id="multiWeekToggle" onchange="onMultiWeekToggle()"> 2-week / holiday ad
+          </label>
+          <span id="endDateWrap" style="display:none;flex-direction:column;gap:4px;">
+            <label class="tlabel" style="margin:0;">through:</label>
+            <input type="date" id="endDatePicker" onchange="applyWeek()">
+          </span>
+          <span id="weekPreview" style="font-size:11.5px;color:#555;"></span>
+        </div>
+
+        <div class="drawer-section">
+          <label class="tlabel">This flyer:</label>
+          <span id="currentNameLabel" style="font-size:13px;">(unsaved)</span>
+          <span id="saveState" class="save-state">Save once to enable auto-save</span>
+          <div class="drawer-row">
+            <button onclick="saveFlyer()">💾 Save</button>
+            <button class="secondary" onclick="saveAsFlyer()">Save As…</button>
+          </div>
+          <button class="secondary" onclick="if(confirm('Clear everything and start a blank flyer?')) newBlank()">＋ New blank flyer</button>
+          <span class="status" id="statusMsg"></span>
+        </div>
+
+        <div class="drawer-section">
+          <label class="tlabel">Saved flyers:</label>
+          <div class="saved-flyer-list" id="savedFlyerList"><div class="saved-flyer-empty">No saved flyers yet.</div></div>
+        </div>
+
+        <div class="drawer-section">
+          <label class="tlabel">Template / layout:</label>
+          <select id="layoutSelect" onchange="onLayoutSelectChange()"></select>
+          <div id="layoutBlurb" style="font-size:11.5px;color:#777;margin-top:2px;"></div>
+        </div>
+
+        <div class="drawer-section">
+          <button class="secondary" onclick="openProductDB()">📋 Product Database</button>
+          <button class="secondary" onclick="openScheduleList()">📅 Scheduled Ads</button>
+          <button class="secondary" onclick="openSubscribers()">👥 Subscribers</button>
+          <button class="secondary" onclick="window.open('/how-to.html','_blank','noopener')">❓ Quick How-To</button>
+          <button onclick="sendNow()">📣 Send Now</button>
+        </div>
+
+        <div class="drawer-section">
+          <button class="secondary" onclick="openAdPreview()">👁 Ad Preview</button>
+          <button onclick="printFlyer()">🖨️ Print / Save as PDF</button>
+          <button onclick="shareOrExportImage()">📤 Share to Facebook / Save Image</button>
+        </div>
+
+        <div class="drawer-section">
+          <label class="tlabel">Data safety:</label>
+          <button class="secondary" onclick="downloadDatabaseBackup()">⬇ Download full backup</button>
+          <button class="secondary" onclick="document.getElementById('restoreBackupFile').click()">↥ Restore from backup</button>
+          <input id="restoreBackupFile" type="file" accept="application/json,.json" hidden onchange="restoreDatabaseBackup(this)">
+          <span class="data-safety-note">Backs up saved flyers, products, settings, and subscribers in one file.</span>
+        </div>
+
+        <div class="drawer-section">
+          <label class="tlabel">Software updates:</label>
+          <div class="update-panel" id="updatePanel"><strong id="updateTitle">Update available</strong><p id="updateNotes"></p><button type="button" onclick="downloadAvailableUpdate()">Download update</button></div>
+          <button class="secondary" onclick="checkForUpdates(true)">↻ Check for updates</button>
+          <span class="update-version" id="appVersionLabel">Checking installed version…</span>
+        </div>
+
+        <div class="drawer-section">
+          <button class="secondary" onclick="doLogout()">Log out</button>
+        </div>
+
+        <div class="hint" style="margin:0;">
+          <b>Saving:</b> flyers and the product list are stored on the server now, so anyone with the password sees the same saved list. <b>Product Database:</b> Save updates it automatically — type a name that's been used before and it offers to fill in the photo/price. <b>Photo search:</b> click "🔎 find photo" on any image box to search free stock photos instead of uploading your own.
+        </div>
+
+      </div>
+    </div>
+
+    <div class="page" id="page">
+
+      <div class="header">
+        <label class="photo logo-photo has-img" id="logoPhoto" style="background-image:url(/assets/cashsaver-logo.png)" data-img="/assets/cashsaver-logo.png" data-original-img="/assets/cashsaver-logo.png">
+          <span class="lbl">Click to<br>upload your logo</span>
+          <input type="file" accept="image/*" onchange="setPhoto(this)">
+          <span class="resize-btn" onclick="event.preventDefault(); event.stopPropagation(); reopenCropper(this)">✂️ crop/resize</span>
+          <button type="button" class="remove-photo-btn" title="Remove photo" onclick="event.preventDefault();event.stopPropagation();removePhoto(this)">✕</button>
+          <button type="button" class="undo-photo-btn" title="Undo last photo change" onclick="event.preventDefault();event.stopPropagation();undoPhotoChange(this)">↶</button>
+          <button type="button" class="undo-container-size-btn" title="Undo last image box resize" onclick="event.preventDefault();event.stopPropagation();undoContainerResize(this)">↶ size</button>
+          <span class="container-resize-handle" title="Drag to resize the image box" onclick="event.preventDefault();event.stopPropagation()">↘</span>
+        </label>
+        <div class="store-box">
+          <div contenteditable="true">Crossett Cash Saver</div>
+          <div contenteditable="true">1066 HWY 133 North</div>
+          <div contenteditable="true">Crossett, AR</div>
+          <div contenteditable="true">870-364-2313</div>
+        </div>
+      </div>
+
+      <div class="tagline">
+        <div class="line1" contenteditable="true">We price every item at cost, then add just 10% at the checkout.</div>
+        <div class="line2" contenteditable="true">Product cost is determined by the expense it takes to buy and get our merchandise from our supplier to the shelf.</div>
+      </div>
+
+      <div id="topArea"></div>
+
+      <div class="wow-banner">
+        <div contenteditable="true">WOW – GET IT NOW! SPECIAL PURCHASES WITH UNBEATABLE LOW PRICES.</div>
+        <div contenteditable="true">WHEN THEY'RE GONE, THEY'RE GONE!</div>
+      </div>
+
+      <div id="bottomArea"></div>
+
+      <div class="footer">
+        PRICES EFFECTIVE <span contenteditable="true" id="footStart">[START DATE]</span> THRU <span contenteditable="true" id="footEnd">[END DATE]</span>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Clean ad preview modal -->
+  <div class="modal-overlay" id="previewModal">
+    <div class="modal preview-modal">
+      <div class="modal-head"><h2>Ad Preview</h2><span style="font-size:11px;color:#777;">This is how the flyer looks without editing controls.</span></div>
+      <div class="modal-body"><div class="preview-viewport" id="previewViewport"><div class="preview-stage" id="previewStage"></div></div></div>
+      <div class="modal-foot"><button onclick="closeAdPreview();printFlyer()">Print / Save PDF</button><button onclick="closeAdPreview()">Close</button></div>
+    </div>
+  </div>
+
+  <!-- Subscribers modal -->
+  <div class="modal-overlay" id="subsModal">
+    <div class="modal">
+      <div class="modal-head">
+        <h2>Subscribers</h2>
+      </div>
+      <div class="modal-body">
+        <div style="display:flex;gap:8px;margin-bottom:10px;">
+          <select id="subType" style="padding:7px;border-radius:6px;border:1px solid #bbb;">
+            <option value="email">Email</option>
+            <option value="sms">SMS (phone number)</option>
+          </select>
+          <input type="text" id="subContact" placeholder="email address or phone number" style="flex:1;padding:7px;border-radius:6px;border:1px solid #bbb;">
+          <button onclick="addSubscriber()" style="background:var(--red);color:#fff;border:none;border-radius:6px;padding:8px 12px;">Add</button>
+        </div>
+        <details style="margin-bottom:12px;">
+          <summary style="cursor:pointer;font-size:12px;color:#555;">Add a bunch at once (paste a list)</summary>
+          <textarea id="bulkSubs" rows="4" style="width:100%;margin-top:6px;padding:8px;border-radius:6px;border:1px solid #bbb;font-family:inherit;font-size:12px;" placeholder="One per line — emails and phone numbers are both fine, mixed together:&#10;jane@example.com&#10;5551234567&#10;bob@example.com"></textarea>
+          <button class="secondary" onclick="addBulkSubscribers()" style="margin-top:6px;border-radius:6px;padding:7px 12px;">Add all</button>
+        </details>
+        <div id="subsList"></div>
+      </div>
+      <div class="modal-foot"><button onclick="closeSubscribers()">Close</button></div>
+    </div>
+  </div>
+
+  <!-- Scheduled Ads modal -->
+  <div class="modal-overlay" id="scheduleModal">
+    <div class="modal">
+      <div class="modal-head">
+        <h2>Scheduled Ads</h2>
+      </div>
+      <div class="modal-body" id="scheduleList"></div>
+      <div class="modal-foot"><button onclick="closeScheduleList()">Close</button></div>
+    </div>
+  </div>
+
+  <!-- Product Database modal -->
+  <div class="modal-overlay" id="dbModal">
+    <div class="modal catalog-modal">
+      <div class="modal-head">
+        <h2>Product Catalog</h2>
+        <input type="text" id="dbSearch" placeholder="Search products…" oninput="renderDbList()">
+      </div>
+      <div class="modal-body">
+        <div class="db-replace-banner" id="dbReplaceBanner"><span>Replacing:</span><strong id="dbReplaceName"></strong><button type="button" onclick="cancelCatalogReplace()">Cancel replacement</button></div>
+        <div class="db-list-head">
+          <strong>Saved products <span class="db-count" id="dbCount"></span></strong>
+          <div class="db-list-tools">
+            <a class="db-import-btn" href="/product-import-template.xlsx" download>Download Excel template</a>
+            <button type="button" class="db-import-btn" onclick="document.getElementById('productImportFile').click()">Import Excel / CSV</button>
+            <input id="productImportFile" type="file" accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv" hidden onchange="importProductSheet(this)">
+          </div>
+        </div>
+        <div id="dbImportStatus" class="db-import-status"></div>
+        <div id="dbList"></div>
+        <form class="db-editor" onsubmit="saveDbProduct(event)">
+          <div class="db-editor-head">
+            <strong id="dbEditorTitle">Add a product</strong>
+          </div>
+          <div class="db-editor-grid">
+            <div class="db-field"><label>Product name</label><input id="dbProductName" required placeholder="e.g. Boneless Ribeye Steaks"></div>
+            <div class="db-field"><label>Size / description</label><input id="dbProductDescription" placeholder="e.g. USDA Choice, family pack"></div>
+            <div class="db-field"><label>Price</label><input id="dbProductPrice" required inputmode="decimal" placeholder="9.99"></div>
+            <div class="db-field"><label>Unit</label><select id="dbProductUnit" onchange="toggleDbCustomUnit()"></select></div>
+            <div class="db-field" id="dbCustomUnitField" style="display:none;"><label>Custom unit</label><input id="dbProductUnitCustom" placeholder="2 for"></div>
+          </div>
+          <div class="db-editor-lower">
+            <div class="db-photo-editor">
+              <label>Product photo</label>
+              <div class="photo db-catalog-photo" id="dbProductPhotoPreview"><span class="lbl">No photo</span></div>
+              <input type="file" accept="image/*" style="display:none" onchange="uploadDbPhoto(this)">
+              <button type="button" class="db-photo-find" onclick="this.previousElementSibling.click()">⬆ Upload photo</button>
+              <button type="button" class="db-photo-find" onclick="openCatalogPhotoSearch()">🔎 Find / change photo</button>
+            </div>
+            <div class="db-field db-size-field"><label>Default ad size</label><div class="db-size-options"><label><input type="checkbox" id="dbBigAd" onchange="setDbAdSize('big')"> Big ad</label><label><input type="checkbox" id="dbSmallAd" checked onchange="setDbAdSize('small')"> Small ad</label></div></div>
+            <button class="db-save" type="submit">Save product</button>
+          </div>
+          <div id="dbEditorStatus"></div>
+        </form>
+      </div>
+      <div class="modal-foot"><button onclick="closeProductDB()">Close</button></div>
+    </div>
+  </div>
+
+  <!-- Crop / resize modal -->
+  <div class="modal-overlay" id="cropModal">
+    <div class="modal" style="width:560px;">
+      <div class="modal-head">
+        <h2>Crop &amp; resize photo</h2>
+      </div>
+      <div class="modal-body" style="padding:14px 18px;">
+        <div id="cropStage" style="width:480px;height:360px;overflow:hidden;position:relative;background:#ffffff;border:1px solid #ccc;margin:0 auto;cursor:grab;touch-action:none;">
+          <img id="cropImg" style="position:absolute;left:0;top:0;transform-origin:0 0;user-select:none;-webkit-user-drag:none;">
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;margin-top:12px;">
+          <label style="font-size:12px;font-weight:bold;color:#555;">Zoom</label>
+          <input type="range" id="cropZoom" min="20" max="300" value="100" style="flex:1;" oninput="onCropZoom(this.value)">
+        </div>
+        <p style="font-size:11.5px;color:#888;margin:8px 0 0 0;">Drag the photo to reposition it. Zoom in to crop tighter, or zoom out if the photo is too big to fit — extra space fills in white.</p>
+      </div>
+      <div class="modal-foot" style="display:flex;justify-content:space-between;align-items:center;">
+        <button class="secondary" onclick="useWholeImage()" style="border-radius:6px;padding:8px 14px;">Use whole original (undo crop)</button>
+        <span>
+          <button class="secondary" onclick="closeCropper()">Cancel</button>
+          <button onclick="useCroppedImage()" style="background:var(--red);color:#fff;border:none;">Use this crop</button>
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Photo search modal -->
+  <div class="modal-overlay" id="photoModal">
+    <div class="modal">
+      <div class="modal-head">
+        <h2>Find a photo</h2>
+        <input type="text" id="photoSearchInput" placeholder="e.g. watermelon, ribeye steak…" onkeydown="if(event.key==='Enter') runPhotoSearch()">
+        <button class="secondary" style="border-radius:6px;padding:8px 12px;" onclick="runPhotoSearch()">Search</button>
+      </div>
+      <div class="photo-search-status" id="photoSearchStatus">Photo search is ready</div>
+      <div class="modal-body"><div class="photo-results" id="photoResults"></div></div>
+      <div class="modal-foot"><button onclick="closePhotoSearch()">Close</button></div>
+    </div>
+  </div>
+
+  <div id="creditBar"><a href="https://lockwooditservices.com/" id="creditLink" target="_blank" rel="noopener noreferrer">Made by Lockwood IT Services</a></div>
+
+<script>
+const UNIT_OPTIONS = ["lb.","each","oz.","ea.","box","bag","gal.","ct.","pk.","dozen","case","other"];
+const DEFAULT_LOGO_IMG = '/assets/cashsaver-logo.png';
+let activePhotoTarget = null; // which .photo element the photo-search modal is filling in
+
+/* ================= LOGIN ================= */
+async function checkSession(){
+  const res = await fetch('/api/session');
+  const data = await res.json();
+  if(data.authed){
+    document.getElementById('loginScreen').classList.add('hidden');
+    const licRes = await fetch('/api/license-status');
+    const lic = await licRes.json();
+    if(!lic.licensed){
+      document.getElementById('lockMessage').textContent = lic.message || 'This tool has been paused. Contact Lockwood IT Services to reactivate.';
+      document.getElementById('lockScreen').classList.add('open');
+      document.getElementById('app').classList.remove('visible');
+      return;
+    }
+    document.getElementById('lockScreen').classList.remove('open');
+    document.getElementById('app').classList.add('visible');
+    document.getElementById('creditBar').style.display = data.adFree ? 'none' : 'block';
+    boot();
+  } else {
+    document.getElementById('loginScreen').classList.remove('hidden');
+    document.getElementById('app').classList.remove('visible');
+  }
+}
+
+async function doLogin(){
+  const password = document.getElementById('loginPassword').value;
+  const res = await fetch('/api/login', {
+    method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({password})
+  });
+  if(res.ok){
+    document.getElementById('loginError').textContent = '';
+    checkSession();
+  } else {
+    document.getElementById('loginError').textContent = 'Wrong password — try again.';
+  }
+}
+
+function toggleDrawer(){
+  document.getElementById('toolsDrawer').classList.toggle('open');
+  document.getElementById('drawerBackdrop').classList.toggle('open');
+}
+
+async function doLogout(){
+  await fetch('/api/logout', {method:'POST'});
+  location.reload();
+}
+
+async function recheckLicense(){
+  const btn = event.target;
+  const original = btn.textContent;
+  btn.textContent = 'Checking…';
+  btn.disabled = true;
+  try{
+    const res = await fetch('/api/license-status/recheck', { method:'POST' });
+    const lic = await res.json();
+    if(lic.licensed){
+      location.reload();
+    } else {
+      document.getElementById('lockMessage').textContent = lic.message || 'This tool has been paused. Contact Lockwood IT Services to reactivate.';
+      btn.textContent = original;
+      btn.disabled = false;
+    }
+  } catch(e){
+    btn.textContent = original;
+    btn.disabled = false;
+  }
+}
+
+/* ================= CELL BUILDING ================= */
+function makeCell(isHero){
+  const cell = document.createElement('div');
+  cell.className = isHero ? 'cell hero' : 'cell';
+  const unitOptionsHtml = UNIT_OPTIONS.map(u => `<option value="${u}">${u === 'other' ? 'Other…' : u}</option>`).join('');
+  cell.innerHTML = `
+    <span class="drag-handle" draggable="true" title="Drag to reorder">⠿</span>
+    <span class="db-badge" title="Filled from Product Database">DB</span>
+    <div class="cell-hover-menu" onmouseenter="syncNameSizeInput(this)">
+      <div class="hover-menu-row">
+        <button type="button" class="search-btn" title="Find photo" onclick="event.preventDefault(); event.stopPropagation(); openPhotoSearch(this)">🔎 photo</button>
+        <button type="button" class="resize-btn" title="Crop / resize photo" onclick="event.preventDefault(); event.stopPropagation(); reopenCropper(this)">✂️ crop</button>
+        <button type="button" class="replace-item-btn" title="Replace this ad with a product from the catalog" onclick="openReplaceProduct(this)">↔ replace</button>
+      </div>
+      <div class="hover-menu-row">
+        <span class="name-size-box" title="Product name font size (px)">
+          <button type="button" class="name-size-btn" title="Make product name smaller" onclick="changeProductNameSize(this,-1)">−</button>
+          <input type="number" class="name-size-input" min="8" max="32" onclick="event.stopPropagation()" onchange="setProductNameSize(this)">
+          <button type="button" class="name-size-btn" title="Make product name larger" onclick="changeProductNameSize(this,1)">+</button>
+        </span>
+        <button type="button" class="name-size-btn" title="Automatically fit product name" onclick="resetProductNameSize(this)">Auto</button>
+        <button type="button" class="text-align-btn" title="Center the product name and description" onclick="toggleProductTextAlignment(this)">Center</button>
+      </div>
+      <div class="hover-menu-row">
+        <button type="button" class="remove-item-btn" title="Remove this item from the flyer" onclick="clearFlyerCell(this)">× delete</button>
+      </div>
+    </div>
+    <div class="cell-top">
+      <label class="photo">
+        <span class="lbl">Click to<br>add photo</span>
+        <input type="file" accept="image/*" onchange="setPhoto(this)">
+        <button type="button" class="remove-photo-btn" title="Remove photo" onclick="event.preventDefault();event.stopPropagation();removePhoto(this)">✕</button>
+        <button type="button" class="undo-photo-btn" title="Undo last photo change" onclick="event.preventDefault();event.stopPropagation();undoPhotoChange(this)">↶</button>
+        <button type="button" class="undo-container-size-btn" title="Undo last image box resize" onclick="event.preventDefault();event.stopPropagation();undoContainerResize(this)">↶ size</button>
+        <span class="container-resize-handle" title="Drag to resize the image box" onclick="event.preventDefault();event.stopPropagation()">↘</span>
+      </label>
+      <div class="info">
+        <div style="position:relative;">
+          <div class="pname" contenteditable="true" oninput="onNameInput(this)" onblur="onNameBlur(this)">Product Name</div>
+          <div class="suggest-list"></div>
+        </div>
+        <div class="psize" contenteditable="true">size / description</div>
+      </div>
+    </div>
+    <div class="priceline">
+      <div class="price-wrap">
+        <div class="price-visual" title="Click to edit price" onclick="startPriceEdit(this)">
+          <span class="dollar-sign">$</span><span class="price-whole">1</span><span class="price-cents">99</span>
+        </div>
+        <input class="price-input" type="text" inputmode="decimal" value="1.99" onblur="finishPriceEdit(this)" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}">
+      </div>
+      <select class="unit-select" onchange="onUnitChange(this)">${unitOptionsHtml}</select>
+      <input class="unit-custom" type="text" placeholder="unit">
+    </div>
+    <div class="foot" contenteditable="true">Plus 10% Added at Checkout.</div>
+  `;
+  enableContainerResize(cell.querySelector('.photo'));
+  updatePriceVisual(cell.querySelector('.price-input'));
+  return cell;
+}
+
+function enableContainerResize(photo){
+  const handle = photo.querySelector('.container-resize-handle');
+  if(!handle || handle.dataset.ready) return;
+  handle.dataset.ready = '1';
+  handle.addEventListener('pointerdown', e => {
+    if(e.button !== undefined && e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const startWidth = photo.offsetWidth;
+    const startHeight = photo.offsetHeight;
+    const startInlineWidth = photo.style.width || '__auto__';
+    const startInlineHeight = photo.style.height || '__auto__';
+    const parent = photo.parentElement;
+    const isVertical = getComputedStyle(parent).flexDirection === 'column';
+    const siblingAllowance = photo.classList.contains('logo-photo') ? 270 : (isVertical ? 0 : 58);
+    const maxWidth = Math.max(80, parent.clientWidth - siblingAllowance);
+    photo.classList.add('resizing-container');
+    const onMove = ev => {
+      photo.style.width = Math.min(maxWidth, Math.max(50, startWidth + ev.clientX - startX)) + 'px';
+      photo.style.height = Math.min(340, Math.max(60, startHeight + ev.clientY - startY)) + 'px';
+    };
+    const onEnd = () => {
+      photo.classList.remove('resizing-container');
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onEnd);
+      document.removeEventListener('pointercancel', onEnd);
+      if(photo.offsetWidth !== startWidth || photo.offsetHeight !== startHeight){
+        photo.dataset.previousWidth = startInlineWidth;
+        photo.dataset.previousHeight = startInlineHeight;
+        updatePhotoActionState(photo);
+      }
+      markFlyerDirty();
+    };
+    document.addEventListener('pointermove', onMove);
+    document.addEventListener('pointerup', onEnd);
+    document.addEventListener('pointercancel', onEnd);
+  });
+}
+
+function onUnitChange(sel){
+  const custom = sel.parentElement.querySelector('.unit-custom');
+  if(sel.value === 'other'){ custom.style.display = 'inline-block'; custom.focus(); }
+  else { custom.style.display = 'none'; }
+}
+
+function formatPrice(input){
+  const n = parseFloat(input.value.replace(/[^0-9.]/g,''));
+  input.value = isNaN(n) ? '0.00' : n.toFixed(2);
+  updatePriceVisual(input);
+}
+
+function updatePriceVisual(input){
+  const n = parseFloat(String(input.value).replace(/[^0-9.]/g,''));
+  const formatted = Number.isNaN(n) ? '0.00' : n.toFixed(2);
+  input.value = formatted;
+  const [whole, cents] = formatted.split('.');
+  const visual = input.parentElement.querySelector('.price-visual');
+  if(!visual) return;
+  visual.querySelector('.price-whole').textContent = whole;
+  visual.querySelector('.price-cents').textContent = cents;
+}
+
+function startPriceEdit(visual){
+  const input = visual.parentElement.querySelector('.price-input');
+  visual.style.display = 'none';
+  input.style.display = 'block';
+  input.style.width = Math.max(3.2, input.value.length + .4) + 'ch';
+  input.focus();
+  input.select();
+}
+
+function finishPriceEdit(input){
+  formatPrice(input);
+  input.style.display = 'none';
+  input.parentElement.querySelector('.price-visual').style.display = 'flex';
+}
+
+function setPhoto(input){
+  const file = input.files[0];
+  if(!file) return;
+  const target = input.closest('.photo');
+  const reader = new FileReader();
+  reader.onload = e => openCropper(e.target.result, target, true);
+  reader.readAsDataURL(file);
+  input.value = ''; // allow picking the same file again later
+}
+
+// Re-open the crop/zoom editor on a photo that's already placed — lets you shrink it
+// in further, reposition, or just make it smaller without re-uploading anything.
+function reopenCropper(btn){
+  // The logo photo's resize-btn still lives inside .photo; per-cell resize buttons
+  // live in the .cell-hover-menu toolbar instead, so fall back to the cell's photo.
+  const target = btn.closest('.photo') || btn.closest('.cell')?.querySelector('.photo');
+  if(!target || !target.dataset.img) return;
+  openCropper(target.dataset.originalImg || target.dataset.img, target, false);
+}
+
+function updatePhotoActionState(photo){
+  photo.classList.toggle('can-undo', !!photo.dataset.previousImg);
+  photo.classList.toggle('can-undo-size', !!photo.dataset.previousWidth || !!photo.dataset.previousHeight);
+}
+
+function undoContainerResize(button){
+  const photo = button.closest('.photo');
+  if(!photo.dataset.previousWidth && !photo.dataset.previousHeight) return;
+  const currentWidth = photo.style.width || '__auto__';
+  const currentHeight = photo.style.height || '__auto__';
+  const previousWidth = photo.dataset.previousWidth || '__auto__';
+  const previousHeight = photo.dataset.previousHeight || '__auto__';
+  photo.style.width = previousWidth === '__auto__' ? '' : previousWidth;
+  photo.style.height = previousHeight === '__auto__' ? '' : previousHeight;
+  photo.dataset.previousWidth = currentWidth;
+  photo.dataset.previousHeight = currentHeight;
+  updatePhotoActionState(photo);
+  markFlyerDirty();
+}
+
+function removePhoto(btn){
+  const photo = btn.closest('.photo');
+  if(!photo.dataset.img) return;
+  photo.dataset.previousImg = photo.dataset.img;
+  delete photo.dataset.img;
+  photo.style.backgroundImage = '';
+  photo.classList.remove('has-img');
+  updatePhotoActionState(photo);
+  markFlyerDirty();
+}
+
+function undoPhotoChange(btn){
+  const photo = btn.closest('.photo');
+  const previous = photo.dataset.previousImg;
+  if(!previous) return;
+  const current = photo.dataset.img || '';
+  photo.dataset.img = previous;
+  photo.style.backgroundImage = `url(${previous})`;
+  photo.classList.add('has-img');
+  if(current) photo.dataset.previousImg = current;
+  else delete photo.dataset.previousImg;
+  updatePhotoActionState(photo);
+  markFlyerDirty();
+}
+
+function clearFlyerCell(btn){
+  const cell = btn.closest('.cell');
+  const name = cell.querySelector('.pname').textContent.trim();
+  const hasItem = name && name !== 'Product Name';
+  if(hasItem && !confirm(`Remove "${name}" from this flyer? It will stay in the Product Database.`)) return;
+
+  const photo = cell.querySelector('.photo');
+  photo.style.backgroundImage = '';
+  photo.style.width = '';
+  photo.style.height = '';
+  delete photo.dataset.img;
+  delete photo.dataset.originalImg;
+  delete photo.dataset.previousImg;
+  delete photo.dataset.previousWidth;
+  delete photo.dataset.previousHeight;
+  photo.classList.remove('has-img', 'can-undo');
+  updatePhotoActionState(photo);
+
+  const productName = cell.querySelector('.pname');
+  productName.textContent = 'Product Name';
+  productName.style.fontSize = '';
+  delete productName.dataset.manualSize;
+  cell.querySelector('.psize').textContent = 'size / description';
+  cell.querySelector('.suggest-list').innerHTML = '';
+  cell.querySelector('.suggest-list').classList.remove('open');
+  const price = cell.querySelector('.price-input');
+  price.value = '1.99';
+  updatePriceVisual(price);
+  cell.querySelector('.unit-select').value = 'lb.';
+  cell.querySelector('.unit-custom').value = '';
+  cell.querySelector('.unit-custom').style.display = 'none';
+  cell.querySelector('.foot').textContent = 'Plus 10% Added at Checkout.';
+  cell.querySelector('.db-badge').style.display = 'none';
+  cell.classList.add('is-cleared');
+  markFlyerDirty();
+  setStatus(hasItem ? `Removed "${name}" from the flyer. The catalog entry was kept.` : 'Ad slot cleared.');
+}
+
+/* ================= LAYOUTS ================= */
+// Each layout describes the sections that go above the WOW banner ("top") and
+// below it ("bottom"). A section is a column count + how many cells + whether
+// those cells get the big "hero" price treatment. Page furniture (header,
+// tagline, WOW banner, footer) stays the same across every layout — only the
+// product grid arrangement changes.
+const LAYOUTS = {
+  classic: {
+    name: 'Classic Weekly Ad',
+    blurb: '2 featured items up top, then two rows of 4, then a 16-item WOW grid. The original layout.',
+    top: [ { count: 2, cols: 2, hero: true }, { count: 8, cols: 4, hero: false } ],
+    bottom: [ { count: 16, cols: 4, hero: false } ]
+  },
+  bigSavings: {
+    name: 'Big Savings',
+    blurb: '4 large featured items up top with huge prices, then a simpler 12-item grid below. Good when you have fewer, bigger deals to push.',
+    top: [ { count: 4, cols: 2, hero: true } ],
+    bottom: [ { count: 12, cols: 4, hero: false } ]
+  },
+  simpleGrid: {
+    name: 'Simple Grid',
+    blurb: 'No featured row — just a clean, even 24-item grid. Good for a straightforward coupon-style ad where nothing needs to stand out more than anything else.',
+    top: [ { count: 12, cols: 4, hero: false } ],
+    bottom: [ { count: 12, cols: 4, hero: false } ]
+  },
+  compact3: {
+    name: 'Compact 3-Column',
+    blurb: '2 featured items, then bigger 3-across cells instead of 4 — fewer items overall (20), but each one gets more visual room. Good for fewer items with bigger photos.',
+    top: [ { count: 2, cols: 2, hero: true } ],
+    bottom: [ { count: 18, cols: 3, hero: false } ]
+  },
+  megaFeature: {
+    name: 'Mega Feature',
+    blurb: '6 featured items with big prices, then a smaller 8-item grid. For a sale where most of what you\'re advertising deserves to stand out.',
+    top: [ { count: 6, cols: 3, hero: true } ],
+    bottom: [ { count: 8, cols: 4, hero: false } ]
+  },
+  spotlight: {
+    name: 'Spotlight + Supporting Deals',
+    blurb: 'One full-width headline deal leads the page, followed by 6 roomy offers and 12 supporting items. Built for a clear hero product.',
+    top: [ { count: 1, cols: 1, hero: true, variant: 'spotlight-feature' }, { count: 6, cols: 3, hero: false } ],
+    bottom: [ { count: 12, cols: 4, hero: false } ]
+  },
+  marketMix: {
+    name: 'Market Mix',
+    blurb: 'Two large opening deals, a balanced 3-column middle, and compact 5-across specials. Useful for mixing premium and everyday offers.',
+    top: [ { count: 2, cols: 2, hero: true, variant: 'split-feature' }, { count: 6, cols: 3, hero: false } ],
+    bottom: [ { count: 15, cols: 5, hero: false, variant: 'deal-strip' } ]
+  },
+  featureFour: {
+    name: 'Four Corners',
+    blurb: 'Four equal feature deals followed by 15 compact specials. A strong symmetrical layout with plenty of inventory.',
+    top: [ { count: 4, cols: 2, hero: true, variant: 'tile-cards' } ],
+    bottom: [ { count: 15, cols: 5, hero: false, variant: 'compact-specials' } ]
+  },
+  roomyThree: {
+    name: 'Roomy Three',
+    blurb: 'Three featured deals followed by 15 generous 3-column items. Best when photos and product descriptions need more breathing room.',
+    top: [ { count: 3, cols: 3, hero: true, variant: 'photo-cards' } ],
+    bottom: [ { count: 15, cols: 3, hero: false, variant: 'photo-cards' } ]
+  }
+};
+
+let currentLayoutId = 'classic';
+
+function colsClass(n){
+  return n === 1 ? 'one' : n === 2 ? 'top' : n === 3 ? 'three' : n === 5 ? 'five' : 'four';
+}
+
+// Reads every current cell's data (name/size/price/photo/etc) in DOM order —
+// used when switching layouts so existing work carries over into the new shape.
+function collectAllCellData(){
+  return Array.from(document.querySelectorAll('.cell')).map(cell => {
+    const photo = cell.querySelector('.photo');
+    return {
+      img: photo.dataset.img || null,
+      originalImg: photo.dataset.originalImg || photo.dataset.img || null,
+      previousImg: photo.dataset.previousImg || null,
+      name: cell.querySelector('.pname').textContent,
+      nameSize: cell.querySelector('.pname').dataset.manualSize || null,
+      textAlign: cell.classList.contains('text-centered') ? 'center' : 'left',
+      size: cell.querySelector('.psize').innerHTML,
+      price: cell.querySelector('.price-input').value,
+      unit: cell.querySelector('.unit-select').value,
+      unitCustom: cell.querySelector('.unit-custom').value,
+      foot: cell.querySelector('.foot').innerHTML,
+      adSize: cell.classList.contains('hero') ? 'big' : 'small',
+      photoWidth: photo.style.width || null,
+      photoHeight: photo.style.height || null,
+      previousPhotoWidth: photo.dataset.previousWidth || null,
+      previousPhotoHeight: photo.dataset.previousHeight || null,
+      removed: cell.classList.contains('is-cleared')
+    };
+  });
+}
+
+function fillCellData(cell, d){
+  if(!d) return;
+  cell.classList.toggle('is-cleared', !!d.removed);
+  cell.classList.toggle('text-centered', d.textAlign === 'center');
+  const alignButton = cell.querySelector('.text-align-btn');
+  if(alignButton){
+    alignButton.textContent = d.textAlign === 'center' ? 'Left' : 'Center';
+    alignButton.title = d.textAlign === 'center' ? 'Align the product name and description left' : 'Center the product name and description';
+  }
+  const photo = cell.querySelector('.photo');
+  if(d.img){
+    photo.style.backgroundImage = `url(${d.img})`;
+    photo.dataset.img = d.img;
+    photo.classList.add('has-img');
+  }
+  if(d.originalImg) photo.dataset.originalImg = d.originalImg;
+  if(d.previousImg) photo.dataset.previousImg = d.previousImg;
+  updatePhotoActionState(photo);
+  const productName = cell.querySelector('.pname');
+  productName.textContent = d.name || 'Product Name';
+  if(d.nameSize){
+    productName.dataset.manualSize = d.nameSize;
+    productName.style.fontSize = `${d.nameSize}px`;
+  } else {
+    delete productName.dataset.manualSize;
+    productName.style.fontSize = '';
+  }
+  cell.querySelector('.psize').innerHTML = sanitizeStoredHtml(d.size || 'size / description');
+  cell.querySelector('.price-input').value = d.price || '1.99';
+  updatePriceVisual(cell.querySelector('.price-input'));
+  cell.querySelector('.unit-select').value = d.unit || 'lb.';
+  cell.querySelector('.unit-custom').value = d.unitCustom || '';
+  cell.querySelector('.unit-custom').style.display = (d.unit === 'other') ? 'inline-block' : 'none';
+  cell.querySelector('.foot').innerHTML = sanitizeStoredHtml(d.foot || 'Plus 10% Added at Checkout.');
+  if(d.photoWidth) photo.style.width = d.photoWidth;
+  if(d.photoHeight) photo.style.height = d.photoHeight;
+  if(d.previousPhotoWidth) photo.dataset.previousWidth = d.previousPhotoWidth;
+  if(d.previousPhotoHeight) photo.dataset.previousHeight = d.previousPhotoHeight;
+  updatePhotoActionState(photo);
+}
+
+// Rebuilds the top/bottom areas to match the given layout. If existingData is
+// passed (from collectAllCellData), it's redistributed into the new cells in
+// order — nothing is deleted, but if the new layout has fewer total slots than
+// you had items, the leftover ones just won't have a spot anymore.
+function buildLayoutDom(layoutId, existingData){
+  const layout = LAYOUTS[layoutId] || LAYOUTS.classic;
+  currentLayoutId = layoutId;
+  const topArea = document.getElementById('topArea');
+  const bottomArea = document.getElementById('bottomArea');
+  topArea.innerHTML = '';
+  bottomArea.innerHTML = '';
+
+  let dataIdx = 0;
+  function buildSections(sections, area){
+    sections.forEach(section => {
+      const grid = document.createElement('div');
+      grid.className = 'grid ' + colsClass(section.cols) + (section.variant ? ' ' + section.variant : '');
+      for(let i=0;i<section.count;i++){
+        const cell = makeCell(section.hero);
+        if(existingData) fillCellData(cell, existingData[dataIdx++]);
+        grid.appendChild(cell);
+      }
+      area.appendChild(grid);
+      enableReordering(grid);
+    });
+  }
+  buildSections(layout.top, topArea);
+  buildSections(layout.bottom, bottomArea);
+  requestAnimationFrame(() => document.querySelectorAll('.pname').forEach(autoFitProductName));
+}
+
+function switchLayout(layoutId){
+  const data = collectAllCellData();
+  buildLayoutDom(layoutId, data);
+  markFlyerDirty();
+  setStatus(`Switched to "${LAYOUTS[layoutId].name}" layout.`);
+}
+
+function populateLayoutSelect(){
+  const sel = document.getElementById('layoutSelect');
+  sel.innerHTML = Object.entries(LAYOUTS).map(([id, l]) =>
+    `<option value="${id}">${l.name}</option>`
+  ).join('');
+  sel.value = currentLayoutId;
+  document.getElementById('layoutBlurb').textContent = LAYOUTS[currentLayoutId].blurb;
+}
+
+function onLayoutSelectChange(){
+  const sel = document.getElementById('layoutSelect');
+  const newId = sel.value;
+  if(newId === currentLayoutId) return;
+  const ok = confirm(
+    `Switch to the "${LAYOUTS[newId].name}" layout?\n\n` +
+    `Your current items will carry over into the new arrangement, but if it has ` +
+    `fewer slots than you have items filled in, the extras won't have a spot.`
+  );
+  if(!ok){
+    sel.value = currentLayoutId; // put the dropdown back since they backed out
+    return;
+  }
+  switchLayout(newId);
+  document.getElementById('layoutBlurb').textContent = LAYOUTS[newId].blurb;
+}
+
+let gridsBuilt = false;
+function buildGrids(){
+  if(gridsBuilt) return;
+  buildLayoutDom(currentLayoutId);
+  gridsBuilt = true;
+}
+
+/* ================= DRAG TO REORDER PRODUCTS ================= */
+// A cell can be dragged anywhere on the page — within its own section, or into any
+// other section entirely. Dropping into/out of the hero row automatically switches
+// the cell between "hero" (huge price) and regular sizing to match its new home.
+// Built on Pointer Events rather than native HTML5 drag-and-drop — far more
+// reliable across browsers, and works with touch (tablet/phone) the same as a
+// mouse, which native HTML5 DnD does not.
+let dragState = null; // { cell, container, offsetX, offsetY, pointerId }
+
+function enableReordering(container){
+  container.querySelectorAll('.drag-handle').forEach(handle => {
+    handle.addEventListener('pointerdown', onDragHandleDown);
+  });
+}
+
+function onDragHandleDown(e){
+  if(e.button !== undefined && e.button !== 0) return; // left click / primary touch only
+  const handle = e.currentTarget;
+  const cell = handle.closest('.cell');
+  const container = cell.parentElement;
+  e.preventDefault();
+
+  const rect = cell.getBoundingClientRect();
+  dragState = {
+    cell, container, pointerId: e.pointerId,
+    offsetX: e.clientX - rect.left, offsetY: e.clientY - rect.top,
+    startX: e.clientX, startY: e.clientY, moved: false
+  };
+
+  // Listen on window rather than relying on pointer capture — capture can be silently
+  // dropped by the browser when the dragged element gets reparented mid-drag (which we
+  // do, to float it above everything else), which would otherwise strand the drag.
+  window.addEventListener('pointermove', onDragMove);
+  window.addEventListener('pointerup', onDragUp);
+  window.addEventListener('pointercancel', onDragUp);
+}
+
+function onDragMove(e){
+  if(!dragState || e.pointerId !== dragState.pointerId) return;
+  const dx = e.clientX - dragState.startX, dy = e.clientY - dragState.startY;
+  if(!dragState.moved && Math.hypot(dx, dy) < 4) return; // small threshold so a plain click still works
+  if(!dragState.moved){
+    dragState.moved = true;
+    dragState.cell.classList.add('dragging');
+    dragState.placeholder = document.createElement('div');
+    dragState.placeholder.className = 'drag-placeholder';
+    const cellRect = dragState.cell.getBoundingClientRect();
+    dragState.placeholder.style.minHeight = cellRect.height + 'px';
+    dragState.cell.after(dragState.placeholder);
+    dragState.cell.style.width = cellRect.width + 'px';
+    document.body.appendChild(dragState.cell);
+    dragState.cell.classList.add('drag-floating');
+  }
+  dragState.cell.style.left = (e.clientX - dragState.offsetX) + 'px';
+  dragState.cell.style.top = (e.clientY - dragState.offsetY) + 'px';
+
+  // figure out which cell we're currently hovering over — anywhere on the page, not
+  // just within the section this drag started in — and move the placeholder there
+  dragState.cell.style.visibility = 'hidden';
+  const overEl = document.elementFromPoint(e.clientX, e.clientY);
+  dragState.cell.style.visibility = '';
+  const overCell = overEl && overEl.closest ? overEl.closest('.cell') : null;
+  if(overCell && overCell !== dragState.placeholder && overCell !== dragState.cell){
+    const rect = overCell.getBoundingClientRect();
+    // simplest reliable rule for a multi-column grid: insert before/after based on
+    // whichever side of the hovered cell's center the pointer currently sits
+    const midX = rect.left + rect.width / 2;
+    if(e.clientX < midX) overCell.before(dragState.placeholder);
+    else overCell.after(dragState.placeholder);
+  }
+}
+
+function onDragUp(e){
+  if(!dragState || e.pointerId !== dragState.pointerId) return;
+  window.removeEventListener('pointermove', onDragMove);
+  window.removeEventListener('pointerup', onDragUp);
+  window.removeEventListener('pointercancel', onDragUp);
+
+  if(dragState.moved){
+    const targetContainer = dragState.placeholder.parentElement;
+    dragState.placeholder.replaceWith(dragState.cell);
+    dragState.cell.classList.remove('drag-floating', 'dragging');
+    dragState.cell.style.left = '';
+    dragState.cell.style.top = '';
+    dragState.cell.style.width = '';
+    // moving into/out of the hero row changes how big the cell should look —
+    // it adopts whichever style matches its new home automatically
+    if(targetContainer && targetContainer.id === 'gridHero'){
+      dragState.cell.classList.add('hero');
+    } else {
+      dragState.cell.classList.remove('hero');
+    }
+    markFlyerDirty();
+  }
+  dragState = null;
+}
+
+/* ================= PRODUCT DATABASE (server-backed) ================= */
+let suggestTimer = null;
+
+function autoFitProductName(nameEl){
+  if(!nameEl || nameEl.dataset.manualSize) return;
+  nameEl.style.fontSize = '';
+  const text = nameEl.textContent.trim();
+  if(!text || text === 'Product Name') return;
+  const info = nameEl.closest('.info');
+  const width = info ? info.clientWidth : 0;
+  const base = parseFloat(getComputedStyle(nameEl).fontSize) || 14;
+  if(!width) return;
+  const estimatedCapacity = Math.max(10, (width / (base * .56)) * 2.15);
+  const fitted = text.length <= estimatedCapacity
+    ? base
+    : Math.max(9, base * Math.sqrt(estimatedCapacity / text.length));
+  nameEl.style.fontSize = `${Math.round(fitted * 10) / 10}px`;
+}
+
+function syncNameSizeInput(menu){
+  const input = menu.querySelector('.name-size-input');
+  const nameEl = menu.closest('.cell').querySelector('.pname');
+  if(input && nameEl) input.value = Math.round(parseFloat(getComputedStyle(nameEl).fontSize) || 14);
+}
+
+function changeProductNameSize(button, direction){
+  const cell = button.closest('.cell');
+  const nameEl = cell.querySelector('.pname');
+  const current = parseFloat(getComputedStyle(nameEl).fontSize) || 14;
+  const next = Math.max(8, Math.min(32, current + direction));
+  nameEl.dataset.manualSize = String(next);
+  nameEl.style.fontSize = `${next}px`;
+  const input = cell.querySelector('.name-size-input');
+  if(input) input.value = Math.round(next);
+  markFlyerDirty();
+}
+
+function setProductNameSize(input){
+  const cell = input.closest('.cell');
+  const nameEl = cell.querySelector('.pname');
+  const size = Math.max(8, Math.min(32, parseInt(input.value, 10) || 14));
+  input.value = size;
+  nameEl.dataset.manualSize = String(size);
+  nameEl.style.fontSize = `${size}px`;
+  markFlyerDirty();
+}
+
+function resetProductNameSize(button){
+  const cell = button.closest('.cell');
+  const nameEl = cell.querySelector('.pname');
+  delete nameEl.dataset.manualSize;
+  nameEl.style.fontSize = '';
+  autoFitProductName(nameEl);
+  const input = cell.querySelector('.name-size-input');
+  if(input) input.value = Math.round(parseFloat(getComputedStyle(nameEl).fontSize) || 14);
+  markFlyerDirty();
+}
+
+function toggleProductTextAlignment(button){
+  const cell = button.closest('.cell');
+  const centered = cell.classList.toggle('text-centered');
+  button.textContent = centered ? 'Left' : 'Center';
+  button.title = centered ? 'Align the product name and description left' : 'Center the product name and description';
+  markFlyerDirty();
+}
+
+function onNameInput(div){
+  autoFitProductName(div);
+  clearTimeout(suggestTimer);
+  const q = div.textContent.trim();
+  if(q && q !== 'Product Name') div.closest('.cell').classList.remove('is-cleared');
+  const list = div.parentElement.querySelector('.suggest-list');
+  if(q.length < 1){ list.classList.remove('open'); return; }
+  suggestTimer = setTimeout(async () => {
+    const res = await fetch('/api/products?q=' + encodeURIComponent(q));
+    if(!res.ok) return;
+    const rows = await res.json();
+    if(rows.length === 0){ list.classList.remove('open'); return; }
+    list.innerHTML = rows.slice(0,6).map(r => `
+      <div class="suggest-item" onmousedown="event.preventDefault(); applySuggestion(this, ${JSON.stringify(r).replace(/"/g,'&quot;')})">
+        ${r.img ? `<img src="${r.img}">` : ''}<span>${r.display_name} — $${r.price}/${r.unit === 'other' ? r.unit_custom : r.unit}</span>
+      </div>
+    `).join('');
+    list.classList.add('open');
+  }, 200);
+}
+
+function normalizedFlyerName(value){
+  return String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+function findProductOnFlyer(name, exceptCell = null){
+  const wanted = normalizedFlyerName(name);
+  if(!wanted || wanted === 'product name') return null;
+  return Array.from(document.querySelectorAll('.cell')).find(cell =>
+    cell !== exceptCell && normalizedFlyerName(cell.querySelector('.pname').textContent) === wanted
+  ) || null;
+}
+
+function highlightExistingFlyerItem(cell){
+  cell.classList.add('duplicate-item');
+  cell.scrollIntoView({behavior:'smooth', block:'center'});
+  setTimeout(() => updateDuplicateMarkers(), 1800);
+}
+
+function updateDuplicateMarkers(){
+  const cells = Array.from(document.querySelectorAll('.cell'));
+  cells.forEach(cell => cell.classList.remove('duplicate-item'));
+  const seen = new Map();
+  const duplicates = [];
+  cells.forEach(cell => {
+    const raw = cell.querySelector('.pname').textContent.trim();
+    const key = normalizedFlyerName(raw);
+    if(!key || key === 'product name' || cell.classList.contains('is-cleared')) return;
+    if(seen.has(key)){
+      seen.get(key).classList.add('duplicate-item');
+      cell.classList.add('duplicate-item');
+      duplicates.push(raw);
+    } else {
+      seen.set(key, cell);
+    }
+  });
+  return [...new Set(duplicates.map(normalizedFlyerName))];
+}
+
+function validateNoDuplicateFlyerItems(showAlert = false){
+  const duplicates = updateDuplicateMarkers();
+  if(!duplicates.length) return true;
+  const label = duplicates.join(', ');
+  showSaveState(`Duplicate item: ${label}`, 'error');
+  if(showAlert) alert(`This flyer contains the same product more than once: ${label}. Remove or rename one copy before saving.`);
+  return false;
+}
+
+function applySuggestion(el, product){
+  const cell = el.closest('.cell');
+  const p = typeof product === 'string' ? JSON.parse(product) : product;
+  if(fillCellFromProduct(cell, p)) cell.querySelector('.suggest-list').classList.remove('open');
+}
+
+function fillCellFromProduct(cell, p, options = {}){
+  const existing = findProductOnFlyer(p.display_name, cell);
+  if(existing){
+    highlightExistingFlyerItem(existing);
+    setStatus(`"${p.display_name}" is already on this flyer.`);
+    return false;
+  }
+  cell.classList.remove('is-cleared');
+  const productName = cell.querySelector('.pname');
+  productName.textContent = p.display_name;
+  if(options.replace){
+    delete productName.dataset.manualSize;
+    productName.style.fontSize = '';
+  }
+  if(!productName.dataset.manualSize) autoFitProductName(productName);
+  cell.querySelector('.psize').textContent = p.description || 'size / description';
+  cell.querySelector('.price-input').value = p.price;
+  updatePriceVisual(cell.querySelector('.price-input'));
+  cell.querySelector('.unit-select').value = p.unit || 'lb.';
+  cell.querySelector('.unit-custom').value = p.unit_custom || '';
+  cell.querySelector('.unit-custom').style.display = (p.unit === 'other') ? 'inline-block' : 'none';
+  const photo = cell.querySelector('.photo');
+  if(p.img){
+    photo.style.backgroundImage = `url(${p.img})`;
+    photo.dataset.img = p.img;
+    photo.dataset.originalImg = p.original_img || p.img;
+    delete photo.dataset.previousImg;
+    photo.classList.add('has-img');
+    updatePhotoActionState(photo);
+  } else if(options.replace){
+    photo.style.backgroundImage = '';
+    delete photo.dataset.img;
+    delete photo.dataset.originalImg;
+    delete photo.dataset.previousImg;
+    photo.classList.remove('has-img', 'can-undo');
+    updatePhotoActionState(photo);
+  }
+  cell.querySelector('.db-badge').style.display = 'block';
+  markFlyerDirty();
+  return true;
+}
+
+function onNameBlur(div){
+  setTimeout(() => {
+    div.parentElement.querySelector('.suggest-list').classList.remove('open');
+  }, 150);
+}
+
+let editingDbKey = null;
+let replaceTargetCell = null;
+
+function escapeHtml(value){
+  return String(value ?? '').replace(/[&<>"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
+}
+
+// v.lastPrice/.lastPriceUnit/.lastPriceAt come from the server's price_history lookup
+// (most recent saved price that differs from the current one) — gives pricing context.
+function formatLastPrice(v){
+  if(!v.lastPrice) return '';
+  const unit = v.lastPriceUnit === 'other' ? '' : (v.lastPriceUnit || '');
+  const when = new Date(v.lastPriceAt).toLocaleDateString('en-US', { month:'long', day:'numeric' });
+  return `Last on sale: $${escapeHtml(v.lastPrice)}${unit ? '/' + escapeHtml(unit) : ''} — ${when}`;
+}
+
+async function togglePriceHistory(btn){
+  const panel = btn.nextElementSibling;
+  const opening = !panel.classList.contains('open');
+  panel.classList.toggle('open', opening);
+  btn.textContent = btn.textContent.replace(/^[▾▴]/, opening ? '▴' : '▾');
+  if(!opening || panel.dataset.loaded) return;
+  panel.innerHTML = '<div class="price-history-empty">Loading…</div>';
+  try{
+    const res = await fetch('/api/products/' + encodeURIComponent(btn.dataset.key) + '/price-history');
+    const rows = res.ok ? await res.json() : [];
+    panel.dataset.loaded = '1';
+    if(!rows.length){
+      panel.innerHTML = '<div class="price-history-empty">No price history yet.</div>';
+      return;
+    }
+    panel.innerHTML = '<div class="price-history-panel-inner">' + rows.map(r => {
+      const unit = r.unit === 'other' ? '' : (r.unit || '');
+      const when = new Date(r.recorded_at).toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
+      return `<div class="price-history-row"><span>$${escapeHtml(r.price)}${unit ? '/' + escapeHtml(unit) : ''}</span><span>${when}</span></div>`;
+    }).join('') + '</div>';
+  } catch(err){
+    panel.innerHTML = '<div class="price-history-empty">Could not load price history.</div>';
+  }
+}
+
+// Cell fields like .psize/.foot round-trip through innerHTML so light formatting
+// (e.g. bold from a paste) survives a save/load cycle. Backup/restore lets an
+// external JSON file populate these same fields, so strip anything that isn't
+// plain inline formatting before it ever reaches the DOM as HTML.
+const SANITIZE_ALLOWED_TAGS = new Set(['B','I','U','EM','STRONG','BR','SPAN','DIV']);
+function sanitizeStoredHtml(html){
+  const tpl = document.createElement('template');
+  tpl.innerHTML = String(html ?? '');
+  const strip = node => {
+    Array.from(node.childNodes).forEach(child => {
+      if(child.nodeType !== 1) return;
+      if(!SANITIZE_ALLOWED_TAGS.has(child.tagName)){
+        child.replaceWith(document.createTextNode(child.textContent));
+        return;
+      }
+      Array.from(child.attributes).forEach(attr => child.removeAttribute(attr.name));
+      strip(child);
+    });
+  };
+  strip(tpl.content);
+  return tpl.innerHTML;
+}
+
+function openProductDB(targetCell = null){
+  replaceTargetCell = targetCell;
+  document.getElementById('dbModal').classList.add('open');
+  document.getElementById('dbSearch').value = '';
+  editingDbKey = null;
+  const unitSelect = document.getElementById('dbProductUnit');
+  if(!unitSelect.options.length){
+    unitSelect.innerHTML = UNIT_OPTIONS.map(u => `<option value="${u}">${u === 'other' ? 'Other…' : u}</option>`).join('');
+  }
+  resetDbEditor();
+  updateCatalogReplaceMode();
+  renderDbList();
+}
+function closeProductDB(){
+  document.getElementById('dbModal').classList.remove('open');
+  replaceTargetCell = null;
+  updateCatalogReplaceMode();
+}
+
+function openReplaceProduct(button){
+  const cell = button.closest('.cell');
+  openProductDB(cell);
+}
+
+function updateCatalogReplaceMode(){
+  const banner = document.getElementById('dbReplaceBanner');
+  if(!banner) return;
+  banner.classList.toggle('open', !!replaceTargetCell);
+  document.getElementById('dbReplaceName').textContent = replaceTargetCell
+    ? (replaceTargetCell.querySelector('.pname').textContent.trim() || 'this ad slot')
+    : '';
+}
+
+function cancelCatalogReplace(){
+  replaceTargetCell = null;
+  updateCatalogReplaceMode();
+  renderDbList();
+}
+
+function toggleDbCustomUnit(){
+  const custom = document.getElementById('dbCustomUnitField');
+  custom.style.display = document.getElementById('dbProductUnit').value === 'other' ? 'flex' : 'none';
+}
+
+function setDbAdSize(size){
+  document.getElementById('dbBigAd').checked = size === 'big';
+  document.getElementById('dbSmallAd').checked = size !== 'big';
+}
+
+function setDbPhotoPreview(img, originalImg){
+  const preview = document.getElementById('dbProductPhotoPreview');
+  preview.style.backgroundImage = img ? `url(${img})` : '';
+  if(img){
+    preview.dataset.img = img;
+    preview.dataset.originalImg = originalImg || img;
+    preview.classList.add('has-img');
+  } else {
+    delete preview.dataset.img;
+    delete preview.dataset.originalImg;
+    delete preview.dataset.previousImg;
+    preview.classList.remove('has-img', 'can-undo');
+  }
+}
+
+function uploadDbPhoto(input){
+  const file = input.files && input.files[0];
+  if(!file) return;
+  const wrap = input.closest('.db-photo-editor, .db-inline-photo-wrap');
+  const target = wrap && wrap.querySelector('.photo');
+  if(!target) return;
+  const reader = new FileReader();
+  reader.onload = e => openCropper(e.target.result, target, true);
+  reader.readAsDataURL(file);
+  input.value = '';
+}
+
+function resetDbEditor(clearStatus = true){
+  document.getElementById('dbEditorTitle').textContent = 'Add a product';
+  document.getElementById('dbProductName').value = '';
+  document.getElementById('dbProductDescription').value = '';
+  document.getElementById('dbProductPrice').value = '';
+  document.getElementById('dbProductUnit').value = 'lb.';
+  document.getElementById('dbProductUnitCustom').value = '';
+  setDbPhotoPreview(null, null);
+  setDbAdSize('small');
+  toggleDbCustomUnit();
+  if(clearStatus) document.getElementById('dbEditorStatus').textContent = '';
+}
+
+async function saveDbProduct(event){
+  event.preventDefault();
+  const name = document.getElementById('dbProductName').value.trim();
+  const rawPrice = document.getElementById('dbProductPrice').value.trim();
+  const parsedPrice = parseFloat(rawPrice.replace(/[^0-9.]/g,''));
+  const status = document.getElementById('dbEditorStatus');
+  if(!name || Number.isNaN(parsedPrice)){
+    status.style.color = '#a32720';
+    status.textContent = 'Enter a product name and a valid price.';
+    return;
+  }
+  const payload = {
+    displayName:name,
+    description:document.getElementById('dbProductDescription').value.trim(),
+    price:parsedPrice.toFixed(2),
+    unit:document.getElementById('dbProductUnit').value,
+    unitCustom:document.getElementById('dbProductUnitCustom').value.trim(),
+    adSize:document.getElementById('dbBigAd').checked ? 'big' : 'small',
+    img:document.getElementById('dbProductPhotoPreview').dataset.img || null,
+    originalImg:document.getElementById('dbProductPhotoPreview').dataset.originalImg || null
+  };
+  const res = await fetch('/api/products', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)});
+  if(!res.ok){
+    status.style.color = '#a32720';
+    status.textContent = 'Could not save that product.';
+    return;
+  }
+  resetDbEditor(false);
+  status.style.color = '#287a3d';
+  status.textContent = 'Product added.';
+  document.getElementById('dbSearch').value = '';
+  renderDbList();
+}
+
+async function editDbProduct(key){
+  editingDbKey = key;
+  await renderDbList();
+  const input = document.querySelector('.db-row-editing .inline-name');
+  if(input) input.focus();
+}
+
+function cancelInlineDbEdit(){
+  editingDbKey = null;
+  renderDbList();
+}
+
+function setInlineAdSize(input, size){
+  const row = input.closest('.db-row-editing');
+  row.querySelector('.inline-big').checked = size === 'big';
+  row.querySelector('.inline-small').checked = size !== 'big';
+}
+
+function inlineUnitChanged(select){
+  const custom = select.closest('.db-row-editing').querySelector('.inline-custom-unit');
+  custom.style.display = select.value === 'other' ? 'block' : 'none';
+}
+
+function openInlineCatalogPhotoSearch(btn){
+  const row = btn.closest('.db-row-editing');
+  activePhotoTarget = row.querySelector('.db-inline-photo');
+  document.getElementById('photoModal').classList.add('open');
+  document.getElementById('photoResults').innerHTML = '';
+  document.getElementById('photoSearchInput').value = row.querySelector('.inline-name').value.trim();
+  updatePhotoSearchStatus();
+}
+
+async function saveInlineDbProduct(btn){
+  const row = btn.closest('.db-row-editing');
+  const name = row.querySelector('.inline-name').value.trim();
+  const price = parseFloat(row.querySelector('.inline-price').value.replace(/[^0-9.]/g,''));
+  if(!name || Number.isNaN(price)){
+    document.getElementById('dbEditorStatus').textContent = 'Enter a valid name and price.';
+    return;
+  }
+  const photo = row.querySelector('.db-inline-photo');
+  const payload = {
+    displayName:name,
+    description:row.querySelector('.inline-description').value.trim(),
+    price:price.toFixed(2),
+    unit:row.querySelector('.inline-unit').value,
+    unitCustom:row.querySelector('.inline-custom-unit').value.trim(),
+    adSize:row.querySelector('.inline-big').checked ? 'big' : 'small',
+    img:photo.dataset.img || null,
+    originalImg:photo.dataset.originalImg || photo.dataset.img || null
+  };
+  const res = await fetch('/api/products/' + encodeURIComponent(editingDbKey), {method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+  if(!res.ok){
+    document.getElementById('dbEditorStatus').textContent = 'Could not update that product.';
+    return;
+  }
+  editingDbKey = null;
+  document.getElementById('dbEditorStatus').textContent = 'Product updated.';
+  renderDbList();
+}
+
+async function addDbProductToFlyer(key){
+  const status = document.getElementById('dbEditorStatus');
+  const res = await fetch('/api/products/' + encodeURIComponent(key));
+  if(!res.ok) return;
+  const product = await res.json();
+  const existing = findProductOnFlyer(product.display_name, replaceTargetCell);
+  if(existing){
+    status.style.color = '#a56a00';
+    status.textContent = `${product.display_name} is already on this flyer — no second copy was added.`;
+    highlightExistingFlyerItem(existing);
+    return;
+  }
+  if(replaceTargetCell){
+    const oldName = replaceTargetCell.querySelector('.pname').textContent.trim();
+    if(!fillCellFromProduct(replaceTargetCell, product, {replace:true})) return;
+    status.style.color = '#287a3d';
+    status.textContent = `${oldName && oldName !== 'Product Name' ? oldName : 'Ad slot'} replaced with ${product.display_name}.`;
+    setStatus(status.textContent);
+    closeProductDB();
+    return;
+  }
+  const wantsBig = product.ad_size === 'big';
+  const target = Array.from(document.querySelectorAll('.cell')).find(cell => {
+    const name = cell.querySelector('.pname').textContent.trim();
+    const isEmpty = !name || name === 'Product Name';
+    return isEmpty && cell.classList.contains('hero') === wantsBig;
+  });
+  if(!target){
+    status.style.color = '#a32720';
+    status.textContent = `This flyer has no empty ${wantsBig ? 'big' : 'small'} ad slots.`;
+    return;
+  }
+  if(!fillCellFromProduct(target, product)) return;
+  status.style.color = '#287a3d';
+  status.textContent = `${product.display_name} added to the next empty flyer slot.`;
+}
+
+function renderInlineDbEditor(v){
+  const unitOptions = UNIT_OPTIONS.map(unit => `<option value="${unit}" ${v.unit === unit ? 'selected' : ''}>${unit === 'other' ? 'Other…' : unit}</option>`).join('');
+  return `
+    <div class="db-row db-row-editing" data-key="${escapeHtml(v.name_key)}">
+      <div class="db-inline-photo-wrap">
+        <div class="photo db-inline-photo"><span class="lbl">No photo</span></div>
+        <input type="file" accept="image/*" style="display:none" onchange="uploadDbPhoto(this)">
+        <button type="button" class="db-inline-find" onclick="this.previousElementSibling.click()">⬆ Upload</button>
+        <button type="button" class="db-inline-find" onclick="openInlineCatalogPhotoSearch(this)">🔎 Photo</button>
+      </div>
+      <div class="db-inline-field"><label>Product name</label><input class="inline-name" value="${escapeHtml(v.display_name)}"></div>
+      <div class="db-inline-field"><label>Description</label><input class="inline-description" value="${escapeHtml(v.description || '')}"></div>
+      <div class="db-inline-field"><label>Price</label><input class="inline-price" inputmode="decimal" value="${escapeHtml(v.price)}">${v.lastPrice ? `<span style="font-size:9px;color:#a56a00;">${formatLastPrice(v)}</span>` : ''}</div>
+      <div class="db-inline-field"><label>Unit</label><select class="inline-unit" onchange="inlineUnitChanged(this)">${unitOptions}</select><input class="inline-custom-unit" value="${escapeHtml(v.unit_custom || '')}" placeholder="custom unit" style="display:${v.unit === 'other' ? 'block' : 'none'}"></div>
+      <div class="db-inline-field db-inline-size"><label>Ad size</label><div class="db-size-options"><label><input type="checkbox" class="inline-big" ${v.ad_size === 'big' ? 'checked' : ''} onchange="setInlineAdSize(this,'big')"> Big</label><label><input type="checkbox" class="inline-small" ${v.ad_size !== 'big' ? 'checked' : ''} onchange="setInlineAdSize(this,'small')"> Small</label></div></div>
+      <div class="db-inline-actions"><button type="button" class="save" onclick="saveInlineDbProduct(this)">Save</button><button type="button" class="cancel" onclick="cancelInlineDbEdit()">Cancel</button></div>
+    </div>`;
+}
+
+async function renderDbList(){
+  const q = document.getElementById('dbSearch').value.trim();
+  const res = await fetch('/api/products?q=' + encodeURIComponent(q));
+  const rows = await res.json();
+  const list = document.getElementById('dbList');
+  document.getElementById('dbCount').textContent = `${rows.length} product${rows.length === 1 ? '' : 's'}`;
+  if(rows.length === 0){
+    list.innerHTML = `<div class="empty-db">No matching products. Add one below or clear the search.</div>`;
+    return;
+  }
+  list.innerHTML = rows.map(v => editingDbKey === v.name_key ? renderInlineDbEditor(v) : `
+    <div class="db-row">
+      ${v.img ? `<img src="${escapeHtml(v.img)}">` : `<div class="db-noimg"></div>`}
+      <div class="db-name">${escapeHtml(v.display_name)}</div>
+      <div class="db-description" title="${escapeHtml(v.description)}">${escapeHtml(v.description || '—')}</div>
+      <div class="db-price">$${escapeHtml(v.price)} / ${escapeHtml(v.unit === 'other' ? (v.unit_custom||'') : v.unit)}</div>
+      <span class="db-size-badge ${v.ad_size === 'big' ? 'big' : 'small'}">${v.ad_size === 'big' ? 'Big ad' : 'Small ad'}</span>
+      <div class="db-updated">${new Date(v.updated_at).toLocaleDateString()}</div>
+      <div class="db-row-actions">
+        <button class="db-action add" data-key="${escapeHtml(v.name_key)}" onclick="addDbProductToFlyer(this.dataset.key)">${replaceTargetCell ? 'Replace item' : 'Add to flyer'}</button>
+        <button class="db-action edit" data-key="${escapeHtml(v.name_key)}" onclick="editDbProduct(this.dataset.key)">Edit</button>
+        <button class="db-action delete" data-key="${escapeHtml(v.name_key)}" onclick="deleteDbEntry(this.dataset.key)">Delete</button>
+      </div>
+      <button type="button" class="price-history-toggle" data-key="${escapeHtml(v.name_key)}" onclick="togglePriceHistory(this)">▾ ${v.lastPrice ? `Price history · last ${escapeHtml(v.lastPrice)}/${escapeHtml(v.lastPriceUnit === 'other' ? '' : (v.lastPriceUnit || ''))} — ${new Date(v.lastPriceAt).toLocaleDateString('en-US',{month:'short',day:'numeric'})}` : 'Price history'}</button>
+      <div class="price-history-panel"></div>
+    </div>
+  `).join('');
+  if(editingDbKey){
+    const product = rows.find(v => v.name_key === editingDbKey);
+    const preview = list.querySelector('.db-row-editing .db-inline-photo');
+    if(product && preview && product.img){
+      preview.style.backgroundImage = `url(${product.img})`;
+      preview.dataset.img = product.img;
+      preview.dataset.originalImg = product.original_img || product.img;
+      preview.classList.add('has-img');
+    }
+  }
+}
+
+async function deleteDbEntry(key){
+  if(!confirm('Delete this product from the catalog?')) return;
+  await fetch('/api/products/' + encodeURIComponent(key), { method:'DELETE' });
+  if(editingDbKey === key) editingDbKey = null;
+  renderDbList();
+}
+
+function importHeaderKey(value){
+  return String(value || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+function importValue(row, aliases){
+  const wanted = new Set(aliases.map(importHeaderKey));
+  const key = Object.keys(row).find(k => wanted.has(importHeaderKey(k)));
+  return key == null ? '' : row[key];
+}
+
+function normalizeImportedUnit(value){
+  const unit = String(value || '').trim().toLowerCase();
+  const aliases = {
+    'lb':'lb.', 'lbs':'lb.', 'pound':'lb.', 'pounds':'lb.',
+    'ea':'each', 'each':'each',
+    'oz':'oz.', 'ounce':'oz.', 'ounces':'oz.',
+    'pkg':'pkg.', 'package':'pkg.', 'pack':'pkg.',
+    'bag':'bag', 'box':'box'
+  };
+  return aliases[unit.replace(/\.$/, '')] || (unit ? 'other' : 'lb.');
+}
+
+async function importProductSheet(input){
+  const file = input.files && input.files[0];
+  input.value = '';
+  if(!file) return;
+  const status = document.getElementById('dbImportStatus');
+  status.className = 'db-import-status';
+  status.textContent = 'Reading spreadsheet…';
+  try{
+    if(!window.XLSX) throw new Error('The Excel importer did not load. Restart the app and try again.');
+    const bytes = await file.arrayBuffer();
+    const workbook = XLSX.read(bytes, {type:'array'});
+    const sheetName = workbook.SheetNames.find(n => n.toLowerCase() === 'products') || workbook.SheetNames[0];
+    if(!sheetName) throw new Error('That spreadsheet has no sheets.');
+    const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], {defval:'', raw:false});
+    const productsByName = new Map();
+    let skipped = 0;
+    for(const row of rows){
+      const displayName = String(importValue(row, ['Product Name','Name','Product'])).trim();
+      const rawPrice = String(importValue(row, ['Price','Cost'])).trim().replace(/[^0-9.]/g, '');
+      if(!displayName || !rawPrice || !Number.isFinite(Number(rawPrice))){ skipped++; continue; }
+      const rawUnit = importValue(row, ['Unit','Price Unit','Sold By']);
+      const unit = normalizeImportedUnit(rawUnit);
+      const sizeValue = String(importValue(row, ['Default Ad Size','Ad Size','Size'])).trim().toLowerCase();
+      productsByName.set(normalizedFlyerName(displayName), {
+        displayName,
+        description:String(importValue(row, ['Size / Description','Description','Product Description'])).trim(),
+        price:Number(rawPrice).toFixed(2),
+        unit,
+        unitCustom:unit === 'other' ? String(rawUnit).trim() : '',
+        adSize:sizeValue.includes('big') ? 'big' : 'small'
+      });
+    }
+    const products = [...productsByName.values()];
+    if(!products.length) throw new Error('No valid products were found. Product Name and Price are required.');
+
+    const existingRes = await fetch('/api/products');
+    if(!existingRes.ok) throw new Error('Could not compare the spreadsheet with the catalog.');
+    const existing = await existingRes.json();
+    const existingKeys = new Set(existing.map(v => normalizedFlyerName(v.display_name)));
+    const updated = products.filter(v => existingKeys.has(normalizedFlyerName(v.displayName))).length;
+    const added = products.length - updated;
+    const duplicateRows = rows.length - skipped - products.length;
+    const summary = `${file.name}\n\n${added} new product${added === 1 ? '' : 's'}\n${updated} existing product${updated === 1 ? '' : 's'} will be updated\n${skipped} invalid/blank row${skipped === 1 ? '' : 's'} skipped${duplicateRows > 0 ? `\n${duplicateRows} repeated name${duplicateRows === 1 ? '' : 's'} combined` : ''}\n\nExisting photos are kept when a product name matches. Import now?`;
+    status.textContent = `Ready: ${added} new, ${updated} updates, ${skipped} skipped.`;
+    if(!confirm(summary)){ status.textContent = 'Import cancelled — nothing changed.'; return; }
+
+    status.textContent = 'Importing products…';
+    const res = await fetch('/api/products/import', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({products})});
+    const result = await res.json().catch(() => ({}));
+    if(!res.ok) throw new Error(result.error || 'Could not import products.');
+    status.textContent = `Import complete: ${result.added} added, ${result.updated} updated, ${result.skipped + skipped} skipped.`;
+    document.getElementById('dbSearch').value = '';
+    renderDbList();
+  } catch(err){
+    status.className = 'db-import-status error';
+    status.textContent = err.message || 'Could not read that spreadsheet.';
+  }
+}
+
+async function downloadDatabaseBackup(){
+  if(flyerDirty && !confirm('The current flyer has unsaved changes. The backup only includes saved data. Download the backup anyway?')) return;
+  try{
+    const res = await fetch('/api/backup');
+    if(!res.ok) throw new Error('backup_failed');
+    const blob = await res.blob();
+    const disposition = res.headers.get('content-disposition') || '';
+    const match = disposition.match(/filename="([^"]+)"/i);
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = match ? match[1] : `cashsaver-backup-${new Date().toISOString().slice(0,10)}.json`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+    setStatus('Full database backup downloaded ✓');
+  } catch(err){ alert('Could not create the backup. Try again.'); }
+}
+
+async function restoreDatabaseBackup(input){
+  const file = input.files && input.files[0];
+  input.value = '';
+  if(!file) return;
+  try{
+    const backup = JSON.parse(await file.text());
+    if(backup.format !== 'weekly-ad-builder-backup' || backup.version !== 1 || !backup.tables) throw new Error('invalid');
+    const counts = {
+      flyers:Array.isArray(backup.tables.flyers) ? backup.tables.flyers.length : 0,
+      products:Array.isArray(backup.tables.products) ? backup.tables.products.length : 0,
+      subscribers:Array.isArray(backup.tables.subscribers) ? backup.tables.subscribers.length : 0
+    };
+    const ok = confirm(`Restore this backup?\n\n${counts.flyers} flyers\n${counts.products} products\n${counts.subscribers} subscribers\n\nThis replaces the database currently in the app. This cannot be undone unless you download a backup first.`);
+    if(!ok) return;
+    const typed = prompt('Type RESTORE to confirm replacing the current saved database:');
+    if(typed !== 'RESTORE') return;
+    const res = await fetch('/api/restore', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(backup)});
+    const result = await res.json().catch(() => ({}));
+    if(!res.ok) throw new Error(result.message || result.error || 'restore_failed');
+    flyerDirty = false;
+    alert(`Restore complete. Loaded ${result.restored.flyers} flyers and ${result.restored.products} products. The app will refresh now.`);
+    location.reload();
+  } catch(err){
+    alert('That is not a valid Cash Saver backup, or it could not be restored. Nothing was replaced.');
+  }
+}
+
+let availableUpdateUrl = '';
+
+async function checkForUpdates(manual = false){
+  const label = document.getElementById('appVersionLabel');
+  const panel = document.getElementById('updatePanel');
+  if(manual) label.textContent = 'Checking for updates…';
+  try{
+    const res = await fetch('/api/update-status');
+    const result = await res.json().catch(() => ({}));
+    if(!res.ok) throw new Error('check_failed');
+    label.textContent = `Installed version ${result.currentVersion || 'unknown'}`;
+    if(!result.configured){
+      panel.classList.remove('open');
+      if(manual) setStatus('Update service is not configured on this installation.');
+      return;
+    }
+    if(result.updateAvailable){
+      availableUpdateUrl = result.downloadUrl;
+      document.getElementById('updateTitle').textContent = `Version ${result.latestVersion} is available`;
+      document.getElementById('updateNotes').textContent = result.releaseNotes || 'A newer version of Weekly Ad Builder is ready.';
+      panel.classList.add('open');
+      if(manual) setStatus(`Update ${result.latestVersion} is available.`);
+    } else {
+      availableUpdateUrl = '';
+      panel.classList.remove('open');
+      if(manual) setStatus('You already have the latest version ✓');
+    }
+  } catch(err){
+    panel.classList.remove('open');
+    label.textContent = 'Could not check for updates';
+    if(manual) setStatus('Could not check for updates. Internet may be unavailable.');
+  }
+}
+
+function downloadAvailableUpdate(){
+  if(!availableUpdateUrl) return;
+  if(flyerDirty && !confirm('You have unsaved flyer changes. Save them before installing the update. Download the installer anyway?')) return;
+  window.open(availableUpdateUrl, '_blank', 'noopener');
+}
+
+/* ================= PHOTO SEARCH (Pexels) ================= */
+async function updatePhotoSearchStatus(){
+  const res = await fetch('/api/settings');
+  const s = await res.json();
+  const status = document.getElementById('photoSearchStatus');
+  status.textContent = s.pexelsConfigured ? 'Photo search is ready' : 'Photo search is not configured — ask the administrator to set PEXELS_API_KEY';
+  status.classList.toggle('not-configured', !s.pexelsConfigured);
+}
+
+function openPhotoSearch(btn){
+  activePhotoTarget = btn.closest('.photo') || btn.closest('.cell')?.querySelector('.photo');
+  document.getElementById('photoModal').classList.add('open');
+  document.getElementById('photoResults').innerHTML = '';
+  const nameGuess = activePhotoTarget.closest('.cell').querySelector('.pname').textContent.trim();
+  document.getElementById('photoSearchInput').value = (nameGuess && nameGuess !== 'Product Name') ? nameGuess : '';
+  updatePhotoSearchStatus();
+}
+
+function openCatalogPhotoSearch(){
+  activePhotoTarget = document.getElementById('dbProductPhotoPreview');
+  document.getElementById('photoModal').classList.add('open');
+  document.getElementById('photoResults').innerHTML = '';
+  document.getElementById('photoSearchInput').value = document.getElementById('dbProductName').value.trim();
+  updatePhotoSearchStatus();
+}
+function closePhotoSearch(){
+  document.getElementById('photoModal').classList.remove('open');
+  activePhotoTarget = null;
+}
+
+async function runPhotoSearch(){
+  const query = document.getElementById('photoSearchInput').value.trim();
+  const results = document.getElementById('photoResults');
+  if(!query){ return; }
+  results.innerHTML = '<p style="grid-column:1/-1;color:#888;">Searching…</p>';
+  try{
+    const res = await fetch(`/api/photo-search?q=${encodeURIComponent(query)}`);
+    if(!res.ok){
+      const error = await res.json().catch(() => ({}));
+      results.innerHTML = `<p style="grid-column:1/-1;color:#c0231a;">${error.message || 'Photo search failed. Please try again.'}</p>`;
+      return;
+    }
+    const data = await res.json();
+    if(!data.photos || data.photos.length === 0){ results.innerHTML = '<p style="grid-column:1/-1;color:#888;">No results. Try a different search term.</p>'; return; }
+    results.innerHTML = data.photos.map(p => `
+      <div class="photo-result" data-url="${escapeHtml(p.medium)}" onclick="pickPhotoResult(this.dataset.url)">
+        <img src="${escapeHtml(p.small)}" loading="lazy">
+      </div>
+    `).join('');
+  } catch(e){
+    results.innerHTML = '<p style="grid-column:1/-1;color:#c0231a;">Search failed — check your internet connection.</p>';
+  }
+}
+
+async function pickPhotoResult(url){
+  if(!activePhotoTarget) return;
+  const target = activePhotoTarget;
+  try{
+    const res = await fetch(url);
+    const blob = await res.blob();
+    const reader = new FileReader();
+    reader.onload = e => {
+      closePhotoSearch();
+      openCropper(e.target.result, target, true);
+    };
+    reader.readAsDataURL(blob);
+  } catch(e){
+    alert('Could not load that photo — try another one.');
+    closePhotoSearch();
+  }
+}
+
+/* ================= CROP / RESIZE ================= */
+let CROP_W = 480, CROP_H = 360;     // updated to match the target image container
+const PRODUCT_OUTPUT_MAX = 720;
+const LOGO_OUTPUT_MAX = 2000;
+const JPEG_QUALITY = 0.92;
+
+let cropTarget = null;   // the .photo element we're filling in
+let cropOriginalDataUrl = null;
+let cropNaturalW = 0, cropNaturalH = 0;
+let cropScaleBase = 1;   // scale at 100% zoom (the "cover" scale)
+let cropScale = 1;
+let cropOffsetX = 0, cropOffsetY = 0;
+let cropDragging = false, cropDragStartX = 0, cropDragStartY = 0, cropStartOffX = 0, cropStartOffY = 0;
+
+function openCropper(dataUrl, target, isNewSource = false){
+  cropTarget = target;
+  // Match the editing stage to the actual destination box. A wide logo now gets
+  // a wide crop, while portrait or square product boxes keep their own shape.
+  const targetWidth = Math.max(1, target.offsetWidth);
+  const targetHeight = Math.max(1, target.offsetHeight);
+  const targetRatio = targetWidth / targetHeight;
+  const maxStageWidth = 480;
+  const maxStageHeight = 360;
+  if(targetRatio >= maxStageWidth / maxStageHeight){
+    CROP_W = maxStageWidth;
+    CROP_H = Math.max(60, Math.round(CROP_W / targetRatio));
+  } else {
+    CROP_H = maxStageHeight;
+    CROP_W = Math.max(60, Math.round(CROP_H * targetRatio));
+  }
+  const stage = document.getElementById('cropStage');
+  stage.style.width = CROP_W + 'px';
+  stage.style.height = CROP_H + 'px';
+  const img = document.getElementById('cropImg');
+  img.onload = () => {
+    cropNaturalW = img.naturalWidth;
+    cropNaturalH = img.naturalHeight;
+    cropOriginalDataUrl = (isNewSource || !target.dataset.originalImg)
+      ? makeCompressedOriginal(img)
+      : target.dataset.originalImg;
+    cropScaleBase = Math.max(CROP_W / cropNaturalW, CROP_H / cropNaturalH);
+    cropScale = cropScaleBase;
+    cropOffsetX = (CROP_W - cropNaturalW * cropScale) / 2;
+    cropOffsetY = (CROP_H - cropNaturalH * cropScale) / 2;
+    document.getElementById('cropZoom').value = 100;
+    applyCropTransform();
+  };
+  img.src = dataUrl;
+  document.getElementById('cropModal').classList.add('open');
+}
+
+function applyCropTransform(){
+  const img = document.getElementById('cropImg');
+  img.style.transform = `translate(${cropOffsetX}px, ${cropOffsetY}px) scale(${cropScale})`;
+  img.style.width = cropNaturalW + 'px';
+  img.style.height = cropNaturalH + 'px';
+}
+
+function clampCropOffsets(){
+  cropOffsetX = clampAxis(cropOffsetX, cropNaturalW, cropScale, CROP_W);
+  cropOffsetY = clampAxis(cropOffsetY, cropNaturalH, cropScale, CROP_H);
+}
+
+// If the image (at the current zoom) is smaller than the crop stage on this axis,
+// center it instead of pinning it to a corner — this is what makes zooming OUT
+// past 100% actually useful for a wide/oversized image instead of just breaking.
+function clampAxis(pos, naturalSize, scale, stageSize){
+  const scaledSize = naturalSize * scale;
+  if(scaledSize <= stageSize) return (stageSize - scaledSize) / 2;
+  const min = stageSize - scaledSize;
+  return Math.min(0, Math.max(min, pos));
+}
+
+function onCropZoom(val){
+  const oldScale = cropScale;
+  cropScale = cropScaleBase * (val / 100);
+  // keep the stage's center point anchored while zooming
+  const cx = CROP_W / 2, cy = CROP_H / 2;
+  const relX = (cx - cropOffsetX) / oldScale;
+  const relY = (cy - cropOffsetY) / oldScale;
+  cropOffsetX = cx - relX * cropScale;
+  cropOffsetY = cy - relY * cropScale;
+  clampCropOffsets();
+  applyCropTransform();
+}
+
+(function initCropDrag(){
+  const stage = document.getElementById('cropStage');
+  stage.addEventListener('pointerdown', e => {
+    cropDragging = true;
+    cropDragStartX = e.clientX; cropDragStartY = e.clientY;
+    cropStartOffX = cropOffsetX; cropStartOffY = cropOffsetY;
+    stage.setPointerCapture(e.pointerId);
+    stage.style.cursor = 'grabbing';
+  });
+  stage.addEventListener('pointermove', e => {
+    if(!cropDragging) return;
+    cropOffsetX = cropStartOffX + (e.clientX - cropDragStartX);
+    cropOffsetY = cropStartOffY + (e.clientY - cropDragStartY);
+    clampCropOffsets();
+    applyCropTransform();
+  });
+  const endDrag = () => { cropDragging = false; stage.style.cursor = 'grab'; };
+  stage.addEventListener('pointerup', endDrag);
+  stage.addEventListener('pointerleave', endDrag);
+})();
+
+function closeCropper(){
+  document.getElementById('cropModal').classList.remove('open');
+  cropTarget = null;
+  cropOriginalDataUrl = null;
+}
+
+function finishCrop(dataUrl){
+  if(cropTarget){
+    if(cropTarget.dataset.img && cropTarget.dataset.img !== dataUrl){
+      cropTarget.dataset.previousImg = cropTarget.dataset.img;
+    }
+    cropTarget.style.backgroundImage = `url(${dataUrl})`;
+    cropTarget.dataset.img = dataUrl;
+    cropTarget.dataset.originalImg = cropOriginalDataUrl || dataUrl;
+    cropTarget.classList.add('has-img');
+    const flyerCell = cropTarget.closest('.cell');
+    if(flyerCell) flyerCell.classList.remove('is-cleared');
+    updatePhotoActionState(cropTarget);
+    if(flyerCell || cropTarget.classList.contains('logo-photo')) markFlyerDirty();
+  }
+  closeCropper();
+}
+
+function makeCompressedOriginal(img){
+  const maxDimension = cropTarget && cropTarget.classList.contains('logo-photo') ? 2400 : 1800;
+  const scale = Math.min(1, maxDimension / Math.max(img.naturalWidth, img.naturalHeight));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
+  canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+  const isLogo = cropTarget && cropTarget.classList.contains('logo-photo');
+  return canvas.toDataURL(isLogo ? 'image/png' : 'image/jpeg', isLogo ? undefined : .92);
+}
+
+function useCroppedImage(){
+  // Render directly from the original image at final resolution. Rendering the
+  // 480px preview first made logos and type permanently blurry when enlarged.
+  const img = document.getElementById('cropImg');
+  const outputSize = getCropOutputSize();
+  const outW = outputSize.width;
+  const outH = outputSize.height;
+  const out = document.createElement('canvas');
+  out.width = outW; out.height = outH;
+  const ctx = out.getContext('2d');
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, outW, outH);
+  const scaleX = outW / CROP_W;
+  const scaleY = outH / CROP_H;
+  ctx.drawImage(
+    img,
+    cropOffsetX * scaleX,
+    cropOffsetY * scaleY,
+    cropNaturalW * cropScale * scaleX,
+    cropNaturalH * cropScale * scaleY
+  );
+  finishCrop(canvasImageData(out));
+}
+
+function useWholeImage(){
+  // fit the whole photo (contain), padding with white — nothing gets cut off
+  const outputSize = getCropOutputSize();
+  const outW = outputSize.width;
+  const outH = outputSize.height;
+  const scale = Math.min(outW / cropNaturalW, outH / cropNaturalH);
+  const drawW = cropNaturalW * scale, drawH = cropNaturalH * scale;
+  const dx = (outW - drawW) / 2, dy = (outH - drawH) / 2;
+
+  const out = document.createElement('canvas');
+  out.width = outW; out.height = outH;
+  const ctx = out.getContext('2d');
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, outW, outH);
+  const img = document.getElementById('cropImg');
+  ctx.drawImage(img, dx, dy, drawW, drawH);
+  finishCrop(canvasImageData(out));
+}
+
+function getCropOutputSize(){
+  const ratio = CROP_W / CROP_H;
+  const outputMax = cropTarget && cropTarget.classList.contains('logo-photo') ? LOGO_OUTPUT_MAX : PRODUCT_OUTPUT_MAX;
+  if(ratio >= 1){
+    return { width:outputMax, height:Math.max(1, Math.round(outputMax / ratio)) };
+  }
+  return { width:Math.max(1, Math.round(outputMax * ratio)), height:outputMax };
+}
+
+function canvasImageData(canvas){
+  const isLogo = cropTarget && cropTarget.classList.contains('logo-photo');
+  return canvas.toDataURL(isLogo ? 'image/png' : 'image/jpeg', isLogo ? undefined : JPEG_QUALITY);
+}
+
+/* ================= AD SCHEDULE (Wed-Tue by default, editable for holiday runs) ================= */
+const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+
+function snapToWednesday(dateStr){
+  const d = new Date(dateStr + 'T00:00:00');
+  const day = d.getDay();
+  const diff = 3 - day;
+  d.setDate(d.getDate() + diff);
+  return d;
+}
+function formatShort(d){ return `${MONTHS[d.getMonth()]} ${d.getDate()}`; }
+function formatLong(d){ return `${MONTHS[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`; }
+function toDateInputValue(d){ return d.toISOString().slice(0,10); }
+
+function onMultiWeekToggle(){
+  const on = document.getElementById('multiWeekToggle').checked;
+  document.getElementById('endDateWrap').style.display = on ? 'flex' : 'none';
+  if(on){
+    // default the end date picker to 13 days out (a 2-week run) if it's not already set sensibly
+    const start = snapToWednesday(document.getElementById('weekPicker').value);
+    const suggestedEnd = new Date(start);
+    suggestedEnd.setDate(suggestedEnd.getDate() + 13);
+    document.getElementById('endDatePicker').value = toDateInputValue(suggestedEnd);
+  }
+  applyWeek();
+}
+
+function getScheduleTimestamps(){
+  const picker = document.getElementById('weekPicker');
+  if(!picker.value) return null;
+  const start = snapToWednesday(picker.value);
+  const time = document.getElementById('startTime').value || '07:00';
+  const [hh, mm] = time.split(':').map(Number);
+  start.setHours(hh, mm, 0, 0);
+
+  let end;
+  if(document.getElementById('multiWeekToggle').checked && document.getElementById('endDatePicker').value){
+    end = new Date(document.getElementById('endDatePicker').value + 'T23:59:59');
+  } else {
+    end = new Date(start);
+    end.setDate(end.getDate() + 6);
+    end.setHours(23,59,59,0);
+  }
+  return { startMs: start.getTime(), endMs: end.getTime(), startDate: start, endDate: end };
+}
+
+function applyWeek(){
+  const sched = getScheduleTimestamps();
+  if(!sched) return;
+  document.getElementById('footStart').textContent = formatShort(sched.startDate).toUpperCase();
+  document.getElementById('footEnd').textContent = formatLong(sched.endDate).toUpperCase();
+  const dayCount = Math.round((sched.endMs - sched.startMs) / 86400000) + 1;
+  const time12 = document.getElementById('startTime').value;
+  document.getElementById('weekPreview').textContent =
+    `= goes live ${formatShort(sched.startDate)} at ${time12}, runs ${dayCount} days through ${formatShort(sched.endDate)}, ${sched.endDate.getFullYear()}`;
+}
+
+function initWeekPicker(){
+  const today = new Date();
+  const wed = snapToWednesday(today.toISOString().slice(0,10));
+  if(wed < today) wed.setDate(wed.getDate() + 7);
+  document.getElementById('weekPicker').value = toDateInputValue(wed);
+  document.getElementById('startTime').value = '07:00';
+  document.getElementById('multiWeekToggle').checked = false;
+  document.getElementById('endDateWrap').style.display = 'none';
+}
+
+/* ---------------- Scheduled Ads list ---------------- */
+function openScheduleList(){
+  document.getElementById('scheduleModal').classList.add('open');
+  renderScheduleList();
+}
+function closeScheduleList(){ document.getElementById('scheduleModal').classList.remove('open'); }
+
+async function renderScheduleList(){
+  const res = await fetch('/api/flyers');
+  const rows = await res.json();
+  const list = document.getElementById('scheduleList');
+  const scheduled = rows.filter(r => r.scheduled_start);
+  const unscheduled = rows.filter(r => !r.scheduled_start);
+
+  if(rows.length === 0){
+    list.innerHTML = '<div class="empty-db">No flyers saved yet.</div>';
+    return;
+  }
+
+  const fmt = ms => new Date(ms).toLocaleString([], { month:'short', day:'numeric', hour:'numeric', minute:'2-digit' });
+  const pillLabel = { scheduled: 'Scheduled', live: 'Live now', past: 'Past', unscheduled: 'No schedule set' };
+
+  let html = scheduled
+    .sort((a,b) => a.scheduled_start - b.scheduled_start)
+    .map(r => `
+      <div class="sched-row">
+        <div class="sched-name">${r.name}</div>
+        <div class="sched-dates">${fmt(r.scheduled_start)} → ${r.scheduled_end ? fmt(r.scheduled_end) : '—'}</div>
+        <span class="sched-pill ${r.status}">${pillLabel[r.status]}</span>
+      </div>
+    `).join('');
+
+  if(unscheduled.length){
+    html += unscheduled.map(r => `
+      <div class="sched-row">
+        <div class="sched-name">${r.name}</div>
+        <div class="sched-dates" style="color:#aaa;">no go-live date set</div>
+        <span class="sched-pill unscheduled">${pillLabel.unscheduled}</span>
+      </div>
+    `).join('');
+  }
+
+  list.innerHTML = html;
+}
+
+/* ================= SHARE / EXPORT IMAGE ================= */
+function buildCleanPreviewClone(){
+  const clone = document.getElementById('page').cloneNode(true);
+  clone.removeAttribute('id');
+  clone.classList.add('render-clean', 'preview-page');
+  clone.querySelectorAll('.db-badge,.cell-hover-menu,.drag-handle,.container-resize-handle,.undo-container-size-btn,.remove-photo-btn,.undo-photo-btn,.suggest-list,input[type=file]').forEach(el => el.remove());
+  clone.querySelectorAll('[contenteditable]').forEach(el => el.removeAttribute('contenteditable'));
+  clone.querySelectorAll('.price-input').forEach(input => {
+    const amount = Number.parseFloat(input.value);
+    const formatted = Number.isFinite(amount) ? amount.toFixed(2) : '0.00';
+    const [whole, cents] = formatted.split('.');
+    const visual = input.parentElement.querySelector('.price-visual');
+    if(visual){
+      visual.querySelector('.price-whole').textContent = whole;
+      visual.querySelector('.price-cents').textContent = cents;
+      visual.style.display = 'flex';
+    }
+    input.remove();
+  });
+  clone.querySelectorAll('.priceline').forEach(line => {
+    const select = line.querySelector('.unit-select');
+    const custom = line.querySelector('.unit-custom');
+    const rendered = document.createElement('span');
+    rendered.className = 'rendered-unit';
+    rendered.textContent = select && select.value === 'other' ? (custom ? custom.value : '') : (select ? select.value : '');
+    if(select) select.replaceWith(rendered);
+    else line.appendChild(rendered);
+    if(custom) custom.remove();
+  });
+  clone.querySelectorAll('[id]').forEach(el => el.removeAttribute('id'));
+  return clone;
+}
+
+function sizeAdPreview(){
+  const viewport = document.getElementById('previewViewport');
+  const stage = document.getElementById('previewStage');
+  const preview = stage && stage.querySelector('.preview-page');
+  if(!viewport || !preview) return;
+  preview.style.transform = 'none';
+  const naturalWidth = preview.offsetWidth || 816;
+  const naturalHeight = preview.scrollHeight || preview.offsetHeight;
+  const scale = Math.min(1, Math.max(.35, (viewport.clientWidth - 12) / naturalWidth));
+  preview.style.transform = `scale(${scale})`;
+  stage.style.width = `${naturalWidth * scale}px`;
+  stage.style.height = `${naturalHeight * scale}px`;
+}
+
+function openAdPreview(){
+  const stage = document.getElementById('previewStage');
+  stage.innerHTML = '';
+  stage.appendChild(buildCleanPreviewClone());
+  document.getElementById('previewModal').classList.add('open');
+  requestAnimationFrame(sizeAdPreview);
+}
+
+function closeAdPreview(){
+  document.getElementById('previewModal').classList.remove('open');
+  document.getElementById('previewStage').innerHTML = '';
+}
+
+window.addEventListener('resize', () => {
+  if(document.getElementById('previewModal').classList.contains('open')) sizeAdPreview();
+});
+
+function captureFlyerCanvas(scale = 1.4){
+  const page = document.getElementById('page');
+  // Photo elements also carry full-resolution original and undo copies in data
+  // attributes. html2canvas would clone all of those multi-megabyte strings even
+  // though only the CSS background is visible. Strip them during capture, then
+  // restore immediately so crop/undo keeps working normally.
+  const photoData = Array.from(page.querySelectorAll('.photo')).map(photo => ({
+    photo,
+    img: photo.getAttribute('data-img'),
+    original: photo.getAttribute('data-original-img'),
+    previous: photo.getAttribute('data-previous-img')
+  }));
+  photoData.forEach(({photo}) => {
+    photo.removeAttribute('data-img');
+    photo.removeAttribute('data-original-img');
+    photo.removeAttribute('data-previous-img');
+  });
+  const prices = Array.from(page.querySelectorAll('.price-input')).map(input => input.value);
+  const units = Array.from(page.querySelectorAll('.priceline')).map(line => {
+    const select = line.querySelector('.unit-select');
+    const custom = line.querySelector('.unit-custom');
+    return select && select.value === 'other' ? (custom.value || '') : (select ? select.value : '');
+  });
+  return html2canvas(page, {
+    scale,
+    useCORS:true,
+    imageTimeout:3000,
+    logging:false,
+    removeContainer:true,
+    backgroundColor:'#ffffff',
+    onclone: clonedDocument => {
+      const clonedPage = clonedDocument.getElementById('page');
+      clonedPage.classList.add('render-clean');
+      clonedPage.querySelectorAll('.db-badge,.cell-hover-menu,.drag-handle,.container-resize-handle,.undo-container-size-btn,.remove-photo-btn,.undo-photo-btn,.suggest-list,input[type=file]').forEach(el => el.remove());
+      clonedPage.querySelectorAll('[contenteditable]').forEach(el => el.removeAttribute('contenteditable'));
+      clonedPage.querySelectorAll('.price-input').forEach((input, index) => {
+        const amount = Number.parseFloat(prices[index]);
+        const formatted = Number.isFinite(amount) ? amount.toFixed(2) : '0.00';
+        const [whole, cents] = formatted.split('.');
+        const visual = input.parentElement.querySelector('.price-visual');
+        visual.querySelector('.price-whole').textContent = whole;
+        visual.querySelector('.price-cents').textContent = cents;
+        visual.style.display = 'flex';
+        input.remove();
+      });
+      clonedPage.querySelectorAll('.priceline').forEach((line, index) => {
+        const select = line.querySelector('.unit-select');
+        const custom = line.querySelector('.unit-custom');
+        const text = clonedDocument.createElement('span');
+        text.className = 'rendered-unit';
+        text.textContent = units[index] || '';
+        if(select) select.replaceWith(text); else line.appendChild(text);
+        if(custom) custom.remove();
+      });
+    }
+  }).finally(() => {
+    photoData.forEach(({photo,img,original,previous}) => {
+      if(img !== null) photo.setAttribute('data-img', img);
+      if(original !== null) photo.setAttribute('data-original-img', original);
+      if(previous !== null) photo.setAttribute('data-previous-img', previous);
+    });
+  });
+}
+
+function shareOrExportImage(){
+  const btn = event.target;
+  const original = btn.textContent;
+  btn.textContent = 'Rendering…';
+  btn.disabled = true;
+
+  captureFlyerCanvas(1.4)
+    .then(canvas => {
+      canvas.toBlob(async blob => {
+        const filename = (currentName || 'weekly-ad').replace(/[^a-z0-9\-_]+/gi,'_') + '.jpg';
+        const file = new File([blob], filename, { type: 'image/jpeg' });
+
+        // Native desktop share sheets can sit open indefinitely and make a normal
+        // image export look frozen. Share natively only on phones/tablets; desktop
+        // browsers download the finished image immediately.
+        const useNativeShare = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+          || (navigator.maxTouchPoints > 1 && window.innerWidth < 900);
+        if (useNativeShare && navigator.canShare && navigator.canShare({ files: [file] })) {
+          try {
+            await navigator.share({ files: [file], title: 'Weekly Ad', text: "This week's deals!" });
+            btn.textContent = original;
+            btn.disabled = false;
+            return;
+          } catch (err) {
+            // user backed out of the share sheet, or it failed — fall through to download
+          }
+        }
+
+        // Fallback: just download the image. Facebook (and every other platform)
+        // can't accept a locally-generated image via a link — there's no way around
+        // a manual upload step here, this just gets the file into their hands fast.
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = filename;
+        link.click();
+        setStatus(`Saved "${filename}" — upload it to Facebook like any other photo.`);
+        btn.textContent = original;
+        btn.disabled = false;
+      }, 'image/jpeg', .92);
+    })
+    .catch(() => {
+      alert('Could not create the image. Try again, or use Print / Save as PDF instead.');
+      btn.textContent = original;
+      btn.disabled = false;
+    });
+}
+
+/* ---------------- Subscribers ---------------- */
+function openSubscribers(){
+  document.getElementById('subsModal').classList.add('open');
+  renderSubsList();
+}
+function closeSubscribers(){ document.getElementById('subsModal').classList.remove('open'); }
+
+async function renderSubsList(){
+  const res = await fetch('/api/subscribers');
+  const rows = await res.json();
+  const list = document.getElementById('subsList');
+  if(rows.length === 0){
+    list.innerHTML = '<div class="empty-db">No subscribers yet.</div>';
+    return;
+  }
+  list.innerHTML = rows.map(s => `
+    <div class="sub-row ${s.active ? '' : 'sub-inactive'}">
+      <span class="sub-type ${s.type}">${s.type === 'email' ? 'EMAIL' : 'SMS'}</span>
+      <span class="sub-contact">${s.contact}</span>
+      <button class="secondary" style="border-radius:5px;padding:4px 8px;font-size:11px;" onclick="toggleSubscriber(${s.id})">${s.active ? 'Pause' : 'Resume'}</button>
+      <button style="background:#8a1410;color:#fff;border:none;border-radius:5px;padding:4px 8px;font-size:11px;cursor:pointer;" onclick="removeSubscriber(${s.id})">Delete</button>
+    </div>
+  `).join('');
+}
+
+async function addSubscriber(){
+  const type = document.getElementById('subType').value;
+  const contact = document.getElementById('subContact').value.trim();
+  if(!contact) return;
+  await fetch('/api/subscribers', {
+    method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({type, contact})
+  });
+  document.getElementById('subContact').value = '';
+  renderSubsList();
+}
+
+async function addBulkSubscribers(){
+  const lines = document.getElementById('bulkSubs').value.split('\n');
+  const res = await fetch('/api/subscribers/bulk', {
+    method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({lines})
+  });
+  const data = await res.json();
+  document.getElementById('bulkSubs').value = '';
+  setStatus(`Added ${data.added} subscriber(s).`);
+  renderSubsList();
+}
+
+async function toggleSubscriber(id){
+  await fetch(`/api/subscribers/${id}/toggle`, { method:'POST' });
+  renderSubsList();
+}
+
+async function removeSubscriber(id){
+  if(!confirm('Remove this subscriber?')) return;
+  await fetch(`/api/subscribers/${id}`, { method:'DELETE' });
+  renderSubsList();
+}
+
+/* ---------------- Send Now ---------------- */
+async function sendNow(){
+  if(!currentName){
+    alert('Save this flyer first, then you can send it.');
+    return;
+  }
+  if(!confirm(`Send "${currentName}" to your subscriber list right now? This can't be undone.`)) return;
+  const btn = event.target;
+  const original = btn.textContent;
+  btn.textContent = 'Sending…';
+  btn.disabled = true;
+  try{
+    const res = await fetch(`/api/flyers/${encodeURIComponent(currentName)}/send-now`, { method:'POST' });
+    const data = await res.json();
+    if(!res.ok){ alert('Could not send: ' + (data.message || 'unknown error')); return; }
+    const r = data.results;
+    setStatus(`Sent — ${r.emailSent} email(s), ${r.smsSent} text(s). (${r.emailFailed} email + ${r.smsFailed} text failures)`);
+  } catch(e){
+    alert('Could not send. Check the server is running and try again.');
+  } finally {
+    btn.textContent = original;
+    btn.disabled = false;
+  }
+}
+
+/* ================= FLYERS (server-backed) ================= */
+let currentName = null;
+let flyerDirty = false;
+let flyerChangeVersion = 0;
+let autoSaveTimer = null;
+let autoSaveInFlight = false;
+
+function showSaveState(message, state = ''){
+  const el = document.getElementById('saveState');
+  if(!el) return;
+  el.textContent = message;
+  el.className = `save-state ${state}`.trim();
+}
+
+function scheduleAutoSave(){
+  clearTimeout(autoSaveTimer);
+  if(currentName) autoSaveTimer = setTimeout(autoSaveFlyer, 1500);
+}
+
+function markFlyerDirty(){
+  flyerDirty = true;
+  flyerChangeVersion++;
+  const hasDuplicates = updateDuplicateMarkers().length > 0;
+  if(hasDuplicates){
+    showSaveState('Duplicate item — fix before saving', 'error');
+    clearTimeout(autoSaveTimer);
+    return;
+  }
+  if(currentName){
+    showSaveState('Unsaved changes…', 'dirty');
+    scheduleAutoSave();
+  } else {
+    showSaveState('Not saved — click Save once', 'dirty');
+  }
+}
+
+function markFlyerSaved(savedVersion = flyerChangeVersion){
+  if(savedVersion === flyerChangeVersion){
+    flyerDirty = false;
+    showSaveState('Saved ✓', 'saved');
+  } else {
+    flyerDirty = true;
+    showSaveState('Unsaved changes…', 'dirty');
+    scheduleAutoSave();
+  }
+}
+
+function resetFlyerDirtyState(){
+  clearTimeout(autoSaveTimer);
+  flyerDirty = false;
+  flyerChangeVersion = 0;
+  showSaveState(currentName ? 'Saved ✓' : 'Save once to enable auto-save', currentName ? 'saved' : '');
+}
+
+async function autoSaveFlyer(){
+  if(!flyerDirty || !currentName || autoSaveInFlight) return;
+  if(!validateNoDuplicateFlyerItems(false)) return;
+  autoSaveInFlight = true;
+  const nameAtStart = currentName;
+  const versionAtStart = flyerChangeVersion;
+  showSaveState('Saving…', 'saving');
+  try{
+    const res = await fetch('/api/flyers/' + encodeURIComponent(nameAtStart), {
+      method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(serializeState())
+    });
+    if(!res.ok) throw new Error('save_failed');
+    if(currentName === nameAtStart) markFlyerSaved(versionAtStart);
+  } catch(e){
+    flyerDirty = true;
+    showSaveState('Auto-save failed — use Save', 'error');
+  } finally {
+    autoSaveInFlight = false;
+    if(flyerDirty && currentName === nameAtStart && versionAtStart !== flyerChangeVersion) scheduleAutoSave();
+  }
+}
+
+function serializeState(){
+  const cells = collectAllCellData();
+  const header = {
+    logoImage: document.getElementById('logoPhoto').dataset.img || null,
+    logoOriginalImage: document.getElementById('logoPhoto').dataset.originalImg || document.getElementById('logoPhoto').dataset.img || null,
+    logoPreviousImage: document.getElementById('logoPhoto').dataset.previousImg || null,
+    logoWidth: document.getElementById('logoPhoto').style.width || null,
+    logoHeight: document.getElementById('logoPhoto').style.height || null,
+    logoPreviousWidth: document.getElementById('logoPhoto').dataset.previousWidth || null,
+    logoPreviousHeight: document.getElementById('logoPhoto').dataset.previousHeight || null,
+    layoutId: currentLayoutId,
+    store: Array.from(document.querySelectorAll('.store-box div')).map(d => d.innerHTML),
+    line1: document.querySelector('.tagline .line1').innerHTML,
+    line2: document.querySelector('.tagline .line2').innerHTML,
+    wow1: document.querySelectorAll('.wow-banner div')[0].innerHTML,
+    wow2: document.querySelectorAll('.wow-banner div')[1].innerHTML,
+    footStart: document.getElementById('footStart').textContent,
+    footEnd: document.getElementById('footEnd').textContent,
+    weekPickerValue: document.getElementById('weekPicker').value,
+    startTime: document.getElementById('startTime').value,
+    multiWeek: document.getElementById('multiWeekToggle').checked,
+    endDateValue: document.getElementById('endDatePicker').value
+  };
+  const sched = getScheduleTimestamps();
+  const scheduling = sched ? { start: sched.startMs, end: sched.endMs } : { start: null, end: null };
+  return { header, cells, scheduling };
+}
+
+function applyState(state){
+  const logoPhoto = document.getElementById('logoPhoto');
+  logoPhoto.style.width = state.header.logoWidth || '';
+  logoPhoto.style.height = state.header.logoHeight || '';
+  if(state.header.logoPreviousWidth) logoPhoto.dataset.previousWidth = state.header.logoPreviousWidth;
+  else delete logoPhoto.dataset.previousWidth;
+  if(state.header.logoPreviousHeight) logoPhoto.dataset.previousHeight = state.header.logoPreviousHeight;
+  else delete logoPhoto.dataset.previousHeight;
+  // Flyers with no explicitly saved logo fall back to the CashSaver logo baked
+  // into the template, so a new flyer starts branded instead of needing a re-upload.
+  const logoImg = state.header.logoImage || DEFAULT_LOGO_IMG;
+  logoPhoto.style.backgroundImage = `url(${logoImg})`;
+  logoPhoto.dataset.img = logoImg;
+  logoPhoto.classList.add('has-img');
+  logoPhoto.dataset.originalImg = state.header.logoOriginalImage || logoImg;
+  if(state.header.logoPreviousImage) logoPhoto.dataset.previousImg = state.header.logoPreviousImage;
+  else delete logoPhoto.dataset.previousImg;
+  updatePhotoActionState(logoPhoto);
+  document.querySelectorAll('.store-box div').forEach((d,i) => d.innerHTML = state.header.store[i] ?? '');
+  document.querySelector('.tagline .line1').innerHTML = state.header.line1;
+  document.querySelector('.tagline .line2').innerHTML = state.header.line2;
+  document.querySelectorAll('.wow-banner div')[0].innerHTML = state.header.wow1;
+  document.querySelectorAll('.wow-banner div')[1].innerHTML = state.header.wow2;
+  document.getElementById('footStart').textContent = state.header.footStart ?? '[START DATE]';
+  document.getElementById('footEnd').textContent = state.header.footEnd ?? '[END DATE]';
+  if(state.header.weekPickerValue) document.getElementById('weekPicker').value = state.header.weekPickerValue;
+  document.getElementById('startTime').value = state.header.startTime || '07:00';
+  document.getElementById('multiWeekToggle').checked = !!state.header.multiWeek;
+  document.getElementById('endDateWrap').style.display = state.header.multiWeek ? 'flex' : 'none';
+  if(state.header.endDateValue) document.getElementById('endDatePicker').value = state.header.endDateValue;
+
+  // rebuild the grid structure to match this flyer's saved layout, then fill in
+  // each cell's content as it's created — handles flyers saved under a different
+  // layout than whatever's currently on screen
+  buildLayoutDom(state.header.layoutId || 'classic', state.cells);
+  populateLayoutSelect(); // keep the dropdown in sync with whatever layout this flyer actually uses
+}
+
+async function refreshSavedList(){
+  const res = await fetch('/api/flyers');
+  const rows = await res.json();
+  const list = document.getElementById('savedFlyerList');
+  if(!rows.length){
+    list.innerHTML = '<div class="saved-flyer-empty">No saved flyers yet.</div>';
+    return;
+  }
+  const order = {live:0,scheduled:1,unscheduled:2,past:3};
+  rows.sort((a,b) => (order[a.status] - order[b.status]) || ((b.scheduled_start || b.updated_at) - (a.scheduled_start || a.updated_at)));
+  const labels = {live:'Current',scheduled:'Upcoming',past:'Past',unscheduled:'No dates'};
+  list.innerHTML = rows.map(row => {
+    const start = row.scheduled_start ? new Date(row.scheduled_start) : null;
+    const end = row.scheduled_end ? new Date(row.scheduled_end) : null;
+    const dateOptions = {month:'short',day:'numeric',year:'numeric'};
+    const dates = start
+      ? `${start.toLocaleDateString(undefined,dateOptions)}${end ? ' – ' + end.toLocaleDateString(undefined,dateOptions) : ''}`
+      : 'No effective dates set';
+    return `<div class="flyer-card ${row.status} ${currentName === row.name ? 'is-editing' : ''}" data-name="${escapeHtml(row.name)}">
+      <div class="flyer-card-head"><div class="flyer-card-name" title="${escapeHtml(row.name)}">${escapeHtml(row.name)}</div><span class="flyer-status-pill ${row.status}">${labels[row.status]}</span></div>
+      <div class="flyer-card-dates">${dates}</div>
+      <div class="flyer-card-actions">
+        <button class="open" onclick="openSavedFlyer(this.closest('.flyer-card').dataset.name)">Open</button>
+        <button class="duplicate" onclick="duplicateSavedFlyer(this.closest('.flyer-card').dataset.name)">Duplicate</button>
+        <button class="delete" title="Delete flyer" onclick="deleteSavedFlyer(this.closest('.flyer-card').dataset.name)">✕</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function setStatus(msg){
+  const el = document.getElementById('statusMsg');
+  el.textContent = msg;
+  setTimeout(() => { if(el.textContent === msg) el.textContent = ''; }, 3000);
+}
+
+function setCurrentName(name){
+  currentName = name;
+  document.getElementById('currentNameLabel').textContent = name ? name : '(unsaved)';
+  if(!name && !flyerDirty) showSaveState('Save once to enable auto-save');
+  refreshSavedList();
+}
+
+function renderFlyerImage(){
+  return captureFlyerCanvas(1.35).then(canvas => canvas.toDataURL('image/jpeg', .9));
+}
+
+async function saveFlyer(){
+  if(!validateNoDuplicateFlyerItems(true)) return;
+  let name = currentName;
+  if(!name){
+    name = prompt('Name this flyer (e.g. "Aug 5 - Aug 11"):');
+    if(!name) return;
+  }
+  clearTimeout(autoSaveTimer);
+  const versionAtStart = flyerChangeVersion;
+  showSaveState('Saving…', 'saving');
+  const payload = serializeState();
+  // if this flyer has a go-live schedule, render a picture of it now so scheduled
+  // emails/texts have something to send without needing a browser open at send-time
+  if(payload.scheduling && payload.scheduling.start){
+    try{ payload.renderedImage = await renderFlyerImage(); }
+    catch(e){ console.warn('Could not render flyer image for scheduled sending:', e); }
+  }
+  const res = await fetch('/api/flyers/' + encodeURIComponent(name), {
+    method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)
+  });
+  if(!res.ok){ flyerDirty = true; showSaveState('Save failed — try again', 'error'); alert('Could not save. Try again.'); return; }
+  setCurrentName(name);
+  markFlyerSaved(versionAtStart);
+  setStatus(`Saved "${name}" ✓ — product database updated too.`);
+}
+
+async function saveAsFlyer(){
+  if(!validateNoDuplicateFlyerItems(true)) return;
+  const suggested = currentName ? currentName + ' copy' : 'My flyer';
+  const name = prompt('Save as (new name):', suggested);
+  if(!name) return;
+  clearTimeout(autoSaveTimer);
+  const versionAtStart = flyerChangeVersion;
+  showSaveState('Saving…', 'saving');
+  const payload = serializeState();
+  if(payload.scheduling && payload.scheduling.start){
+    try{ payload.renderedImage = await renderFlyerImage(); }
+    catch(e){ console.warn('Could not render flyer image for scheduled sending:', e); }
+  }
+  const res = await fetch('/api/flyers/' + encodeURIComponent(name), {
+    method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)
+  });
+  if(!res.ok){ flyerDirty = true; showSaveState('Save failed — try again', 'error'); alert('Could not save. Try again.'); return; }
+  setCurrentName(name);
+  markFlyerSaved(versionAtStart);
+  setStatus(`Saved as "${name}" ✓ — you're now editing this copy.`);
+}
+
+async function openSavedFlyer(name){
+  if(!name) return;
+  if(flyerDirty && !confirm('You still have unsaved changes. Open another flyer and discard them?')) return;
+  const res = await fetch('/api/flyers/' + encodeURIComponent(name));
+  if(!res.ok){ alert('Could not open that flyer.'); return; }
+  const state = await res.json();
+  applyState(state);
+  setCurrentName(name);
+  resetFlyerDirtyState();
+  setStatus(`Opened "${name}"`);
+}
+
+async function duplicateSavedFlyer(name){
+  if(flyerDirty && !confirm('You still have unsaved changes. Continue and discard them?')) return;
+  const res = await fetch('/api/flyers/' + encodeURIComponent(name));
+  if(!res.ok){ alert('Could not open that flyer to duplicate it.'); return; }
+  const state = await res.json();
+  const copyName = prompt('Name the duplicated flyer:', name + ' copy');
+  if(!copyName || copyName === name) return;
+
+  const listRes = await fetch('/api/flyers');
+  const existing = await listRes.json();
+  if(existing.some(row => row.name.toLowerCase() === copyName.toLowerCase())){
+    alert('A flyer with that name already exists. Choose a different name so nothing gets overwritten.');
+    return;
+  }
+
+  // Put a duplicate into the next available Wednesday-to-Tuesday week. This
+  // prevents an old schedule (and its sent status) from being copied forward.
+  applyState(state);
+  const today = new Date();
+  let nextStart = snapToWednesday(toDateInputValue(today));
+  if(nextStart < today) nextStart.setDate(nextStart.getDate() + 7);
+  if(state.scheduling && state.scheduling.end){
+    const afterSource = new Date(Number(state.scheduling.end));
+    afterSource.setDate(afterSource.getDate() + 1);
+    afterSource.setHours(0,0,0,0);
+    if(afterSource > nextStart) nextStart = snapToWednesday(toDateInputValue(afterSource));
+  }
+  document.getElementById('weekPicker').value = toDateInputValue(nextStart);
+  document.getElementById('startTime').value = state.header.startTime || '07:00';
+  document.getElementById('multiWeekToggle').checked = false;
+  document.getElementById('endDatePicker').value = '';
+  document.getElementById('endDateWrap').style.display = 'none';
+  applyWeek();
+
+  const copyState = serializeState();
+  try{ copyState.renderedImage = await renderFlyerImage(); }
+  catch(e){ console.warn('Could not render the duplicated flyer image:', e); }
+  const saveRes = await fetch('/api/flyers/' + encodeURIComponent(copyName), {
+    method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(copyState)
+  });
+  if(!saveRes.ok){ alert('Could not duplicate that flyer.'); return; }
+  setCurrentName(copyName);
+  resetFlyerDirtyState();
+  setStatus(`Duplicated "${name}" as "${copyName}" for the next available week.`);
+}
+
+async function deleteSavedFlyer(name){
+  if(!name) return;
+  if(!confirm(`Delete saved flyer "${name}"? This can't be undone.`)) return;
+  await fetch('/api/flyers/' + encodeURIComponent(name), { method:'DELETE' });
+  if(currentName === name){
+    setCurrentName(null);
+    markFlyerDirty();
+  }
+  refreshSavedList();
+  setStatus(`Deleted "${name}"`);
+}
+
+function newBlank(){ flyerDirty = false; location.reload(); }
+
+/* ================= CLEAN SINGLE-PAGE PRINTING ================= */
+async function printFlyer(){
+  // Open synchronously so browsers treat this as a user-requested popup. The
+  // clean flyer image is rendered afterward and fitted to the physical sheet.
+  const printWindow = window.open('', '_blank', 'width=900,height=760');
+  if(!printWindow){
+    alert('Please allow popups for this site so the print preview can open.');
+    return;
+  }
+  printWindow.document.write('<!doctype html><title>Preparing flyer…</title><body style="font-family:Arial,sans-serif;display:grid;place-items:center;height:100vh;margin:0;color:#555;">Preparing a clean print copy…</body>');
+  try{
+    const canvas = await captureFlyerCanvas(1.75);
+    const blob = await new Promise((resolve, reject) => canvas.toBlob(value => value ? resolve(value) : reject(new Error('Could not create print image.')), 'image/jpeg', .94));
+    const imageUrl = URL.createObjectURL(blob);
+    const doc = printWindow.document;
+    doc.open();
+    doc.write(`<!doctype html>
+      <html><head><title>${escapeHtml(currentName || 'Weekly Ad')}</title>
+      <style>
+        *{box-sizing:border-box}
+        @page{size:letter portrait;margin:.25in}
+        html,body{margin:0;padding:0;background:#fff}
+        body{width:8in;min-height:10.5in;display:flex;align-items:center;justify-content:center}
+        #flyer{display:block;max-width:8in;max-height:10.5in;width:auto;height:auto;object-fit:contain}
+        #printAgain{position:fixed;right:16px;top:16px;border:0;border-radius:8px;padding:10px 16px;background:#e2231a;color:#fff;font-weight:bold;cursor:pointer;box-shadow:0 2px 8px #999}
+        @media print{#printAgain{display:none!important}}
+      </style></head><body>
+        <button id="printAgain" onclick="window.print()">Print flyer</button>
+        <img id="flyer" alt="Weekly ad">
+      </body></html>`);
+    doc.close();
+    const image = doc.getElementById('flyer');
+    image.onload = () => {
+      printWindow.focus();
+      setTimeout(() => printWindow.print(), 150);
+    };
+    image.src = imageUrl;
+    printWindow.addEventListener('beforeunload', () => URL.revokeObjectURL(imageUrl), {once:true});
+  } catch(e){
+    printWindow.close();
+    alert('Could not prepare the flyer for printing. Try Save Image instead.');
+  }
+}
+
+window.addEventListener('keydown', e => {
+  if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'p'){
+    e.preventDefault();
+    printFlyer();
+  }
+});
+
+window.addEventListener('beforeunload', e => {
+  if(!flyerDirty) return;
+  e.preventDefault();
+  e.returnValue = '';
+});
+
+function initAutoSaveTracking(){
+  const page = document.getElementById('page');
+  page.addEventListener('input', e => {
+    if(!e.target.matches('input[type="file"]')) markFlyerDirty();
+  });
+  page.addEventListener('change', e => {
+    if(!e.target.matches('input[type="file"]')) markFlyerDirty();
+  });
+  ['weekPicker','startTime','multiWeekToggle','endDatePicker'].forEach(id => {
+    document.getElementById(id).addEventListener('change', markFlyerDirty);
+  });
+}
+
+/* ================= BOOT ================= */
+function boot(){
+  buildGrids();
+  enableContainerResize(document.getElementById('logoPhoto'));
+  populateLayoutSelect();
+  refreshSavedList();
+  initWeekPicker();
+  applyWeek();
+  initAutoSaveTracking();
+  resetFlyerDirtyState();
+  setTimeout(() => checkForUpdates(false), 1200);
+}
+
+checkSession();
+setInterval(async () => {
+  try{
+    const res = await fetch('/api/license-status');
+    if(res.status === 401) return; // not logged in, ignore
+    const lic = await res.json();
+    if(!lic.licensed){
+      document.getElementById('lockMessage').textContent = lic.message || 'This tool has been paused. Contact Lockwood IT Services to reactivate.';
+      document.getElementById('lockScreen').classList.add('open');
+      document.getElementById('app').classList.remove('visible');
+    }
+  } catch(e){ /* ignore transient network errors mid-session */ }
+}, 15 * 60 * 1000);
+</script>
+
+</body>
+</html>
