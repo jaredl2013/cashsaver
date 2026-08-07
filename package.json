@@ -1,6 +1,6 @@
 {
   "name": "weekly-ad-builder",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Weekly ad flyer builder with shared-password login, saved flyers, and a searchable product database.",
   "main": "server.js",
   "scripts": {
