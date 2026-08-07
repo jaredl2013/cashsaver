@@ -127,7 +127,7 @@ var
 begin
   if ExistingConfig then Exit;
   ForceDirectories(DataPath());
-  Secret := GetSHA256OfString(PasswordPage.Values[0] + GetDateTimeString('yyyymmddhhnnsszzz', '', ''));
+  Secret := GetSHA256OfString(PasswordPage.Values[0] + GetDateTimeString('yyyymmddhhnnsszzz', #0, #0));
   SetArrayLength(Lines, 18);
   Lines[0] := 'PORT=3000';
   Lines[1] := 'SHARED_PASSWORD=' + DotEnvQuote(PasswordPage.Values[0]);
