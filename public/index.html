@@ -1565,24 +1565,66 @@ function onDragMove(e){
     dragState.cell.style.width = cellRect.width + 'px';
     document.body.appendChild(dragState.cell);
     dragState.cell.classList.add('drag-floating');
+    startDragAutoScroll();
   }
+  dragState.lastClientX = e.clientX;
+  dragState.lastClientY = e.clientY;
   dragState.cell.style.left = (e.clientX - dragState.offsetX) + 'px';
   dragState.cell.style.top = (e.clientY - dragState.offsetY) + 'px';
+  updateDragTarget(e.clientX, e.clientY);
+}
 
-  // figure out which cell we're currently hovering over — anywhere on the page, not
-  // just within the section this drag started in — and move the placeholder there
+// Figures out which cell the pointer is currently over — anywhere on the page, not just
+// within the section this drag started in — and moves the placeholder there. Called on
+// every pointer move, and again each auto-scroll tick since scrolling changes what's under
+// a fixed screen position even though the pointer itself hasn't moved.
+function updateDragTarget(clientX, clientY){
+  if(!dragState || !dragState.moved) return;
   dragState.cell.style.visibility = 'hidden';
-  const overEl = document.elementFromPoint(e.clientX, e.clientY);
+  // elementsFromPoint (not elementFromPoint) — fixed-position chrome like #creditBar sits
+  // above the page content near the bottom of the viewport with no .cell ancestor, so a
+  // drag toward the bottom edge would otherwise hit that overlay and never find the real
+  // cell underneath it. Walk the whole stack instead of just the topmost hit.
+  const stack = document.elementsFromPoint(clientX, clientY);
   dragState.cell.style.visibility = '';
-  const overCell = overEl && overEl.closest ? overEl.closest('.cell') : null;
-  if(overCell && overCell !== dragState.placeholder && overCell !== dragState.cell){
+  let overCell = null;
+  for(const el of stack){
+    const c = el.closest ? el.closest('.cell') : null;
+    if(c && c !== dragState.cell){ overCell = c; break; }
+  }
+  if(overCell && overCell !== dragState.placeholder){
     const rect = overCell.getBoundingClientRect();
     // simplest reliable rule for a multi-column grid: insert before/after based on
     // whichever side of the hovered cell's center the pointer currently sits
     const midX = rect.left + rect.width / 2;
-    if(e.clientX < midX) overCell.before(dragState.placeholder);
+    if(clientX < midX) overCell.before(dragState.placeholder);
     else overCell.after(dragState.placeholder);
   }
+}
+
+// Long flyers are taller than the viewport, so dragging a cell from a visible row to one
+// that's currently scrolled out of view needs the page to scroll during the drag — without
+// this, the pointer can travel past the visible edge with nothing there for elementFromPoint
+// to find, leaving the placeholder stranded wherever it last had a valid target.
+const DRAG_SCROLL_EDGE = 90;
+const DRAG_SCROLL_MAX_SPEED = 16;
+function startDragAutoScroll(){
+  const step = () => {
+    if(!dragState || !dragState.moved){ if(dragState) dragState.scrollRAF = null; return; }
+    const y = dragState.lastClientY;
+    const vh = window.innerHeight;
+    let speed = 0;
+    if(y < DRAG_SCROLL_EDGE) speed = -DRAG_SCROLL_MAX_SPEED * (1 - Math.max(0, y) / DRAG_SCROLL_EDGE);
+    else if(y > vh - DRAG_SCROLL_EDGE) speed = DRAG_SCROLL_MAX_SPEED * (1 - Math.max(0, vh - y) / DRAG_SCROLL_EDGE);
+    if(speed !== 0){
+      window.scrollBy(0, speed);
+      // the dragged cell is position:fixed so it stays under the cursor automatically;
+      // re-check what's now underneath that same screen point now that the page moved
+      updateDragTarget(dragState.lastClientX, dragState.lastClientY);
+    }
+    dragState.scrollRAF = requestAnimationFrame(step);
+  };
+  dragState.scrollRAF = requestAnimationFrame(step);
 }
 
 function onDragUp(e){
@@ -1590,6 +1632,7 @@ function onDragUp(e){
   window.removeEventListener('pointermove', onDragMove);
   window.removeEventListener('pointerup', onDragUp);
   window.removeEventListener('pointercancel', onDragUp);
+  if(dragState.scrollRAF) cancelAnimationFrame(dragState.scrollRAF);
 
   if(dragState.moved){
     const targetContainer = dragState.placeholder.parentElement;
