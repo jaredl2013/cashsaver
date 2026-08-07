@@ -130,7 +130,7 @@ begin
     'Weekly Ad Builder Settings',
     'Choose the password used to open the ad builder.',
     'The Pexels key is optional and can be added later. Existing installations keep their current settings.');
-  PasswordPage.Add('App login password:', True);
+  PasswordPage.Add('App login password:', False);
   PasswordPage.Add('Pexels API key (optional):', False);
   PasswordPage.Add('Port (leave as 3000 unless something else on this computer already uses it):', False);
   PasswordPage.Values[2] := '3000';
