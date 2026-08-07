@@ -29,7 +29,7 @@ if (-not (Test-Path (Join-Path $appRoot 'node_modules'))) {
 if (Test-Path $stageDir) { Remove-Item -LiteralPath $stageDir -Recurse -Force }
 New-Item -ItemType Directory -Path $stageDir,$outputDir -Force | Out-Null
 
-$files = @('server.js','db.js','index.html','install-service.js','uninstall-service.js','package.json','package-lock.json','README.md')
+$files = @('server.js','db.js','install-service.js','uninstall-service.js','package.json','package-lock.json','README.md')
 foreach ($file in $files) { Copy-Item -LiteralPath (Join-Path $appRoot $file) -Destination $stageDir -Force }
 Copy-Item -LiteralPath (Join-Path $appRoot 'public') -Destination (Join-Path $stageDir 'public') -Recurse -Force
 Copy-Item -LiteralPath (Join-Path $appRoot 'node_modules') -Destination (Join-Path $stageDir 'node_modules') -Recurse -Force
@@ -47,7 +47,7 @@ $issPath = Join-Path $PSScriptRoot 'CashSaver.iss'
 & $iscc "/DMyAppVersion=$Version" "/DStageDir=$stageDir" "/DOutputDir=$outputDir" $issPath
 if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed with exit code $LASTEXITCODE." }
 
-$installerName = "CashSaver-Weekly-Ad-Builder-Setup-$Version.exe"
+$installerName = "CashSaver-Ad-Builder-Setup-$Version.exe"
 $installerPath = Join-Path $outputDir $installerName
 if (-not (Test-Path $installerPath)) { throw "Installer was not created: $installerPath" }
 $hash = (Get-FileHash -LiteralPath $installerPath -Algorithm SHA256).Hash.ToLowerInvariant()

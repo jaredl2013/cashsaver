@@ -15,7 +15,7 @@ if (git -C $appRoot status --porcelain) { throw 'Commit or stash existing change
 npm --prefix $appRoot version $Version --no-git-tag-version
 & (Join-Path $PSScriptRoot 'build-release.ps1') -Version $Version -ReleaseNotes $ReleaseNotes
 
-$installer = Join-Path $releaseOutput "CashSaver-Weekly-Ad-Builder-Setup-$Version.exe"
+$installer = Join-Path $releaseOutput "CashSaver-Ad-Builder-Setup-$Version.exe"
 $manifestOutput = Join-Path $releaseOutput 'update.json'
 $manifestRepoDir = Join-Path $appRoot 'release'
 New-Item -ItemType Directory -Path $manifestRepoDir -Force | Out-Null

@@ -8,7 +8,7 @@
   #error OutputDir must be provided by build-release.ps1
 #endif
 
-#define MyAppName "CashSaver Weekly Ad Builder"
+#define MyAppName "CashSaver Ad Builder"
 #define MyPublisher "Lockwood IT Services"
 #define DataDir "{commonappdata}\Lockwood IT Services\CashSaver Weekly Ad Builder"
 
@@ -28,7 +28,7 @@ PrivilegesRequired=admin
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 OutputDir={#OutputDir}
-OutputBaseFilename=CashSaver-Weekly-Ad-Builder-Setup-{#MyAppVersion}
+OutputBaseFilename=CashSaver-Ad-Builder-Setup-{#MyAppVersion}
 Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern
