@@ -293,6 +293,7 @@
   .cell.hero .pname{ font-size:16px; }
   .cell.text-centered .info{ text-align:center; }
   .cell.text-centered .suggest-list{ text-align:left; }
+  .cell.text-centered .priceline{ justify-content:center; }
   .psize{ font-size:10px; color:#333; margin-top:2px; word-wrap:break-word; }
 
   .suggest-list{
@@ -622,10 +623,9 @@
     #app{ display:block !important; width:816px; margin:0; padding:0; }
     .page{
       box-shadow:none; margin:0; width:816px; min-height:0;
-      zoom:var(--print-scale, .94);
       break-inside:avoid; page-break-inside:avoid;
     }
-    @page{ size:letter; margin:0.25in; }
+    @page{ size:letter; margin:0; }
     .photo{ border-style:solid; }
     .price-wrap, .unit-select, .unit-custom{ background:transparent; border-color:transparent; }
     .db-badge, .cell-hover-menu, .drag-handle, .container-resize-handle, .undo-container-size-btn, .remove-photo-btn, .undo-photo-btn, .store-align-btn{ display:none !important; }
@@ -702,6 +702,7 @@
             <button class="secondary" onclick="saveAsFlyer()">Save As…</button>
           </div>
           <button class="secondary" onclick="if(confirm('Clear everything and start a blank flyer?')) newBlank()">＋ New blank flyer</button>
+          <button class="secondary" id="undoMoveBtn" onclick="undoLastMove()" style="display:none;">↶ Undo last move</button>
           <span class="status" id="statusMsg"></span>
         </div>
 
@@ -729,6 +730,11 @@
         </div>
 
         <div class="drawer-section">
+          <label class="tlabel">Print size:</label>
+          <select id="printPageSize">
+            <option value="letter">Letter (8.5" x 11")</option>
+            <option value="tabloid">Tabloid / newspaper insert (11" x 17")</option>
+          </select>
           <button class="secondary" onclick="openAdPreview()">👁 Ad Preview</button>
           <button onclick="printFlyer()">🖨️ Print / Save as PDF</button>
           <button onclick="shareOrExportImage()">📤 Share to Facebook / Save Image</button>
@@ -750,6 +756,7 @@
         </div>
 
         <div class="drawer-section">
+          <button class="secondary" onclick="openAdminSettings()">⚙ Admin Settings</button>
           <button class="secondary" onclick="doLogout()">Log out</button>
         </div>
 
@@ -857,6 +864,31 @@
       </div>
       <div class="modal-body" id="trashList"></div>
       <div class="modal-foot"><button onclick="closeTrash()">Close</button></div>
+    </div>
+  </div>
+
+  <!-- Admin Settings modal -->
+  <div class="modal-overlay" id="adminSettingsModal">
+    <div class="modal">
+      <div class="modal-head">
+        <h2>Admin Settings</h2>
+      </div>
+      <div class="modal-body">
+        <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px;">
+          <label style="font-size:11px;font-weight:bold;color:#555;">Admin password</label>
+          <input type="password" id="adminSettingsPassword" placeholder="Admin password" style="padding:8px;border-radius:6px;border:1px solid #bbb;">
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          <label style="font-size:11px;font-weight:bold;color:#555;">Pexels API key</label>
+          <input type="text" id="adminSettingsPexelsKey" placeholder="Leave blank to keep the current key" style="padding:8px;border-radius:6px;border:1px solid #bbb;">
+          <span id="adminSettingsPexelsStatus" style="font-size:11px;color:#888;"></span>
+        </div>
+        <div id="adminSettingsStatus" style="min-height:16px;margin-top:10px;font-size:12px;font-weight:bold;"></div>
+      </div>
+      <div class="modal-foot">
+        <button onclick="saveAdminSettings()" style="background:var(--red);color:#fff;border:none;">Save</button>
+        <button onclick="closeAdminSettings()">Close</button>
+      </div>
     </div>
   </div>
 
@@ -1415,6 +1447,7 @@ function buildLayoutDom(layoutId, existingData){
   const bottomArea = document.getElementById('bottomArea');
   topArea.innerHTML = '';
   bottomArea.innerHTML = '';
+  clearMoveHistory(); // old snapshot references cells that no longer exist after a rebuild
 
   let dataIdx = 0;
   function buildSections(sections, area){
@@ -1504,7 +1537,8 @@ function onDragHandleDown(e){
   dragState = {
     cell, container, pointerId: e.pointerId,
     offsetX: e.clientX - rect.left, offsetY: e.clientY - rect.top,
-    startX: e.clientX, startY: e.clientY, moved: false
+    startX: e.clientX, startY: e.clientY, moved: false,
+    preDragSnapshot: snapshotCellOrder()
   };
 
   // Listen on window rather than relying on pointer capture — capture can be silently
@@ -1570,9 +1604,34 @@ function onDragUp(e){
     } else {
       dragState.cell.classList.remove('hero');
     }
+    lastMoveSnapshot = dragState.preDragSnapshot;
+    document.getElementById('undoMoveBtn').style.display = 'block';
+    scheduleRowAlign();
     markFlyerDirty();
   }
   dragState = null;
+}
+
+// One-step undo: snapshot every grid's cell order right before a drag starts, and if the
+// drag actually moved something, that snapshot becomes restorable via the Undo button.
+let lastMoveSnapshot = null;
+function snapshotCellOrder(){
+  return Array.from(document.querySelectorAll('#topArea > .grid, #bottomArea > .grid')).map(grid => ({
+    grid, order: Array.from(grid.children).filter(c => c.classList.contains('cell'))
+  }));
+}
+function clearMoveHistory(){
+  lastMoveSnapshot = null;
+  const btn = document.getElementById('undoMoveBtn');
+  if(btn) btn.style.display = 'none';
+}
+function undoLastMove(){
+  if(!lastMoveSnapshot) return;
+  lastMoveSnapshot.forEach(({ grid, order }) => { order.forEach(cell => grid.appendChild(cell)); });
+  clearMoveHistory();
+  scheduleRowAlign();
+  markFlyerDirty();
+  setStatus('Move undone.');
 }
 
 /* ================= PRODUCT DATABASE (server-backed) ================= */
@@ -2724,6 +2783,54 @@ function openTrash(){
 }
 function closeTrash(){ document.getElementById('trashModal').classList.remove('open'); }
 
+/* ---------------- Admin Settings ---------------- */
+async function openAdminSettings(){
+  document.getElementById('adminSettingsModal').classList.add('open');
+  document.getElementById('adminSettingsPassword').value = '';
+  document.getElementById('adminSettingsPexelsKey').value = '';
+  document.getElementById('adminSettingsStatus').textContent = '';
+  const status = document.getElementById('adminSettingsPexelsStatus');
+  status.textContent = 'Checking…';
+  try{
+    const res = await fetch('/api/settings');
+    const data = await res.json();
+    status.textContent = data.pexelsConfigured ? 'A key is currently configured.' : 'No key configured yet — photo search is off.';
+  } catch(err){
+    status.textContent = '';
+  }
+}
+function closeAdminSettings(){ document.getElementById('adminSettingsModal').classList.remove('open'); }
+
+async function saveAdminSettings(){
+  const adminPassword = document.getElementById('adminSettingsPassword').value;
+  const pexelsKey = document.getElementById('adminSettingsPexelsKey').value.trim();
+  const statusEl = document.getElementById('adminSettingsStatus');
+  if(!adminPassword){
+    statusEl.style.color = '#a32720';
+    statusEl.textContent = 'Enter the admin password.';
+    return;
+  }
+  if(!pexelsKey){
+    statusEl.style.color = '#a32720';
+    statusEl.textContent = 'Enter a Pexels API key, or close this without saving to leave it unchanged.';
+    return;
+  }
+  const res = await fetch('/api/settings/pexels-key', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ adminPassword, pexelsKey })
+  });
+  if(!res.ok){
+    const err = await res.json().catch(() => ({}));
+    statusEl.style.color = '#a32720';
+    statusEl.textContent = err.error === 'wrong_admin_password' ? 'Wrong admin password.' : 'Could not save that key.';
+    return;
+  }
+  statusEl.style.color = '#287a3d';
+  statusEl.textContent = 'Saved. Photo search is now configured.';
+  document.getElementById('adminSettingsPexelsKey').value = '';
+  document.getElementById('adminSettingsPexelsStatus').textContent = 'A key is currently configured.';
+}
+
 async function renderTrash(){
   const res = await fetch('/api/trash');
   const { flyers, products } = await res.json();
@@ -3399,16 +3506,27 @@ async function printFlyer(){
     const canvas = await captureFlyerCanvas(1.75);
     const blob = await new Promise((resolve, reject) => canvas.toBlob(value => value ? resolve(value) : reject(new Error('Could not create print image.')), 'image/jpeg', .94));
     const imageUrl = URL.createObjectURL(blob);
+
+    // Pick the page's long edge from the selected size, then derive the short edge from
+    // the flyer's own captured aspect ratio — that way the page always exactly matches the
+    // ad's shape, so it fills edge-to-edge with no letterboxing instead of being forced
+    // into a fixed 8.5x11 and left with white bars top/bottom or side/side.
+    const sizePreset = (document.getElementById('printPageSize') || {}).value || 'letter';
+    const longEdgeIn = sizePreset === 'tabloid' ? 17 : 11;
+    const aspect = canvas.width / canvas.height; // <1 = taller than wide (typical flyer)
+    const pageHeightIn = longEdgeIn;
+    const pageWidthIn = Math.round(longEdgeIn * aspect * 100) / 100;
+
     const doc = printWindow.document;
     doc.open();
     doc.write(`<!doctype html>
       <html><head><title>${escapeHtml(currentName || 'Weekly Ad')}</title>
       <style>
         *{box-sizing:border-box}
-        @page{size:letter portrait;margin:.25in}
+        @page{size:${pageWidthIn}in ${pageHeightIn}in;margin:0}
         html,body{margin:0;padding:0;background:#fff}
-        body{width:8in;min-height:10.5in;display:flex;align-items:center;justify-content:center}
-        #flyer{display:block;max-width:8in;max-height:10.5in;width:auto;height:auto;object-fit:contain}
+        body{width:${pageWidthIn}in;height:${pageHeightIn}in;display:flex}
+        #flyer{display:block;width:${pageWidthIn}in;height:${pageHeightIn}in;object-fit:fill}
         #printAgain{position:fixed;right:16px;top:16px;border:0;border-radius:8px;padding:10px 16px;background:#e2231a;color:#fff;font-weight:bold;cursor:pointer;box-shadow:0 2px 8px #999}
         @media print{#printAgain{display:none!important}}
       </style></head><body>

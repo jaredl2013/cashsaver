@@ -183,11 +183,17 @@ app.post('/api/license-status/recheck', async (req, res) => {
 });
 
 /* ---------------- Settings ---------------- */
+// A key saved in-app (settings table) takes priority over the .env value, so it can be
+// set from the UI without editing .env by hand; .env still works as a first-install default.
+function getPexelsApiKey() {
+  return getSetting('pexelsKey') || PEXELS_API_KEY;
+}
+
 app.get('/api/settings', requireAuth, (req, res) => {
   // Never return stored settings wholesale: some values may be secrets.
   res.json({
     adFree: getSetting('adFree') === 'true',
-    pexelsConfigured: Boolean(PEXELS_API_KEY)
+    pexelsConfigured: Boolean(getPexelsApiKey())
   });
 });
 
@@ -195,9 +201,18 @@ app.post('/api/settings', requireAuth, (req, res) => {
   res.status(400).json({ error: 'no_editable_settings' });
 });
 
+// Admin-password gated (like ad-free) since this is an install-wide setting, not per-user.
+app.post('/api/settings/pexels-key', requireAuth, (req, res) => {
+  const { adminPassword, pexelsKey } = req.body || {};
+  if (adminPassword !== ADMIN_PASSWORD) return res.status(401).json({ error: 'wrong_admin_password' });
+  setSetting('pexelsKey', String(pexelsKey || '').trim());
+  res.json({ ok: true, pexelsConfigured: Boolean(getPexelsApiKey()) });
+});
+
 // Search is proxied through the server so the Pexels API key never reaches the browser.
 app.get('/api/photo-search', requireAuth, async (req, res) => {
-  if (!PEXELS_API_KEY) {
+  const pexelsApiKey = getPexelsApiKey();
+  if (!pexelsApiKey) {
     return res.status(503).json({ error: 'not_configured', message: 'Photo search is not configured.' });
   }
   const query = String(req.query.q || '').trim().slice(0, 120);
@@ -205,7 +220,7 @@ app.get('/api/photo-search', requireAuth, async (req, res) => {
   try {
     const url = `https://api.pexels.com/v1/search?query=${encodeURIComponent(query)}&per_page=12`;
     const upstream = await fetch(url, {
-      headers: { Authorization: PEXELS_API_KEY },
+      headers: { Authorization: pexelsApiKey },
       signal: AbortSignal.timeout(10000)
     });
     if (!upstream.ok) {
