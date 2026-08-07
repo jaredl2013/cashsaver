@@ -332,6 +332,18 @@ app.delete('/api/flyers/:name', requireAuth, (req, res) => {
   res.json({ ok: true });
 });
 
+app.post('/api/flyers/:name/rename', requireAuth, (req, res) => {
+  const oldName = req.params.name;
+  const newName = String((req.body && req.body.newName) || '').trim();
+  if (!newName) return res.status(400).json({ error: 'name_required' });
+  if (newName === oldName) return res.json({ ok: true, name: newName });
+  const clash = db.prepare('SELECT deleted_at FROM flyers WHERE name = ?').get(newName);
+  if (clash) return res.status(409).json({ error: clash.deleted_at ? 'name_taken_in_trash' : 'name_taken' });
+  const info = db.prepare('UPDATE flyers SET name = ? WHERE name = ? AND deleted_at IS NULL').run(newName, oldName);
+  if (!info.changes) return res.status(404).json({ error: 'not_found' });
+  res.json({ ok: true, name: newName });
+});
+
 // Publicly reachable (no login) so Twilio's servers can fetch it for MMS. Only useful/reachable
 // at all if this server is exposed to the internet (see PUBLIC_BASE_URL note above).
 app.get('/api/public/flyer-image/:name', (req, res) => {

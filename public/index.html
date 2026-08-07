@@ -155,6 +155,7 @@
   .flyer-card-actions button{ padding:5px 6px; font-size:9px; }
   .flyer-card-actions .open{ flex:1; background:#374151; }
   .flyer-card-actions .duplicate{ flex:1; background:#1d4ed8; }
+  .flyer-card-actions .rename{ width:auto; background:transparent; border-color:rgba(255,255,255,.18); color:#d1d5db; }
   .flyer-card-actions .delete{ width:auto; background:transparent; border-color:rgba(248,113,113,.35); color:#fca5a5; }
   .saved-flyer-empty{ color:#9ca3af; font-size:11px; text-align:center; padding:12px 4px; }
 
@@ -3219,6 +3220,7 @@ async function refreshSavedList(){
       <div class="flyer-card-actions">
         <button class="open" onclick="openSavedFlyer(this.closest('.flyer-card').dataset.name)">Open</button>
         <button class="duplicate" onclick="duplicateSavedFlyer(this.closest('.flyer-card').dataset.name)">Duplicate</button>
+        <button class="rename" title="Rename flyer" onclick="renameSavedFlyer(this.closest('.flyer-card').dataset.name)">✎</button>
         <button class="delete" title="Delete flyer" onclick="deleteSavedFlyer(this.closest('.flyer-card').dataset.name)">✕</button>
       </div>
     </div>`;
@@ -3358,6 +3360,27 @@ async function deleteSavedFlyer(name){
   }
   refreshSavedList();
   setStatus(`Deleted "${name}" — recoverable from Trash for 7 days`);
+}
+
+async function renameSavedFlyer(oldName){
+  if(!oldName) return;
+  const input = prompt('New name for this flyer:', oldName);
+  if(input === null) return; // cancelled
+  const newName = input.trim();
+  if(!newName || newName === oldName) return;
+  const res = await fetch('/api/flyers/' + encodeURIComponent(oldName) + '/rename', {
+    method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({newName})
+  });
+  if(!res.ok){
+    const err = await res.json().catch(() => ({}));
+    alert(err.error === 'name_taken' || err.error === 'name_taken_in_trash'
+      ? 'A flyer with that name already exists.'
+      : 'Could not rename that flyer.');
+    return;
+  }
+  if(currentName === oldName) setCurrentName(newName);
+  refreshSavedList();
+  setStatus(`Renamed "${oldName}" to "${newName}"`);
 }
 
 function newBlank(){ flyerDirty = false; location.reload(); }
