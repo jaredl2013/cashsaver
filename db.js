@@ -61,10 +61,13 @@ if (!flyerCols.includes('notified')) db.exec('ALTER TABLE flyers ADD COLUMN noti
 if (!flyerCols.includes('rendered_image')) db.exec('ALTER TABLE flyers ADD COLUMN rendered_image TEXT');
 if (!flyerCols.includes('broadcast_sent')) db.exec('ALTER TABLE flyers ADD COLUMN broadcast_sent INTEGER DEFAULT 0');
 
+if (!flyerCols.includes('deleted_at')) db.exec('ALTER TABLE flyers ADD COLUMN deleted_at INTEGER');
+
 const productCols = db.prepare("PRAGMA table_info(products)").all().map(c => c.name);
 if (!productCols.includes('description')) db.exec("ALTER TABLE products ADD COLUMN description TEXT DEFAULT ''");
 if (!productCols.includes('ad_size')) db.exec("ALTER TABLE products ADD COLUMN ad_size TEXT DEFAULT 'small'");
 if (!productCols.includes('original_img')) db.exec('ALTER TABLE products ADD COLUMN original_img TEXT');
+if (!productCols.includes('deleted_at')) db.exec('ALTER TABLE products ADD COLUMN deleted_at INTEGER');
 
 // sensible defaults if not already set
 const seed = db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)');
@@ -74,4 +77,5 @@ seed.run('licenseStatus', 'active');
 seed.run('licenseLastCheck', '0');
 seed.run('licenseMessage', '');
 
+db.dataDir = dataDir;
 module.exports = db;

@@ -1,4 +1,5 @@
 const path = require('path');
+const fs = require('fs');
 require('dotenv').config({ path: process.env.CASH_SAVER_CONFIG || path.join(__dirname, '.env') });
 const express = require('express');
 const session = require('express-session');
@@ -246,13 +247,13 @@ app.get('/api/flyers', requireAuth, (req, res) => {
   const rows = db.prepare(`
     SELECT name, updated_at, scheduled_start, scheduled_end, broadcast_sent,
            (rendered_image IS NOT NULL) AS has_image
-    FROM flyers ORDER BY updated_at DESC
+    FROM flyers WHERE deleted_at IS NULL ORDER BY updated_at DESC
   `).all();
   res.json(rows.map(r => ({ ...r, status: flyerStatus(r, now) })));
 });
 
 app.get('/api/flyers/:name', requireAuth, (req, res) => {
-  const row = db.prepare('SELECT data, scheduled_start, scheduled_end FROM flyers WHERE name = ?').get(req.params.name);
+  const row = db.prepare('SELECT data, scheduled_start, scheduled_end FROM flyers WHERE name = ? AND deleted_at IS NULL').get(req.params.name);
   if (!row) return res.status(404).json({ error: 'not_found' });
   const parsed = JSON.parse(row.data);
   parsed.scheduling = { start: row.scheduled_start, end: row.scheduled_end };
@@ -269,8 +270,8 @@ app.post('/api/flyers/:name', requireAuth, (req, res) => {
   const scheduledEnd = scheduling.end || null;
 
   db.prepare(`
-    INSERT INTO flyers (name, data, updated_at, scheduled_start, scheduled_end, notified, rendered_image, broadcast_sent)
-    VALUES (?, ?, ?, ?, ?, 0, ?, 0)
+    INSERT INTO flyers (name, data, updated_at, scheduled_start, scheduled_end, notified, rendered_image, broadcast_sent, deleted_at)
+    VALUES (?, ?, ?, ?, ?, 0, ?, 0, NULL)
     ON CONFLICT(name) DO UPDATE SET
       data = excluded.data,
       updated_at = excluded.updated_at,
@@ -278,14 +279,15 @@ app.post('/api/flyers/:name', requireAuth, (req, res) => {
       scheduled_end = excluded.scheduled_end,
       rendered_image = COALESCE(excluded.rendered_image, flyers.rendered_image),
       notified = CASE WHEN flyers.scheduled_start IS excluded.scheduled_start THEN flyers.notified ELSE 0 END,
-      broadcast_sent = CASE WHEN flyers.scheduled_start IS excluded.scheduled_start THEN flyers.broadcast_sent ELSE 0 END
+      broadcast_sent = CASE WHEN flyers.scheduled_start IS excluded.scheduled_start THEN flyers.broadcast_sent ELSE 0 END,
+      deleted_at = NULL
   `).run(name, data, Date.now(), scheduledStart, scheduledEnd, renderedImage || null);
 
   // upsert products found in this flyer's cells so the database stays current
   const cells = body.cells || [];
   const upsert = db.prepare(`
-    INSERT INTO products (name_key, display_name, description, ad_size, img, original_img, price, unit, unit_custom, updated_at)
-    VALUES (@key, @displayName, @description, @adSize, @img, @originalImg, @price, @unit, @unitCustom, @updatedAt)
+    INSERT INTO products (name_key, display_name, description, ad_size, img, original_img, price, unit, unit_custom, updated_at, deleted_at)
+    VALUES (@key, @displayName, @description, @adSize, @img, @originalImg, @price, @unit, @unitCustom, @updatedAt, NULL)
     ON CONFLICT(name_key) DO UPDATE SET
       display_name = excluded.display_name,
       description = excluded.description,
@@ -295,7 +297,8 @@ app.post('/api/flyers/:name', requireAuth, (req, res) => {
       price = excluded.price,
       unit = excluded.unit,
       unit_custom = excluded.unit_custom,
-      updated_at = excluded.updated_at
+      updated_at = excluded.updated_at,
+      deleted_at = NULL
   `);
   const tx = db.transaction((cells) => {
     for (const c of cells) {
@@ -325,7 +328,7 @@ app.post('/api/flyers/:name', requireAuth, (req, res) => {
 });
 
 app.delete('/api/flyers/:name', requireAuth, (req, res) => {
-  db.prepare('DELETE FROM flyers WHERE name = ?').run(req.params.name);
+  db.prepare('UPDATE flyers SET deleted_at = ? WHERE name = ?').run(Date.now(), req.params.name);
   res.json({ ok: true });
 });
 
@@ -344,13 +347,13 @@ app.get('/api/public/flyer-image/:name', (req, res) => {
 app.get('/api/products', requireAuth, (req, res) => {
   const q = (req.query.q || '').toLowerCase();
   const rows = q
-    ? db.prepare('SELECT * FROM products WHERE name_key LIKE ? ORDER BY updated_at DESC').all(`%${q}%`)
-    : db.prepare('SELECT * FROM products ORDER BY updated_at DESC').all();
+    ? db.prepare('SELECT * FROM products WHERE deleted_at IS NULL AND name_key LIKE ? ORDER BY updated_at DESC').all(`%${q}%`)
+    : db.prepare('SELECT * FROM products WHERE deleted_at IS NULL ORDER BY updated_at DESC').all();
   res.json(rows.map(withLastPrice));
 });
 
 app.get('/api/products/:key', requireAuth, (req, res) => {
-  const row = db.prepare('SELECT * FROM products WHERE name_key = ?').get(req.params.key.toLowerCase());
+  const row = db.prepare('SELECT * FROM products WHERE name_key = ? AND deleted_at IS NULL').get(req.params.key.toLowerCase());
   if (!row) return res.status(404).json({ error: 'not_found' });
   res.json(withLastPrice(row));
 });
@@ -456,7 +459,7 @@ app.post('/api/products/import', requireAuth, (req, res) => {
 
 app.put('/api/products/:key', requireAuth, (req, res) => {
   const oldKey = req.params.key.toLowerCase();
-  const existing = db.prepare('SELECT * FROM products WHERE name_key = ?').get(oldKey);
+  const existing = db.prepare('SELECT * FROM products WHERE name_key = ? AND deleted_at IS NULL').get(oldKey);
   if (!existing) return res.status(404).json({ error: 'not_found' });
   const body = req.body || {};
   const product = normalizeProduct({ ...body, img: body.img || existing.img });
@@ -473,13 +476,54 @@ app.put('/api/products/:key', requireAuth, (req, res) => {
 });
 
 app.delete('/api/products/:key', requireAuth, (req, res) => {
-  db.prepare('DELETE FROM products WHERE name_key = ?').run(req.params.key.toLowerCase());
+  db.prepare('UPDATE products SET deleted_at = ? WHERE name_key = ?').run(Date.now(), req.params.key.toLowerCase());
   res.json({ ok: true });
 });
 
+/* ---------------- Trash (7-day undo for deleted flyers/products) ---------------- */
+const TRASH_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
+
+app.get('/api/trash', requireAuth, (req, res) => {
+  const flyers = db.prepare('SELECT name, updated_at, deleted_at FROM flyers WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC').all();
+  const products = db.prepare('SELECT name_key, display_name, price, unit, updated_at, deleted_at FROM products WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC').all();
+  res.json({ flyers, products });
+});
+
+app.post('/api/trash/flyers/:name/restore', requireAuth, (req, res) => {
+  const info = db.prepare('UPDATE flyers SET deleted_at = NULL WHERE name = ? AND deleted_at IS NOT NULL').run(req.params.name);
+  if (!info.changes) return res.status(404).json({ error: 'not_found' });
+  res.json({ ok: true });
+});
+
+app.delete('/api/trash/flyers/:name', requireAuth, (req, res) => {
+  db.prepare('DELETE FROM flyers WHERE name = ? AND deleted_at IS NOT NULL').run(req.params.name);
+  res.json({ ok: true });
+});
+
+app.post('/api/trash/products/:key/restore', requireAuth, (req, res) => {
+  const info = db.prepare('UPDATE products SET deleted_at = NULL WHERE name_key = ? AND deleted_at IS NOT NULL').run(req.params.key.toLowerCase());
+  if (!info.changes) return res.status(404).json({ error: 'not_found' });
+  res.json({ ok: true });
+});
+
+app.delete('/api/trash/products/:key', requireAuth, (req, res) => {
+  db.prepare('DELETE FROM products WHERE name_key = ? AND deleted_at IS NOT NULL').run(req.params.key.toLowerCase());
+  res.json({ ok: true });
+});
+
+// Anything trashed longer than the retention window is gone for good — checked hourly, which is
+// plenty precise for a 7-day window.
+function purgeOldTrash() {
+  const cutoff = Date.now() - TRASH_RETENTION_MS;
+  db.prepare('DELETE FROM flyers WHERE deleted_at IS NOT NULL AND deleted_at <= ?').run(cutoff);
+  db.prepare('DELETE FROM products WHERE deleted_at IS NOT NULL AND deleted_at <= ?').run(cutoff);
+}
+purgeOldTrash();
+setInterval(purgeOldTrash, 60 * 60 * 1000);
+
 /* ---------------- Logical database backup / restore ---------------- */
-app.get('/api/backup', requireAuth, (req, res) => {
-  const backup = {
+function buildBackupObject() {
+  return {
     format: 'weekly-ad-builder-backup',
     version: 1,
     createdAt: new Date().toISOString(),
@@ -490,11 +534,40 @@ app.get('/api/backup', requireAuth, (req, res) => {
       subscribers: db.prepare('SELECT * FROM subscribers ORDER BY id').all()
     }
   };
+}
+
+app.get('/api/backup', requireAuth, (req, res) => {
+  const backup = buildBackupObject();
   const stamp = new Date().toISOString().slice(0, 10);
   res.set('Content-Type', 'application/json; charset=utf-8');
   res.set('Content-Disposition', `attachment; filename="cashsaver-backup-${stamp}.json"`);
   res.send(JSON.stringify(backup));
 });
+
+/* ---------------- Daily automated backup to disk ---------------- */
+const BACKUP_DIR = path.join(db.dataDir, 'backups');
+const BACKUP_RETENTION_COUNT = 14;
+
+function runDailyBackup() {
+  try {
+    fs.mkdirSync(BACKUP_DIR, { recursive: true });
+    const stamp = new Date().toISOString().slice(0, 10);
+    const filePath = path.join(BACKUP_DIR, `backup-${stamp}.json`);
+    fs.writeFileSync(filePath, JSON.stringify(buildBackupObject()));
+
+    const files = fs.readdirSync(BACKUP_DIR)
+      .filter(f => /^backup-\d{4}-\d{2}-\d{2}\.json$/.test(f))
+      .sort();
+    while (files.length > BACKUP_RETENTION_COUNT) {
+      fs.unlinkSync(path.join(BACKUP_DIR, files.shift()));
+    }
+    console.log(`[backup] wrote ${filePath}`);
+  } catch (err) {
+    console.warn('[backup] daily backup failed:', err.message);
+  }
+}
+runDailyBackup();
+setInterval(runDailyBackup, 24 * 60 * 60 * 1000);
 
 app.post('/api/restore', requireAuth, (req, res) => {
   const backup = req.body;
@@ -523,14 +596,14 @@ app.post('/api/restore', requireAuth, (req, res) => {
     db.prepare('DELETE FROM subscribers').run();
 
     const insertFlyer = db.prepare(`INSERT INTO flyers
-      (name, data, updated_at, scheduled_start, scheduled_end, notified, rendered_image, broadcast_sent)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`);
-    for (const v of flyers) insertFlyer.run(v.name, v.data, Number(v.updated_at) || Date.now(), v.scheduled_start ?? null, v.scheduled_end ?? null, Number(v.notified) || 0, v.rendered_image ?? null, Number(v.broadcast_sent) || 0);
+      (name, data, updated_at, scheduled_start, scheduled_end, notified, rendered_image, broadcast_sent, deleted_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+    for (const v of flyers) insertFlyer.run(v.name, v.data, Number(v.updated_at) || Date.now(), v.scheduled_start ?? null, v.scheduled_end ?? null, Number(v.notified) || 0, v.rendered_image ?? null, Number(v.broadcast_sent) || 0, v.deleted_at ?? null);
 
     const insertProduct = db.prepare(`INSERT INTO products
-      (name_key, display_name, img, price, unit, unit_custom, updated_at, description, ad_size, original_img)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
-    for (const v of products) insertProduct.run(v.name_key, v.display_name, v.img ?? null, String(v.price ?? ''), v.unit || 'lb.', v.unit_custom || '', Number(v.updated_at) || Date.now(), v.description || '', v.ad_size === 'big' ? 'big' : 'small', v.original_img ?? null);
+      (name_key, display_name, img, price, unit, unit_custom, updated_at, description, ad_size, original_img, deleted_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+    for (const v of products) insertProduct.run(v.name_key, v.display_name, v.img ?? null, String(v.price ?? ''), v.unit || 'lb.', v.unit_custom || '', Number(v.updated_at) || Date.now(), v.description || '', v.ad_size === 'big' ? 'big' : 'small', v.original_img ?? null, v.deleted_at ?? null);
 
     const insertSetting = db.prepare('INSERT INTO settings (key, value) VALUES (?, ?)');
     for (const v of settings) insertSetting.run(v.key, v.value == null ? null : String(v.value));

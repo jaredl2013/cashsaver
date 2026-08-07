@@ -182,7 +182,16 @@
   }
   .logo-photo.has-img{ border-style:solid; border-color:var(--black); }
   .logo-photo input{ position:absolute; top:0; left:0; right:16px; bottom:16px; opacity:0; cursor:pointer; }
-  .store-box{ width:200px; flex:0 0 auto; margin-left:auto; border:2px solid var(--black); padding:10px 14px; font-size:13px; font-weight:bold; line-height:1.5; }
+  .store-box{ width:200px; flex:0 0 auto; margin-left:auto; border:2px solid var(--black); padding:10px 14px; font-size:13px; font-weight:bold; line-height:1.5; position:relative; text-align:left; }
+  .store-box.text-centered{ text-align:center; }
+  .store-align-btn{
+    position:absolute; top:-24px; right:0; border:1px solid #c7c7c7; border-radius:4px; background:#fff;
+    color:#333; font-size:9px; font-weight:800; padding:3px 6px; cursor:pointer;
+    opacity:0; pointer-events:none; transition:opacity .15s;
+  }
+  .store-box:hover .store-align-btn, .store-align-btn:focus{ opacity:1; pointer-events:auto; }
+  .store-align-btn:hover{ border-color:var(--red); color:var(--red); }
+  .render-clean .store-align-btn{ display:none !important; }
 
   .tagline{ background:var(--red); color:#fff; text-align:center; padding:8px 10px; margin:8px 0; }
   .tagline .line1{ font-size:15px; font-weight:900; }
@@ -618,7 +627,7 @@
     @page{ size:letter; margin:0.25in; }
     .photo{ border-style:solid; }
     .price-wrap, .unit-select, .unit-custom{ background:transparent; border-color:transparent; }
-    .db-badge, .cell-hover-menu, .drag-handle, .container-resize-handle, .undo-container-size-btn, .remove-photo-btn, .undo-photo-btn{ display:none !important; }
+    .db-badge, .cell-hover-menu, .drag-handle, .container-resize-handle, .undo-container-size-btn, .remove-photo-btn, .undo-photo-btn, .store-align-btn{ display:none !important; }
   }
   @media (max-width:1180px){
     body{ padding-left:304px; }
@@ -710,6 +719,7 @@
           <button class="secondary" onclick="openProductDB()">📋 Product Database</button>
           <button class="secondary" onclick="openScheduleList()">📅 Scheduled Ads</button>
           <button class="secondary" onclick="openSubscribers()">👥 Subscribers</button>
+          <button class="secondary" onclick="openTrash()">🗑 Trash</button>
           <button class="secondary" onclick="window.open('/how-to.html','_blank','noopener')">❓ Quick How-To</button>
           <button onclick="sendNow()">📣 Send Now</button>
         </div>
@@ -759,6 +769,7 @@
           <span class="container-resize-handle" title="Drag to resize the image box" onclick="event.preventDefault();event.stopPropagation()">↘</span>
         </label>
         <div class="store-box">
+          <button type="button" class="store-align-btn" title="Center the store info" onclick="toggleStoreBoxAlignment(this)">Center</button>
           <div contenteditable="true">Crossett Cash Saver</div>
           <div contenteditable="true">1066 HWY 133 North</div>
           <div contenteditable="true">Crossett, AR</div>
@@ -830,6 +841,18 @@
       </div>
       <div class="modal-body" id="scheduleList"></div>
       <div class="modal-foot"><button onclick="closeScheduleList()">Close</button></div>
+    </div>
+  </div>
+
+  <!-- Trash modal -->
+  <div class="modal-overlay" id="trashModal">
+    <div class="modal">
+      <div class="modal-head">
+        <h2>Trash</h2>
+        <span style="font-size:11px;color:#777;">Deleted flyers and products stay here for 7 days before they're gone for good.</span>
+      </div>
+      <div class="modal-body" id="trashList"></div>
+      <div class="modal-foot"><button onclick="closeTrash()">Close</button></div>
     </div>
   </div>
 
@@ -1610,6 +1633,14 @@ function toggleProductTextAlignment(button){
   markFlyerDirty();
 }
 
+function toggleStoreBoxAlignment(button){
+  const box = button.closest('.store-box');
+  const centered = box.classList.toggle('text-centered');
+  button.textContent = centered ? 'Left' : 'Center';
+  button.title = centered ? 'Align the store info left' : 'Center the store info';
+  markFlyerDirty();
+}
+
 function onNameInput(div){
   autoFitProductName(div);
   clearTimeout(suggestTimer);
@@ -2076,7 +2107,7 @@ async function renderDbList(){
 }
 
 async function deleteDbEntry(key){
-  if(!confirm('Delete this product from the catalog?')) return;
+  if(!confirm('Delete this product from the catalog? It\'ll stay in Trash for 7 days if you change your mind.')) return;
   await fetch('/api/products/' + encodeURIComponent(key), { method:'DELETE' });
   if(editingDbKey === key) editingDbKey = null;
   renderDbList();
@@ -2638,12 +2669,84 @@ async function renderScheduleList(){
   list.innerHTML = html;
 }
 
+/* ---------------- Trash (7-day undo for deleted flyers/products) ---------------- */
+function openTrash(){
+  document.getElementById('trashModal').classList.add('open');
+  renderTrash();
+}
+function closeTrash(){ document.getElementById('trashModal').classList.remove('open'); }
+
+async function renderTrash(){
+  const res = await fetch('/api/trash');
+  const { flyers, products } = await res.json();
+  const list = document.getElementById('trashList');
+
+  if(!flyers.length && !products.length){
+    list.innerHTML = '<div class="empty-db">Trash is empty.</div>';
+    return;
+  }
+
+  const daysLeft = deletedAt => Math.max(0, 7 - Math.floor((Date.now() - deletedAt) / (24*60*60*1000)));
+  let html = '';
+
+  if(flyers.length){
+    html += '<div class="db-list-head"><strong>Flyers</strong></div>';
+    html += flyers.map(f => `
+      <div class="sched-row">
+        <div class="sched-name">${escapeHtml(f.name)}</div>
+        <div class="sched-dates">${daysLeft(f.deleted_at)} day${daysLeft(f.deleted_at) === 1 ? '' : 's'} left</div>
+        <button class="secondary" style="border-radius:5px;padding:5px 9px;font-size:11px;" onclick="restoreTrashedFlyer('${escapeHtml(f.name).replace(/'/g,"\\'")}')">Restore</button>
+        <button style="background:#8a1410;color:#fff;border:none;border-radius:5px;padding:5px 9px;font-size:11px;cursor:pointer;" onclick="permanentlyDeleteFlyer('${escapeHtml(f.name).replace(/'/g,"\\'")}')">Delete forever</button>
+      </div>
+    `).join('');
+  }
+
+  if(products.length){
+    html += '<div class="db-list-head" style="margin-top:10px;"><strong>Products</strong></div>';
+    html += products.map(p => `
+      <div class="sched-row">
+        <div class="sched-name">${escapeHtml(p.display_name)}</div>
+        <div class="sched-dates">${daysLeft(p.deleted_at)} day${daysLeft(p.deleted_at) === 1 ? '' : 's'} left</div>
+        <button class="secondary" style="border-radius:5px;padding:5px 9px;font-size:11px;" data-key="${escapeHtml(p.name_key)}" onclick="restoreTrashedProduct(this.dataset.key)">Restore</button>
+        <button style="background:#8a1410;color:#fff;border:none;border-radius:5px;padding:5px 9px;font-size:11px;cursor:pointer;" data-key="${escapeHtml(p.name_key)}" onclick="permanentlyDeleteProduct(this.dataset.key)">Delete forever</button>
+      </div>
+    `).join('');
+  }
+
+  list.innerHTML = html;
+}
+
+async function restoreTrashedFlyer(name){
+  await fetch('/api/trash/flyers/' + encodeURIComponent(name) + '/restore', { method:'POST' });
+  renderTrash();
+  refreshSavedList();
+  setStatus(`Restored "${name}"`);
+}
+
+async function permanentlyDeleteFlyer(name){
+  if(!confirm(`Permanently delete "${name}"? This can't be undone.`)) return;
+  await fetch('/api/trash/flyers/' + encodeURIComponent(name), { method:'DELETE' });
+  renderTrash();
+}
+
+async function restoreTrashedProduct(key){
+  await fetch('/api/trash/products/' + encodeURIComponent(key) + '/restore', { method:'POST' });
+  renderTrash();
+  setStatus('Product restored');
+}
+
+async function permanentlyDeleteProduct(key){
+  if(!confirm('Permanently delete this product? This can\'t be undone.')) return;
+  await fetch('/api/trash/products/' + encodeURIComponent(key), { method:'DELETE' });
+  renderTrash();
+}
+
 /* ================= SHARE / EXPORT IMAGE ================= */
 function buildCleanPreviewClone(){
   const clone = document.getElementById('page').cloneNode(true);
   clone.removeAttribute('id');
   clone.classList.add('render-clean', 'preview-page');
-  clone.querySelectorAll('.db-badge,.cell-hover-menu,.drag-handle,.container-resize-handle,.undo-container-size-btn,.remove-photo-btn,.undo-photo-btn,.suggest-list,input[type=file]').forEach(el => el.remove());
+  clone.querySelectorAll('.db-badge,.cell-hover-menu,.drag-handle,.container-resize-handle,.undo-container-size-btn,.remove-photo-btn,.undo-photo-btn,.store-align-btn,.suggest-list,input[type=file]').forEach(el => el.remove());
   clone.querySelectorAll('[contenteditable]').forEach(el => el.removeAttribute('contenteditable'));
   clone.querySelectorAll('.price-input').forEach(input => {
     const amount = Number.parseFloat(input.value);
@@ -2735,7 +2838,7 @@ function captureFlyerCanvas(scale = 1.4){
     onclone: clonedDocument => {
       const clonedPage = clonedDocument.getElementById('page');
       clonedPage.classList.add('render-clean');
-      clonedPage.querySelectorAll('.db-badge,.cell-hover-menu,.drag-handle,.container-resize-handle,.undo-container-size-btn,.remove-photo-btn,.undo-photo-btn,.suggest-list,input[type=file]').forEach(el => el.remove());
+      clonedPage.querySelectorAll('.db-badge,.cell-hover-menu,.drag-handle,.container-resize-handle,.undo-container-size-btn,.remove-photo-btn,.undo-photo-btn,.store-align-btn,.suggest-list,input[type=file]').forEach(el => el.remove());
       clonedPage.querySelectorAll('[contenteditable]').forEach(el => el.removeAttribute('contenteditable'));
       clonedPage.querySelectorAll('.price-input').forEach((input, index) => {
         const amount = Number.parseFloat(prices[index]);
@@ -2984,6 +3087,7 @@ function serializeState(){
     logoPreviousHeight: document.getElementById('logoPhoto').dataset.previousHeight || null,
     layoutId: currentLayoutId,
     store: Array.from(document.querySelectorAll('.store-box div')).map(d => d.innerHTML),
+    storeAlign: document.querySelector('.store-box').classList.contains('text-centered') ? 'center' : 'left',
     line1: document.querySelector('.tagline .line1').innerHTML,
     line2: document.querySelector('.tagline .line2').innerHTML,
     wow1: document.querySelectorAll('.wow-banner div')[0].innerHTML,
@@ -3019,6 +3123,12 @@ function applyState(state){
   else delete logoPhoto.dataset.previousImg;
   updatePhotoActionState(logoPhoto);
   document.querySelectorAll('.store-box div').forEach((d,i) => d.innerHTML = state.header.store[i] ?? '');
+  const storeBox = document.querySelector('.store-box');
+  const storeCentered = state.header.storeAlign === 'center';
+  storeBox.classList.toggle('text-centered', storeCentered);
+  const storeAlignBtn = storeBox.querySelector('.store-align-btn');
+  storeAlignBtn.textContent = storeCentered ? 'Left' : 'Center';
+  storeAlignBtn.title = storeCentered ? 'Align the store info left' : 'Center the store info';
   document.querySelector('.tagline .line1').innerHTML = state.header.line1;
   document.querySelector('.tagline .line2').innerHTML = state.header.line2;
   document.querySelectorAll('.wow-banner div')[0].innerHTML = state.header.wow1;
@@ -3193,14 +3303,14 @@ async function duplicateSavedFlyer(name){
 
 async function deleteSavedFlyer(name){
   if(!name) return;
-  if(!confirm(`Delete saved flyer "${name}"? This can't be undone.`)) return;
+  if(!confirm(`Delete saved flyer "${name}"? It'll stay in Trash for 7 days if you change your mind.`)) return;
   await fetch('/api/flyers/' + encodeURIComponent(name), { method:'DELETE' });
   if(currentName === name){
     setCurrentName(null);
     markFlyerDirty();
   }
   refreshSavedList();
-  setStatus(`Deleted "${name}"`);
+  setStatus(`Deleted "${name}" — recoverable from Trash for 7 days`);
 }
 
 function newBlank(){ flyerDirty = false; location.reload(); }
