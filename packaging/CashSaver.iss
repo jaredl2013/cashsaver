@@ -32,6 +32,9 @@ OutputBaseFilename=CashSaver-Ad-Builder-Setup-{#MyAppVersion}
 Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern
+WizardImageFile=wizard-large.png
+WizardSmallImageFile=wizard-small.png
+SetupIconFile=app-icon.ico
 CloseApplications=yes
 RestartApplications=no
 UninstallDisplayName={#MyAppName}
@@ -52,15 +55,15 @@ Name: "{#DataDir}"; Permissions: users-modify
 Source: "{#StageDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-Name: "{autoprograms}\{#MyAppName}"; Filename: "http://127.0.0.1:3000"; Comment: "Open {#MyAppName}"
-Name: "{autoprograms}\Quick How-To"; Filename: "http://127.0.0.1:3000/how-to.html"; Comment: "Open the Weekly Ad Builder guide"
-Name: "{autodesktop}\{#MyAppName}"; Filename: "http://127.0.0.1:3000"; Tasks: desktopicon; Comment: "Open {#MyAppName}"
+Name: "{autoprograms}\{#MyAppName}"; Filename: "http://127.0.0.1:{code:GetAppPort}"; Comment: "Open {#MyAppName}"
+Name: "{autoprograms}\Quick How-To"; Filename: "http://127.0.0.1:{code:GetAppPort}/how-to.html"; Comment: "Open the Weekly Ad Builder guide"
+Name: "{autodesktop}\{#MyAppName}"; Filename: "http://127.0.0.1:{code:GetAppPort}"; Tasks: desktopicon; Comment: "Open {#MyAppName}"
 
 [Run]
 Filename: "{app}\node.exe"; Parameters: """{app}\install-service.js"""; WorkingDir: "{app}"; StatusMsg: "Starting Weekly Ad Builder in the background..."; Flags: runhidden waituntilterminated
 Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall delete rule name=""CashSaver Weekly Ad Builder"""; Flags: runhidden waituntilterminated; Tasks: lanaccess
-Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall add rule name=""CashSaver Weekly Ad Builder"" dir=in action=allow protocol=TCP localport=3000 profile=private"; Flags: runhidden waituntilterminated; Tasks: lanaccess
-Filename: "http://127.0.0.1:3000"; Description: "Open Weekly Ad Builder"; Flags: shellexec postinstall skipifsilent nowait
+Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall add rule name=""CashSaver Weekly Ad Builder"" dir=in action=allow protocol=TCP localport={code:GetAppPort} profile=private"; Flags: runhidden waituntilterminated; Tasks: lanaccess
+Filename: "http://127.0.0.1:{code:GetAppPort}"; Description: "Open Weekly Ad Builder"; Flags: shellexec postinstall skipifsilent nowait
 
 [UninstallRun]
 Filename: "{sys}\sc.exe"; Parameters: "stop weeklyadbuilder.exe"; Flags: runhidden waituntilterminated; RunOnceId: "StopWeeklyAdBuilder"
@@ -86,6 +89,40 @@ begin
   Result := '"' + Value + '"';
 end;
 
+// Reads PORT= out of an existing .env (upgrade case) so shortcuts and the
+// firewall rule stay consistent with whatever port that install already uses.
+function ReadExistingPort(): String;
+var
+  Lines: TArrayOfString;
+  I: Integer;
+  Line: String;
+begin
+  Result := '3000';
+  if LoadStringsFromFile(DataPath() + '\.env', Lines) then
+  begin
+    for I := 0 to GetArrayLength(Lines) - 1 do
+    begin
+      Line := Lines[I];
+      if (Length(Line) > 5) and (Copy(Line, 1, 5) = 'PORT=') then
+      begin
+        Result := Trim(Copy(Line, 6, Length(Line) - 5));
+        Exit;
+      end;
+    end;
+  end;
+end;
+
+// Used both by WriteInitialConfig and by {code:GetAppPort} in [Icons]/[Run].
+function GetAppPort(Param: String): String;
+begin
+  if ExistingConfig then
+    Result := ReadExistingPort()
+  else if Assigned(PasswordPage) then
+    Result := Trim(PasswordPage.Values[2])
+  else
+    Result := '3000';
+end;
+
 procedure InitializeWizard;
 begin
   ExistingConfig := FileExists(DataPath() + '\.env');
@@ -95,6 +132,8 @@ begin
     'The Pexels key is optional and can be added later. Existing installations keep their current settings.');
   PasswordPage.Add('App login password:', True);
   PasswordPage.Add('Pexels API key (optional):', False);
+  PasswordPage.Add('Port (leave as 3000 unless something else on this computer already uses it):', False);
+  PasswordPage.Values[2] := '3000';
 end;
 
 function ShouldSkipPage(PageID: Integer): Boolean;
@@ -103,12 +142,25 @@ begin
 end;
 
 function NextButtonClick(CurPageID: Integer): Boolean;
+var
+  PortNum: Integer;
 begin
   Result := True;
-  if (CurPageID = PasswordPage.ID) and (Length(Trim(PasswordPage.Values[0])) < 6) then
+  if (CurPageID = PasswordPage.ID) then
   begin
-    MsgBox('Please choose an app password with at least 6 characters.', mbError, MB_OK);
-    Result := False;
+    if Length(Trim(PasswordPage.Values[0])) < 6 then
+    begin
+      MsgBox('Please choose an app password with at least 6 characters.', mbError, MB_OK);
+      Result := False;
+      Exit;
+    end;
+    PortNum := StrToIntDef(Trim(PasswordPage.Values[2]), -1);
+    if (PortNum < 1) or (PortNum > 65535) then
+    begin
+      MsgBox('Please enter a valid port number between 1 and 65535 (or just leave it as 3000).', mbError, MB_OK);
+      Result := False;
+      Exit;
+    end;
   end;
 end;
 
@@ -129,7 +181,7 @@ begin
   ForceDirectories(DataPath());
   Secret := GetSHA256OfString(PasswordPage.Values[0] + GetDateTimeString('yyyymmddhhnnsszzz', #0, #0));
   SetArrayLength(Lines, 18);
-  Lines[0] := 'PORT=3000';
+  Lines[0] := 'PORT=' + Trim(PasswordPage.Values[2]);
   Lines[1] := 'SHARED_PASSWORD=' + DotEnvQuote(PasswordPage.Values[0]);
   Lines[2] := 'ADMIN_PASSWORD=' + DotEnvQuote(PasswordPage.Values[0]);
   Lines[3] := 'SESSION_SECRET=' + DotEnvQuote(Secret);
