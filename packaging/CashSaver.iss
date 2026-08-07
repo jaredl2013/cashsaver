@@ -126,6 +126,15 @@ end;
 procedure InitializeWizard;
 begin
   ExistingConfig := FileExists(DataPath() + '\.env');
+
+  if ExistingConfig then
+  begin
+    WizardForm.WelcomeLabel2.Caption :=
+      'This will upgrade {#MyAppName} to version {#MyAppVersion} on this computer.' + #13#10 + #13#10 +
+      'Your saved flyers, product catalog, and settings will be kept as they are.' + #13#10 + #13#10 +
+      'It is recommended that you close {#MyAppName} before continuing.';
+  end;
+
   PasswordPage := CreateInputQueryPage(wpSelectDir,
     'Weekly Ad Builder Settings',
     'Choose the password used to open the ad builder.',
