@@ -204,6 +204,7 @@
   .grid.three{ grid-template-columns: repeat(3,1fr); }
   .grid.four{ grid-template-columns: repeat(4,1fr); }
   .grid.five{ grid-template-columns: repeat(5,1fr); }
+  .grid.six{ grid-template-columns: repeat(6,1fr); }
   .grid.one{ grid-template-columns:1fr; }
 
   .cell{
@@ -411,6 +412,12 @@
   .grid.five .price-visual .dollar-sign{ font-size:18px; }
   .grid.five .price-whole{ font-size:31px; }
   .grid.five .price-cents{ font-size:16px; }
+  .grid.six .pname{ font-size:11px; }
+  .grid.six .psize{ font-size:9px; }
+  .grid.six .price-visual .dollar-sign{ font-size:14px; }
+  .grid.six .price-whole{ font-size:24px; }
+  .grid.six .price-cents{ font-size:12px; }
+  .grid.six .foot{ font-size:8px; }
 
   .db-badge{
     position:absolute; top:2px; right:29px; background:#2a7a2a; color:#fff; font-size:8px;
@@ -467,6 +474,14 @@
   .wow-banner{
     background:var(--red); color:#fff; display:flex; justify-content:space-between; align-items:center;
     padding:5px 10px; font-weight:900; font-style:italic; font-size:12px;
+  }
+
+  /* Category banner shown above a product section (e.g. "FRESH PRODUCE"). One per
+     section that requests one via LAYOUTS' section.label -- not the same thing as
+     the single global .wow-banner between the top/bottom areas. */
+  .section-label{
+    background:var(--red); color:#fff; font-weight:900; font-style:italic;
+    font-size:13px; letter-spacing:.02em; padding:5px 10px; margin:10px 0 0;
   }
 
   .footer{ background:var(--red); color:#fff; text-align:center; font-weight:900; font-size:15px; padding:9px; margin-top:8px; }
@@ -1363,13 +1378,27 @@ const LAYOUTS = {
     blurb: 'Three featured deals followed by 15 generous 3-column items. Best when photos and product descriptions need more breathing room.',
     top: [ { count: 3, cols: 3, hero: true, variant: 'photo-cards' } ],
     bottom: [ { count: 15, cols: 3, hero: false, variant: 'photo-cards' } ]
+  },
+  storeCircular: {
+    name: 'Store Circular',
+    blurb: 'One big headline deal, a family-favorites row, then labeled category strips (produce, pantry, dairy, snacks) like a printed grocery circular.',
+    top: [
+      { count: 1, cols: 1, hero: true, variant: 'spotlight-feature', label: 'OUR BEST DEAL!' },
+      { count: 3, cols: 3, hero: false, label: 'FAMILY MEAL FAVORITES' }
+    ],
+    bottom: [
+      { count: 6, cols: 6, hero: false, variant: 'photo-cards', label: 'FRESH PRODUCE' },
+      { count: 5, cols: 5, hero: false, variant: 'photo-cards', label: 'PANTRY SAVINGS' },
+      { count: 4, cols: 4, hero: false, variant: 'photo-cards', label: 'DAIRY & FROZEN' },
+      { count: 4, cols: 4, hero: false, variant: 'photo-cards', label: 'SNACKS & DRINKS' }
+    ]
   }
 };
 
 let currentLayoutId = 'classic';
 
 function colsClass(n){
-  return n === 1 ? 'one' : n === 2 ? 'top' : n === 3 ? 'three' : n === 5 ? 'five' : 'four';
+  return n === 1 ? 'one' : n === 2 ? 'top' : n === 3 ? 'three' : n === 5 ? 'five' : n === 6 ? 'six' : 'four';
 }
 
 // Reads every current cell's data (name/size/price/photo/etc) in DOM order —
@@ -1456,6 +1485,13 @@ function buildLayoutDom(layoutId, existingData){
   let dataIdx = 0;
   function buildSections(sections, area){
     sections.forEach(section => {
+      if(section.label){
+        const label = document.createElement('div');
+        label.className = 'section-label';
+        label.contentEditable = 'true';
+        label.textContent = section.label;
+        area.appendChild(label);
+      }
       const grid = document.createElement('div');
       grid.className = 'grid ' + colsClass(section.cols) + (section.variant ? ' ' + section.variant : '');
       grid.dataset.baseCount = section.count;
@@ -3319,6 +3355,7 @@ function serializeState(){
     line2: document.querySelector('.tagline .line2').innerHTML,
     wow1: document.querySelectorAll('.wow-banner div')[0].innerHTML,
     wow2: document.querySelectorAll('.wow-banner div')[1].innerHTML,
+    sectionLabels: Array.from(document.querySelectorAll('.section-label')).map(el => el.innerHTML),
     footStart: document.getElementById('footStart').textContent,
     footEnd: document.getElementById('footEnd').textContent,
     weekPickerValue: document.getElementById('weekPicker').value,
@@ -3373,6 +3410,14 @@ function applyState(state){
   // layout than whatever's currently on screen
   buildLayoutDom(state.header.layoutId || 'classic', state.cells);
   populateLayoutSelect(); // keep the dropdown in sync with whatever layout this flyer actually uses
+
+  // section labels are created with their layout-default text by buildLayoutDom above;
+  // overwrite with whatever was actually saved, if this flyer has any
+  if(state.header.sectionLabels){
+    document.querySelectorAll('.section-label').forEach((el,i) => {
+      if(state.header.sectionLabels[i] != null) el.innerHTML = sanitizeStoredHtml(state.header.sectionLabels[i]);
+    });
+  }
 }
 
 async function refreshSavedList(){
