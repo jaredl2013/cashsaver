@@ -290,7 +290,7 @@
   .grid.compact-specials .cell{ background:#fff; border:1px solid #d6b74f; min-height:132px; }
 
   .grid.photo-cards{ border:0; gap:9px; background:#fff; }
-  .grid.photo-cards .cell{ border:1px solid #aaa; border-radius:8px; min-height:235px; overflow:hidden; padding:8px; }
+  .grid.photo-cards .cell{ border:1px solid #aaa; border-radius:8px; min-height:235px; padding:8px; }
   .grid.photo-cards .cell-top{ flex-direction:column; }
   .grid.photo-cards .photo{ width:100%; min-height:112px; flex:none; }
   .grid.photo-cards .info{ flex:none; }
@@ -449,6 +449,18 @@
   .cell-hover-menu button:hover{ border-color:var(--red); color:var(--red); }
   .cell-hover-menu button.remove-item-btn{ color:#a32720; border-color:#d8a29e; }
   .cell-hover-menu button.remove-item-btn:hover{ background:#a32720; color:#fff; border-color:#a32720; }
+  .cell-hover-menu button.remove-box-btn{ color:#a32720; border-color:#d8a29e; }
+  .cell-hover-menu button.remove-box-btn:hover{ background:#a32720; color:#fff; border-color:#a32720; }
+
+  /* Tile at the end of every product grid for adding another box to that row --
+     not a .cell, so it's invisible to cell counting, dragging, and save data. */
+  .add-box-tile{
+    display:flex; align-items:center; justify-content:center; min-height:80px;
+    border:2px dashed #bbb; border-radius:6px; color:#888; font-size:12px; font-weight:700;
+    cursor:pointer; text-align:center; padding:8px; background:#fafafa;
+  }
+  .add-box-tile:hover{ border-color:var(--red); color:var(--red); background:#fff5f4; }
+  .render-clean .add-box-tile{ display:none !important; }
   .name-size-box{ display:flex; align-items:center; gap:2px; }
   .name-size-box .name-size-btn{ padding:3px 6px; }
   .name-size-input{
@@ -693,7 +705,7 @@
     @page{ size:letter; margin:0; }
     .photo{ border-style:solid; }
     .price-wrap, .unit-select, .unit-custom{ background:transparent; border-color:transparent; }
-    .db-badge, .cell-hover-menu, .drag-handle, .container-resize-handle, .undo-container-size-btn, .remove-photo-btn, .undo-photo-btn, .store-align-btn, .resize-btn, .overlay-drag-handle, .overlay-remove-btn, .overlay-resize-handle{ display:none !important; }
+    .db-badge, .cell-hover-menu, .drag-handle, .container-resize-handle, .undo-container-size-btn, .remove-photo-btn, .undo-photo-btn, .store-align-btn, .resize-btn, .overlay-drag-handle, .overlay-remove-btn, .overlay-resize-handle, .add-box-tile{ display:none !important; }
   }
   @media (max-width:1180px){
     body{ padding-left:304px; }
@@ -1153,7 +1165,8 @@ function makeCell(isHero){
         <button type="button" class="text-align-btn" title="Center the product name and description" onclick="toggleProductTextAlignment(this)">Center</button>
       </div>
       <div class="hover-menu-row">
-        <button type="button" class="remove-item-btn" title="Remove this item from the flyer" onclick="clearFlyerCell(this)">× delete</button>
+        <button type="button" class="remove-item-btn" title="Clear this box's content (keeps the box)" onclick="clearFlyerCell(this)">× delete</button>
+        <button type="button" class="remove-box-btn" title="Remove this box from the row entirely" onclick="removeBoxFromGrid(this)">🗑 remove box</button>
       </div>
     </div>
     <div class="cell-top">
@@ -1527,8 +1540,12 @@ function fillCellData(cell, d){
 // Rebuilds the top/bottom areas to match the given layout. If existingData is
 // passed (from collectAllCellData), it's redistributed into the new cells in
 // order — nothing is deleted, but if the new layout has fewer total slots than
-// you had items, the leftover ones just won't have a spot anymore.
-function buildLayoutDom(layoutId, existingData){
+// you had items, the leftover ones just won't have a spot anymore. sectionCounts,
+// if passed, overrides each section's default box count with whatever a store
+// actually left it at last time (see addBoxToGrid/removeBoxFromGrid) -- without
+// it, a saved flyer would snap back to the layout template's original count on
+// every reload and silently misalign existingData across the sections after it.
+function buildLayoutDom(layoutId, existingData, sectionCounts){
   const layout = LAYOUTS[layoutId] || LAYOUTS.classic;
   currentLayoutId = layoutId;
   const topArea = document.getElementById('topArea');
@@ -1538,6 +1555,7 @@ function buildLayoutDom(layoutId, existingData){
   clearMoveHistory(); // old snapshot references cells that no longer exist after a rebuild
 
   let dataIdx = 0;
+  let sectionIdx = 0;
   function buildSections(sections, area){
     sections.forEach(section => {
       if(section.label){
@@ -1549,15 +1567,18 @@ function buildLayoutDom(layoutId, existingData){
       }
       const grid = document.createElement('div');
       grid.className = 'grid ' + colsClass(section.cols) + (section.variant ? ' ' + section.variant : '');
-      grid.dataset.baseCount = section.count;
+      const count = (sectionCounts && sectionCounts[sectionIdx] != null) ? sectionCounts[sectionIdx] : section.count;
+      sectionIdx++;
+      grid.dataset.baseCount = count;
       grid.dataset.hero = section.hero ? '1' : '';
-      for(let i=0;i<section.count;i++){
+      for(let i=0;i<count;i++){
         const cell = makeCell(section.hero);
         if(existingData) fillCellData(cell, existingData[dataIdx++]);
         grid.appendChild(cell);
       }
       area.appendChild(grid);
       enableReordering(grid);
+      addTileFor(grid);
     });
   }
   buildSections(layout.top, topArea);
@@ -1727,6 +1748,18 @@ function startDragAutoScroll(){
   dragState.scrollRAF = requestAnimationFrame(step);
 }
 
+function attachDragHandle(cell){
+  cell.querySelectorAll('.drag-handle').forEach(h => h.addEventListener('pointerdown', onDragHandleDown));
+}
+
+// Every grid's "+ Add box" tile has to stay the last child so it never gets
+// treated as a drop target or counted as a cell -- this is the one place new
+// cells get inserted, so the tile lookup + insert-before lives here once.
+function insertCellIntoGrid(grid, cell){
+  const tile = grid.querySelector(':scope > .add-box-tile');
+  if(tile) grid.insertBefore(cell, tile); else grid.appendChild(cell);
+}
+
 // If a cell gets dragged out of a section, that section is left with fewer cells
 // than its layout template defines — without this it just stays short, showing as
 // dead white space instead of a normal empty "click to add" slot.
@@ -1737,8 +1770,41 @@ function backfillGridIfShort(grid){
   if(current >= base) return;
   const cell = makeCell(grid.dataset.hero === '1');
   cell.dataset.autoBackfill = '1';
-  grid.appendChild(cell);
-  cell.querySelectorAll('.drag-handle').forEach(h => h.addEventListener('pointerdown', onDragHandleDown));
+  insertCellIntoGrid(grid, cell);
+  attachDragHandle(cell);
+}
+
+function addTileFor(grid){
+  const tile = document.createElement('div');
+  tile.className = 'add-box-tile';
+  tile.title = 'Add another box to this row';
+  tile.innerHTML = '<span>+ Add box</span>';
+  tile.addEventListener('click', () => addBoxToGrid(grid));
+  grid.appendChild(tile);
+  return tile;
+}
+
+function addBoxToGrid(grid){
+  const cell = makeCell(grid.dataset.hero === '1');
+  insertCellIntoGrid(grid, cell);
+  grid.dataset.baseCount = String((parseInt(grid.dataset.baseCount, 10) || 0) + 1);
+  attachDragHandle(cell);
+  scheduleRowAlign();
+  markFlyerDirty();
+}
+
+function removeBoxFromGrid(btn){
+  const cell = btn.closest('.cell');
+  const grid = cell.parentElement;
+  const realCells = Array.from(grid.children).filter(c => c.classList.contains('cell'));
+  if(realCells.length <= 1){
+    alert("This row needs at least one box. Switch layouts if you want to drop the whole section.");
+    return;
+  }
+  cell.remove();
+  grid.dataset.baseCount = String(Math.max(0, (parseInt(grid.dataset.baseCount, 10) || 0) - 1));
+  scheduleRowAlign();
+  markFlyerDirty();
 }
 
 function onDragUp(e){
@@ -3221,7 +3287,7 @@ function buildCleanPreviewClone(){
   const clone = document.getElementById('page').cloneNode(true);
   clone.removeAttribute('id');
   clone.classList.add('render-clean', 'preview-page');
-  clone.querySelectorAll('.db-badge,.cell-hover-menu,.drag-handle,.container-resize-handle,.undo-container-size-btn,.remove-photo-btn,.undo-photo-btn,.store-align-btn,.resize-btn,.suggest-list,.overlay-drag-handle,.overlay-remove-btn,.overlay-resize-handle,input[type=file]').forEach(el => el.remove());
+  clone.querySelectorAll('.db-badge,.cell-hover-menu,.drag-handle,.container-resize-handle,.undo-container-size-btn,.remove-photo-btn,.undo-photo-btn,.store-align-btn,.resize-btn,.suggest-list,.overlay-drag-handle,.overlay-remove-btn,.overlay-resize-handle,.add-box-tile,input[type=file]').forEach(el => el.remove());
   clone.querySelectorAll('[contenteditable]').forEach(el => el.removeAttribute('contenteditable'));
   clone.querySelectorAll('.price-input').forEach(input => {
     const amount = Number.parseFloat(input.value);
@@ -3313,7 +3379,7 @@ function captureFlyerCanvas(scale = 1.4){
     onclone: clonedDocument => {
       const clonedPage = clonedDocument.getElementById('page');
       clonedPage.classList.add('render-clean');
-      clonedPage.querySelectorAll('.db-badge,.cell-hover-menu,.drag-handle,.container-resize-handle,.undo-container-size-btn,.remove-photo-btn,.undo-photo-btn,.store-align-btn,.resize-btn,.suggest-list,.overlay-drag-handle,.overlay-remove-btn,.overlay-resize-handle,input[type=file]').forEach(el => el.remove());
+      clonedPage.querySelectorAll('.db-badge,.cell-hover-menu,.drag-handle,.container-resize-handle,.undo-container-size-btn,.remove-photo-btn,.undo-photo-btn,.store-align-btn,.resize-btn,.suggest-list,.overlay-drag-handle,.overlay-remove-btn,.overlay-resize-handle,.add-box-tile,input[type=file]').forEach(el => el.remove());
       clonedPage.querySelectorAll('[contenteditable]').forEach(el => el.removeAttribute('contenteditable'));
       clonedPage.querySelectorAll('.price-input').forEach((input, index) => {
         const amount = Number.parseFloat(prices[index]);
@@ -3568,6 +3634,7 @@ function serializeState(){
     wow1: document.querySelectorAll('.wow-banner div')[0].innerHTML,
     wow2: document.querySelectorAll('.wow-banner div')[1].innerHTML,
     sectionLabels: Array.from(document.querySelectorAll('.section-label')).map(el => el.innerHTML),
+    sectionCounts: Array.from(document.querySelectorAll('#topArea > .grid, #bottomArea > .grid')).map(g => parseInt(g.dataset.baseCount, 10) || 0),
     footStart: document.getElementById('footStart').textContent,
     footEnd: document.getElementById('footEnd').textContent,
     weekPickerValue: document.getElementById('weekPicker').value,
@@ -3621,7 +3688,7 @@ function applyState(state){
   // rebuild the grid structure to match this flyer's saved layout, then fill in
   // each cell's content as it's created — handles flyers saved under a different
   // layout than whatever's currently on screen
-  buildLayoutDom(state.header.layoutId || 'classic', state.cells);
+  buildLayoutDom(state.header.layoutId || 'classic', state.cells, state.header.sectionCounts);
   populateLayoutSelect(); // keep the dropdown in sync with whatever layout this flyer actually uses
 
   // section labels are created with their layout-default text by buildLayoutDom above;
