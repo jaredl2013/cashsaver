@@ -21,9 +21,31 @@
     font-family:Arial, Helvetica, sans-serif;
     background:#5a5a5a;
     margin:0;
-    padding:24px 24px 24px 344px;
+    padding:80px 24px 24px 324px;
     padding-bottom:60px; /* room for the credit bar */
+    transition:padding-left .18s ease;
   }
+  body.rail-collapsed{ padding-left:84px; }
+  #topBar{
+    position:fixed; top:0; left:300px; right:0; height:56px; z-index:60;
+    background:#1f2937; border-bottom:1px solid #2d3748; display:flex; align-items:center;
+    padding:0 16px; gap:14px; transition:left .18s ease;
+  }
+  body.rail-collapsed #topBar{ left:60px; }
+  .topbar-left, .topbar-right{ display:flex; align-items:center; gap:8px; flex:1; }
+  .topbar-right{ justify-content:flex-end; }
+  .topbar-center{ flex:none; max-width:38%; overflow:hidden; text-align:center; }
+  .topbar-center span{ color:#f3f4f6; font-size:13.5px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #topBar button, #topBar select{
+    border:1px solid rgba(255,255,255,.14); border-radius:8px; background:transparent; color:#e5e7eb;
+    font-size:12.5px; font-weight:600; padding:8px 12px; cursor:pointer; white-space:nowrap;
+  }
+  #topBar button:hover{ background:rgba(255,255,255,.08); border-color:rgba(255,255,255,.26); }
+  #topBar button:disabled{ opacity:.35; cursor:default; }
+  #topBar button:disabled:hover{ background:transparent; border-color:rgba(255,255,255,.14); }
+  #topBar button.primary{ background:var(--red); border-color:transparent; color:#fff; }
+  #topBar button.primary:hover{ background:var(--red-dark); }
+  #topBar select{ appearance:auto; color-scheme:dark; }
 
   /* ---------- Login screen ---------- */
   #loginScreen{
@@ -769,6 +791,7 @@
   @media (max-width:1180px){
     body{ padding-left:304px; }
     #toolsDrawer{ width:280px; }
+    #topBar{ left:280px; }
   }
   /* Touch devices (tablets, phones) have no real hover, so the hover-reveal
      controls above would otherwise be unreachable — keep them visible. */
@@ -777,7 +800,7 @@
   }
 </style>
 </head>
-<body>
+<body class="rail-collapsed">
 
   <!-- ---------- Login ---------- -->
   <div id="loginScreen">
@@ -805,9 +828,9 @@
 
     <button id="drawerTab" onclick="toggleDrawer()">☰ Tools</button>
     <div id="drawerBackdrop" onclick="toggleDrawer()"></div>
-    <div id="toolsDrawer">
+    <div id="toolsDrawer" class="rail">
       <div class="drawer-header">
-        <button class="drawer-rail-toggle" onclick="toggleDrawerRail()" title="Collapse to icons" id="drawerRailToggle">«</button>
+        <button class="drawer-rail-toggle" onclick="toggleDrawerRail()" title="Expand sidebar" id="drawerRailToggle">»</button>
         <div class="drawer-brand">
           <div class="drawer-brand-mark">%</div>
           <div><h1>Weekly Ad Builder</h1><p>Flyer workspace</p></div>
@@ -829,7 +852,6 @@
             <button class="secondary" onclick="saveAsFlyer()">Save As…</button>
           </div>
           <button class="secondary" onclick="if(confirm('Clear everything and start a blank flyer?')) newBlank()">＋ New blank flyer</button>
-          <button class="secondary" id="undoMoveBtn" onclick="undoLastMove()" style="display:none;">↶ Undo last move</button>
           <span class="status" id="statusMsg"></span>
         </div>
 
@@ -889,19 +911,15 @@
           </div>
         </details>
 
-        <details class="drawer-group" open data-icon="🖨️">
-          <summary><span class="summary-label">Print &amp; export</span></summary>
-          <div class="drawer-group-body">
-            <label class="tlabel">Print size:</label>
-            <select id="printPageSize">
-              <option value="letter">Letter (8.5" x 11")</option>
-              <option value="tabloid">Tabloid / newspaper insert (11" x 17")</option>
-            </select>
-            <button class="secondary" onclick="openAdPreview()">👁 Ad Preview</button>
-            <button onclick="printFlyer()">🖨️ Print / Save as PDF</button>
-            <button onclick="shareOrExportImage()">📤 Share to Facebook / Save Image</button>
-          </div>
-        </details>
+        <div class="drawer-section">
+          <span class="rail-icon" onclick="expandDrawerRail()" title="Print size">🖨️</span>
+          <label class="tlabel">Print size:</label>
+          <select id="printPageSize">
+            <option value="letter">Letter (8.5" x 11")</option>
+            <option value="tabloid">Tabloid / newspaper insert (11" x 17")</option>
+          </select>
+          <span style="font-size:11px;color:#777;">Preview, export, and share have moved to the bar at the top.</span>
+        </div>
 
         <div class="drawer-section rail-passthrough">
           <button class="rail-action secondary" onclick="openAdminSettings()" title="Settings"><span class="rail-emoji">⚙</span><span class="btn-label"> Settings</span></button>
@@ -911,6 +929,23 @@
           <b>Saving:</b> flyers and the product list are stored on the server now, so anyone with the password sees the same saved list. <b>Product Database:</b> Save updates it automatically — type a name that's been used before and it offers to fill in the photo/price. <b>Photo search:</b> click "🔎 find photo" on any image box to search free stock photos instead of uploading your own.
         </div>
 
+      </div>
+    </div>
+
+    <div id="topBar">
+      <div class="topbar-left">
+        <button id="topUndoBtn" onclick="undoLastMove()" title="Undo last move" disabled>↶ Undo</button>
+        <button id="topRedoBtn" onclick="redoLastMove()" title="Redo last move" disabled>↷ Redo</button>
+      </div>
+      <div class="topbar-center"><span id="topBarFlyerName">(unsaved)</span></div>
+      <div class="topbar-right">
+        <button onclick="openAdPreview()">👁 Preview</button>
+        <select id="topExportSelect" onchange="handleTopExportChoice(this)" title="Export">
+          <option value="" selected>⭳ Export</option>
+          <option value="pdf">Export as PDF</option>
+          <option value="image">Export as image</option>
+        </select>
+        <button class="primary" onclick="shareOrExportImage(event.target)">📤 Share</button>
       </div>
     </div>
 
@@ -1208,6 +1243,7 @@ function toggleDrawer(){
 function toggleDrawerRail(){
   const drawer = document.getElementById('toolsDrawer');
   const collapsed = drawer.classList.toggle('rail');
+  document.body.classList.toggle('rail-collapsed', collapsed);
   const toggle = document.getElementById('drawerRailToggle');
   toggle.textContent = collapsed ? '»' : '«';
   toggle.title = collapsed ? 'Expand sidebar' : 'Collapse to icons';
@@ -1219,6 +1255,7 @@ function toggleDrawerRail(){
 function expandDrawerRail(){
   const drawer = document.getElementById('toolsDrawer');
   drawer.classList.remove('rail');
+  document.body.classList.remove('rail-collapsed');
   document.getElementById('drawerRailToggle').textContent = '«';
 }
 
@@ -1896,6 +1933,7 @@ function addBoxToGrid(grid){
   insertCellIntoGrid(grid, cell);
   grid.dataset.baseCount = String((parseInt(grid.dataset.baseCount, 10) || 0) + 1);
   attachDragHandle(cell);
+  clearMoveHistory(); // structural change -- any pending move undo/redo no longer applies cleanly
   scheduleRowAlign();
   markFlyerDirty();
 }
@@ -1910,6 +1948,7 @@ function removeBoxFromGrid(btn){
   }
   cell.remove();
   grid.dataset.baseCount = String(Math.max(0, (parseInt(grid.dataset.baseCount, 10) || 0) - 1));
+  clearMoveHistory();
   scheduleRowAlign();
   markFlyerDirty();
 }
@@ -1938,36 +1977,60 @@ function onDragUp(e){
     }
     backfillGridIfShort(sourceContainer);
     lastMoveSnapshot = dragState.preDragSnapshot;
-    document.getElementById('undoMoveBtn').style.display = 'block';
+    moveRedoSnapshot = null; // a fresh move invalidates whatever was available to redo
+    updateMoveHistoryButtons();
     scheduleRowAlign();
     markFlyerDirty();
   }
   dragState = null;
 }
 
-// One-step undo: snapshot every grid's cell order right before a drag starts, and if the
-// drag actually moved something, that snapshot becomes restorable via the Undo button.
+// One-step undo/redo: snapshot every grid's cell order right before a drag starts. If the
+// drag actually moved something, that snapshot becomes restorable via Undo; undoing it in
+// turn snapshots the now-current (moved) order so Redo can put it back.
 let lastMoveSnapshot = null;
+let moveRedoSnapshot = null;
 function snapshotCellOrder(){
   return Array.from(document.querySelectorAll('#topArea > .grid, #bottomArea > .grid')).map(grid => ({
     grid, order: Array.from(grid.children).filter(c => c.classList.contains('cell'))
   }));
 }
+function updateMoveHistoryButtons(){
+  const undoBtn = document.getElementById('topUndoBtn');
+  const redoBtn = document.getElementById('topRedoBtn');
+  if(undoBtn) undoBtn.disabled = !lastMoveSnapshot;
+  if(redoBtn) redoBtn.disabled = !moveRedoSnapshot;
+}
 function clearMoveHistory(){
   lastMoveSnapshot = null;
-  const btn = document.getElementById('undoMoveBtn');
-  if(btn) btn.style.display = 'none';
+  moveRedoSnapshot = null;
+  updateMoveHistoryButtons();
 }
 function undoLastMove(){
   if(!lastMoveSnapshot) return;
+  moveRedoSnapshot = snapshotCellOrder();
   lastMoveSnapshot.forEach(({ grid, order }) => {
     grid.querySelectorAll(':scope > .cell[data-auto-backfill]').forEach(c => c.remove());
     order.forEach(cell => grid.appendChild(cell));
   });
-  clearMoveHistory();
+  lastMoveSnapshot = null;
+  updateMoveHistoryButtons();
   scheduleRowAlign();
   markFlyerDirty();
   setStatus('Move undone.');
+}
+function redoLastMove(){
+  if(!moveRedoSnapshot) return;
+  lastMoveSnapshot = snapshotCellOrder();
+  moveRedoSnapshot.forEach(({ grid, order }) => {
+    grid.querySelectorAll(':scope > .cell[data-auto-backfill]').forEach(c => c.remove());
+    order.forEach(cell => grid.appendChild(cell));
+  });
+  moveRedoSnapshot = null;
+  updateMoveHistoryButtons();
+  scheduleRowAlign();
+  markFlyerDirty();
+  setStatus('Move redone.');
 }
 
 /* ================= FREE OVERLAYS (text / image, float above everything) ================= */
@@ -3525,11 +3588,16 @@ function captureFlyerCanvas(scale = 1.4){
   });
 }
 
-function shareOrExportImage(){
-  const btn = event.target;
-  const original = btn.textContent;
-  btn.textContent = 'Rendering…';
-  btn.disabled = true;
+function handleTopExportChoice(select){
+  const choice = select.value;
+  select.value = '';
+  if(choice === 'pdf') printFlyer();
+  else if(choice === 'image') shareOrExportImage(null, true);
+}
+
+function shareOrExportImage(btn, forceDownload){
+  const original = btn ? btn.textContent : null;
+  if(btn){ btn.textContent = 'Rendering…'; btn.disabled = true; }
 
   captureFlyerCanvas(1.4)
     .then(canvas => {
@@ -3540,13 +3608,12 @@ function shareOrExportImage(){
         // Native desktop share sheets can sit open indefinitely and make a normal
         // image export look frozen. Share natively only on phones/tablets; desktop
         // browsers download the finished image immediately.
-        const useNativeShare = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
-          || (navigator.maxTouchPoints > 1 && window.innerWidth < 900);
+        const useNativeShare = !forceDownload && (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+          || (navigator.maxTouchPoints > 1 && window.innerWidth < 900));
         if (useNativeShare && navigator.canShare && navigator.canShare({ files: [file] })) {
           try {
             await navigator.share({ files: [file], title: 'Weekly Ad', text: "This week's deals!" });
-            btn.textContent = original;
-            btn.disabled = false;
+            if(btn){ btn.textContent = original; btn.disabled = false; }
             return;
           } catch (err) {
             // user backed out of the share sheet, or it failed — fall through to download
@@ -3561,14 +3628,12 @@ function shareOrExportImage(){
         link.download = filename;
         link.click();
         setStatus(`Saved "${filename}" — upload it to Facebook like any other photo.`);
-        btn.textContent = original;
-        btn.disabled = false;
+        if(btn){ btn.textContent = original; btn.disabled = false; }
       }, 'image/jpeg', .92);
     })
     .catch(() => {
       alert('Could not create the image. Try again, or use Print / Save as PDF instead.');
-      btn.textContent = original;
-      btn.disabled = false;
+      if(btn){ btn.textContent = original; btn.disabled = false; }
     });
 }
 
@@ -3857,6 +3922,7 @@ function setStatus(msg){
 function setCurrentName(name){
   currentName = name;
   document.getElementById('currentNameLabel').textContent = name ? name : '(unsaved)';
+  document.getElementById('topBarFlyerName').textContent = name ? name : '(unsaved)';
   if(!name && !flyerDirty) showSaveState('Save once to enable auto-save');
   refreshSavedList();
 }
