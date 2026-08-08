@@ -95,10 +95,9 @@
     box-shadow:2px 0 8px rgba(0,0,0,.3); letter-spacing:1px;
   }
   #toolsDrawer{
-    position:fixed; top:0; left:0; bottom:0; width:320px; background:var(--sidebar); color:#f9fafb; z-index:70;
-    box-shadow:8px 0 30px rgba(0,0,0,.22); transform:none;
-    display:flex; flex-direction:column; overflow-y:auto;
-    scrollbar-width:thin; scrollbar-color:#4b5563 transparent;
+    position:fixed; top:0; left:0; bottom:0; width:300px; background:var(--sidebar); color:#f9fafb; z-index:70;
+    transform:none; display:flex; flex-direction:column; overflow-y:auto; overflow-x:hidden;
+    scrollbar-width:thin; scrollbar-color:#4b5563 transparent; transition:width .18s ease;
   }
   #toolsDrawer.open{ transform:none; }
   #drawerBackdrop{
@@ -106,48 +105,84 @@
   }
   #drawerBackdrop.open{ display:block; }
   .drawer-header{
-    padding:22px 20px 18px; border-bottom:1px solid var(--sidebar-line); display:flex; align-items:flex-start;
-    justify-content:space-between; gap:10px; background:linear-gradient(145deg,#111827,#1f2937);
+    padding:20px 18px 16px; border-bottom:1px solid var(--sidebar-line); display:flex; align-items:flex-start;
+    justify-content:space-between; gap:8px; background:var(--sidebar);
   }
-  .drawer-brand{ display:flex; align-items:center; gap:11px; }
-  .drawer-brand-mark{ width:36px; height:36px; display:grid; place-items:center; border-radius:10px; background:var(--red); box-shadow:0 6px 16px rgba(226,35,26,.3); font-size:18px; }
-  .drawer-header h1{ font-size:15px; margin:0; line-height:1.25; }
-  .drawer-header p{ margin:3px 0 0; color:var(--sidebar-muted); font-size:10.5px; letter-spacing:.08em; text-transform:uppercase; }
+  .drawer-rail-toggle{
+    order:-1; width:24px; height:24px; flex:none; border:none; background:transparent; color:#6b7280;
+    font-size:13px; cursor:pointer; border-radius:6px; line-height:1;
+  }
+  .drawer-rail-toggle:hover{ background:rgba(255,255,255,.06); color:#e5e7eb; }
+  .drawer-brand{ display:flex; align-items:center; gap:11px; overflow:hidden; }
+  .drawer-brand-mark{ width:32px; height:32px; flex:none; display:grid; place-items:center; border-radius:9px; background:var(--red); font-size:16px; }
+  .drawer-header h1{ font-size:14px; margin:0; line-height:1.25; white-space:nowrap; }
+  .drawer-header p{ margin:3px 0 0; color:var(--sidebar-muted); font-size:10.5px; letter-spacing:.08em; text-transform:uppercase; white-space:nowrap; }
   .drawer-close{ display:none; }
-  .drawer-body{ padding:16px 14px 30px; display:flex; flex-direction:column; gap:12px; }
-  .drawer-section{ display:flex; flex-direction:column; gap:10px; padding:16px; border:1px solid var(--sidebar-line); border-radius:12px; background:rgba(255,255,255,.035); }
+  .update-banner{
+    display:none; align-items:center; justify-content:center; gap:6px; width:100%; border:none;
+    background:rgba(226,35,26,.16); color:#fca5a5; font-size:11.5px; font-weight:700; text-align:center;
+    padding:10px 14px; cursor:pointer; border-bottom:1px solid var(--sidebar-line);
+  }
+  .update-banner:hover{ background:rgba(226,35,26,.26); }
+  .drawer-body{ padding:6px 18px 30px; display:flex; flex-direction:column; }
+  .drawer-section{ display:flex; flex-direction:column; gap:9px; padding:16px 0; border-bottom:1px solid var(--sidebar-line); }
   .drawer-section:last-child{ border-bottom:none; }
   .drawer-section button{ width:100%; }
   .drawer-section select, .drawer-section input[type=date], .drawer-section input[type=time]{ width:100%; }
   .drawer-row{ display:flex; gap:8px; }
   .drawer-row button{ flex:1; }
-  .drawer-section .tlabel{ color:#d1d5db; font-size:11px; text-transform:uppercase; letter-spacing:.08em; }
-  .drawer-section button{ border:1px solid transparent; border-radius:8px; padding:11px 12px; background:var(--red); color:#fff; font-weight:700; font-size:12.5px; cursor:pointer; transition:transform .15s ease, background .15s ease, border-color .15s ease; }
+  .drawer-section .tlabel{ color:#9ca3af; font-size:11px; text-transform:uppercase; letter-spacing:.08em; font-weight:700; }
+  .drawer-section button{ border:1px solid transparent; border-radius:8px; padding:10px 12px; background:var(--red); color:#fff; font-weight:700; font-size:12.5px; cursor:pointer; transition:background .15s ease, border-color .15s ease; }
 
   /* Collapsible groups for less-frequently-used tools — native <details>/<summary>
      needs no toggle JS, and the chevron rotates via the [open] attribute selector. */
-  .drawer-group{ border:1px solid var(--sidebar-line); border-radius:12px; background:rgba(255,255,255,.035); overflow:hidden; }
+  .drawer-group{ border-bottom:1px solid var(--sidebar-line); }
   .drawer-group summary{
-    list-style:none; cursor:pointer; padding:15px 16px; font-size:12.5px; font-weight:800;
-    color:#e5e7eb; display:flex; align-items:center; justify-content:space-between;
-    text-transform:uppercase; letter-spacing:.06em; user-select:none;
+    list-style:none; cursor:pointer; padding:14px 0; font-size:11px; font-weight:700;
+    color:#9ca3af; display:flex; align-items:center; justify-content:space-between;
+    text-transform:uppercase; letter-spacing:.08em; user-select:none;
   }
   .drawer-group summary::-webkit-details-marker{ display:none; }
-  .drawer-group summary::after{ content:'▾'; font-size:11px; color:#9ca3af; transition:transform .15s; }
+  .drawer-group summary::after{ content:'▾'; font-size:10px; transition:transform .15s; }
   .drawer-group[open] summary::after{ transform:rotate(180deg); }
-  .drawer-group summary:hover{ background:rgba(255,255,255,.05); }
-  .drawer-group-body{ display:flex; flex-direction:column; gap:10px; padding:2px 16px 16px; }
-  .drawer-group-body button{ width:100%; border:1px solid transparent; border-radius:8px; padding:11px 12px; background:var(--red); color:#fff; font-weight:700; font-size:12.5px; cursor:pointer; }
-  .drawer-group-body button.secondary{ background:var(--sidebar-soft); border-color:rgba(255,255,255,.12); color:#f3f4f6; }
-  .drawer-group-body button.secondary:hover{ background:#374151; }
+  .drawer-group summary:hover{ color:#e5e7eb; }
+  .drawer-group-body{ display:flex; flex-direction:column; gap:9px; padding:2px 0 14px; }
+  .drawer-group-body button{ width:100%; border:1px solid transparent; border-radius:8px; padding:10px 12px; background:var(--red); color:#fff; font-weight:700; font-size:12.5px; cursor:pointer; }
+  .drawer-group-body button.secondary{ background:transparent; border-color:var(--sidebar-line); color:#e5e7eb; font-weight:600; }
+  .drawer-group-body button.secondary:hover{ background:rgba(255,255,255,.06); border-color:rgba(255,255,255,.24); }
   .drawer-group-body button:not(.secondary):hover{ background:var(--red-dark); }
   .drawer-group-body select{ width:100%; border:1px solid rgba(255,255,255,.14); border-radius:8px; padding:8px 9px; background:#0b1220; color:#f9fafb; font-size:12px; color-scheme:dark; }
-  .drawer-group-body .tlabel{ color:#d1d5db; font-size:11px; text-transform:uppercase; letter-spacing:.08em; }
-  .drawer-section button:hover{ background:var(--red-dark); transform:translateY(-1px); }
-  .drawer-section button.secondary{ background:var(--sidebar-soft); border-color:rgba(255,255,255,.12); color:#f3f4f6; }
-  .drawer-section button.secondary:hover{ background:#374151; }
+  .drawer-group-body .tlabel{ color:#9ca3af; font-size:11px; text-transform:uppercase; letter-spacing:.08em; font-weight:700; }
+  .drawer-section button:hover{ background:var(--red-dark); }
+  .drawer-section button.secondary{ background:transparent; border-color:var(--sidebar-line); color:#e5e7eb; font-weight:600; }
+  .drawer-section button.secondary:hover{ background:rgba(255,255,255,.06); border-color:rgba(255,255,255,.24); }
   .drawer-section button.danger{ background:transparent; border-color:rgba(248,113,113,.35); color:#fca5a5; }
   .drawer-section select, .drawer-section input[type=date], .drawer-section input[type=time]{ border:1px solid rgba(255,255,255,.14); border-radius:8px; padding:8px 9px; background:#0b1220; color:#f9fafb; font-size:12px; color-scheme:dark; }
+
+  /* Icon-rail mode: shrink to a slim strip showing only each section's leading icon.
+     Clicking any of it expands back to the full sidebar via expandDrawerRail(), except
+     .rail-passthrough sections (Product Database, Settings) whose button still opens
+     its modal directly -- those never needed the full sidebar to be usable. */
+  .rail-icon{ display:none; cursor:pointer; }
+  #toolsDrawer.rail{ width:60px; }
+  #toolsDrawer.rail .drawer-header{ padding:16px 0; justify-content:center; }
+  #toolsDrawer.rail .drawer-rail-toggle{ order:0; }
+  #toolsDrawer.rail .drawer-brand > div, #toolsDrawer.rail .update-banner span{ display:none; }
+  #toolsDrawer.rail .update-banner{ padding:10px 0; }
+  #toolsDrawer.rail .drawer-body{ padding:6px 0 30px; align-items:center; }
+  #toolsDrawer.rail .drawer-section, #toolsDrawer.rail .drawer-group{ width:100%; }
+  #toolsDrawer.rail .drawer-section:not(.rail-passthrough) > *:not(.rail-icon),
+  #toolsDrawer.rail .drawer-group-body, #toolsDrawer.rail .drawer-group summary::after{ display:none; }
+  #toolsDrawer.rail .rail-icon{
+    display:flex; align-items:center; justify-content:center; font-size:17px; padding:12px 0; width:100%;
+  }
+  #toolsDrawer.rail .drawer-group summary{ justify-content:center; padding:12px 0; }
+  #toolsDrawer.rail .drawer-group summary::before{ content:attr(data-icon); font-size:17px; }
+  #toolsDrawer.rail .drawer-group .summary-label{ display:none; }
+  #toolsDrawer.rail .rail-passthrough{ padding:16px 0; }
+  #toolsDrawer.rail .rail-action{ display:flex; align-items:center; justify-content:center; padding:10px 0; }
+  #toolsDrawer.rail .rail-action .rail-emoji{ font-size:16px; }
+  #toolsDrawer.rail .rail-action .btn-label{ display:none; }
   #currentNameLabel{ color:#fff; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .save-state{ display:block; min-height:15px; margin-top:3px; color:#94a3b8; font-size:10.5px; font-weight:700; }
   .save-state.dirty{ color:#fbbf24; }
@@ -579,6 +614,10 @@
   .modal-head h2{ font-size:15px; margin:0; flex:1; }
   .modal-head input{ font-size:13px; padding:7px 9px; border-radius:6px; border:1px solid #bbb; width:220px; }
   .modal-body{ overflow-y:auto; padding:8px 18px; }
+  .settings-block{ padding:16px 0; border-bottom:1px solid #eee; }
+  .settings-block:last-child{ border-bottom:none; }
+  .settings-block h3{ margin:0 0 10px; font-size:12px; text-transform:uppercase; letter-spacing:.06em; color:#888; }
+  .settings-row{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
   .preview-modal{ width:1050px; max-width:96vw; max-height:94vh; }
   .preview-modal .modal-body{ padding:0; background:#374151; }
   .preview-viewport{ height:calc(94vh - 112px); overflow:auto; padding:18px; }
@@ -639,10 +678,10 @@
   .db-replace-banner strong{ flex:1; }
   .db-replace-banner button{ border:1px solid #9ca3af; border-radius:5px; background:#fff; padding:5px 8px; font-size:10px; font-weight:700; cursor:pointer; }
   .data-safety-note{ color:#9ca3af; font-size:10px; line-height:1.4; }
-  .update-panel{ display:none; padding:9px; border:1px solid rgba(96,165,250,.48); border-radius:8px; background:rgba(30,64,175,.22); }
+  .update-panel{ display:none; padding:10px; border:1px solid #bfdbfe; border-radius:8px; background:#eff6ff; margin-bottom:10px; }
   .update-panel.open{ display:block; }
-  .update-panel strong{ display:block; color:#bfdbfe; font-size:11px; margin-bottom:3px; }
-  .update-panel p{ margin:0 0 7px; color:#dbeafe; font-size:10px; line-height:1.4; }
+  .update-panel strong{ display:block; color:#1e3a8a; font-size:12px; margin-bottom:3px; }
+  .update-panel p{ margin:0 0 8px; color:#1e40af; font-size:11.5px; line-height:1.4; }
   .update-version{ color:#9ca3af; font-size:9.5px; text-align:center; }
   .db-count{ font-size:11px; color:#888; }
   .db-row .db-description{ width:150px; font-size:11px; color:#666; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -768,15 +807,20 @@
     <div id="drawerBackdrop" onclick="toggleDrawer()"></div>
     <div id="toolsDrawer">
       <div class="drawer-header">
+        <button class="drawer-rail-toggle" onclick="toggleDrawerRail()" title="Collapse to icons" id="drawerRailToggle">«</button>
         <div class="drawer-brand">
           <div class="drawer-brand-mark">%</div>
           <div><h1>Weekly Ad Builder</h1><p>Flyer workspace</p></div>
         </div>
         <button class="drawer-close" onclick="toggleDrawer()">✕</button>
       </div>
+      <button class="update-banner" id="updateBanner" onclick="openAdminSettings()" style="display:none;" title="Open Settings to install it">
+        <span id="updateBannerText">Update available</span>
+      </button>
       <div class="drawer-body">
 
         <div class="drawer-section">
+          <span class="rail-icon" onclick="expandDrawerRail()" title="This flyer">💾</span>
           <label class="tlabel">This flyer:</label>
           <span id="currentNameLabel" style="font-size:13px;">(unsaved)</span>
           <span id="saveState" class="save-state">Save once to enable auto-save</span>
@@ -790,17 +834,20 @@
         </div>
 
         <div class="drawer-section">
+          <span class="rail-icon" onclick="expandDrawerRail()" title="Saved flyers">📑</span>
           <label class="tlabel">Saved flyers:</label>
           <div class="saved-flyer-list" id="savedFlyerList"><div class="saved-flyer-empty">No saved flyers yet.</div></div>
         </div>
 
         <div class="drawer-section">
+          <span class="rail-icon" onclick="expandDrawerRail()" title="Template / layout">🧩</span>
           <label class="tlabel">Template / layout:</label>
           <select id="layoutSelect" onchange="onLayoutSelectChange()"></select>
           <div id="layoutBlurb" style="font-size:11.5px;color:#777;margin-top:2px;"></div>
         </div>
 
         <div class="drawer-section">
+          <span class="rail-icon" onclick="expandDrawerRail()" title="Overlays">🖼</span>
           <label class="tlabel">Overlays:</label>
           <div class="drawer-row">
             <button class="secondary" onclick="addTextOverlay()">＋ Text overlay</button>
@@ -810,6 +857,7 @@
         </div>
 
         <div class="drawer-section">
+          <span class="rail-icon" onclick="expandDrawerRail()" title="Goes live">📅</span>
           <label class="tlabel">Goes live:</label>
           <input type="date" id="weekPicker" onchange="applyWeek()">
           <input type="time" id="startTime" value="07:00" onchange="applyWeek()">
@@ -823,12 +871,12 @@
           <span id="weekPreview" style="font-size:11.5px;color:#555;"></span>
         </div>
 
-        <div class="drawer-section">
-          <button onclick="openProductDB()">📋 Product Database</button>
+        <div class="drawer-section rail-passthrough">
+          <button class="rail-action" onclick="openProductDB()" title="Product Database"><span class="rail-emoji">📋</span><span class="btn-label"> Product Database</span></button>
         </div>
 
-        <details class="drawer-group">
-          <summary>More tools</summary>
+        <details class="drawer-group" data-icon="🧰">
+          <summary><span class="summary-label">More tools</span></summary>
           <div class="drawer-group-body">
             <button class="secondary" onclick="openScheduleList()">📅 Scheduled Ads</button>
             <!-- Subscribers / Send Now hidden for now (not ready for real use yet) — functionality
@@ -841,8 +889,8 @@
           </div>
         </details>
 
-        <details class="drawer-group" open>
-          <summary>Print &amp; export</summary>
+        <details class="drawer-group" open data-icon="🖨️">
+          <summary><span class="summary-label">Print &amp; export</span></summary>
           <div class="drawer-group-body">
             <label class="tlabel">Print size:</label>
             <select id="printPageSize">
@@ -855,32 +903,9 @@
           </div>
         </details>
 
-        <details class="drawer-group">
-          <summary>Data &amp; backups</summary>
-          <div class="drawer-group-body">
-            <button class="secondary" onclick="downloadDatabaseBackup()">⬇ Download full backup</button>
-            <button class="secondary" onclick="document.getElementById('restoreBackupFile').click()">↥ Restore from backup</button>
-            <input id="restoreBackupFile" type="file" accept="application/json,.json" hidden onchange="restoreDatabaseBackup(this)">
-            <span class="data-safety-note">Backs up saved flyers, products, settings, and subscribers in one file.</span>
-          </div>
-        </details>
-
-        <details class="drawer-group" id="updatesGroup">
-          <summary>Software updates</summary>
-          <div class="drawer-group-body">
-            <div class="update-panel" id="updatePanel"><strong id="updateTitle">Update available</strong><p id="updateNotes"></p><button type="button" onclick="downloadAvailableUpdate()">Download update</button></div>
-            <button class="secondary" onclick="checkForUpdates(true)">↻ Check for updates</button>
-            <span class="update-version" id="appVersionLabel">Checking installed version…</span>
-          </div>
-        </details>
-
-        <details class="drawer-group">
-          <summary>Account</summary>
-          <div class="drawer-group-body">
-            <button class="secondary" onclick="openAdminSettings()">⚙ Admin Settings</button>
-            <button class="secondary" onclick="doLogout()">Log out</button>
-          </div>
-        </details>
+        <div class="drawer-section rail-passthrough">
+          <button class="rail-action secondary" onclick="openAdminSettings()" title="Settings"><span class="rail-emoji">⚙</span><span class="btn-label"> Settings</span></button>
+        </div>
 
         <div class="hint" style="margin:0;">
           <b>Saving:</b> flyers and the product list are stored on the server now, so anyone with the password sees the same saved list. <b>Product Database:</b> Save updates it automatically — type a name that's been used before and it offers to fill in the photo/price. <b>Photo search:</b> click "🔎 find photo" on any image box to search free stock photos instead of uploading your own.
@@ -993,22 +1018,51 @@
   <div class="modal-overlay" id="adminSettingsModal">
     <div class="modal">
       <div class="modal-head">
-        <h2>Admin Settings</h2>
+        <h2>Settings</h2>
       </div>
       <div class="modal-body">
-        <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px;">
-          <label style="font-size:11px;font-weight:bold;color:#555;">Admin password</label>
-          <input type="password" id="adminSettingsPassword" placeholder="Admin password" style="padding:8px;border-radius:6px;border:1px solid #bbb;">
+
+        <div class="settings-block">
+          <h3>Admin access</h3>
+          <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px;">
+            <label style="font-size:11px;font-weight:bold;color:#555;">Admin password</label>
+            <input type="password" id="adminSettingsPassword" placeholder="Admin password" style="padding:8px;border-radius:6px;border:1px solid #bbb;">
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            <label style="font-size:11px;font-weight:bold;color:#555;">Pexels API key</label>
+            <input type="text" id="adminSettingsPexelsKey" placeholder="Leave blank to keep the current key" style="padding:8px;border-radius:6px;border:1px solid #bbb;">
+            <span id="adminSettingsPexelsStatus" style="font-size:11px;color:#888;"></span>
+          </div>
+          <div id="adminSettingsStatus" style="min-height:16px;margin-top:10px;font-size:12px;font-weight:bold;"></div>
+          <button onclick="saveAdminSettings()" style="background:var(--red);color:#fff;border:none;margin-top:6px;">Save</button>
         </div>
-        <div style="display:flex;flex-direction:column;gap:6px;">
-          <label style="font-size:11px;font-weight:bold;color:#555;">Pexels API key</label>
-          <input type="text" id="adminSettingsPexelsKey" placeholder="Leave blank to keep the current key" style="padding:8px;border-radius:6px;border:1px solid #bbb;">
-          <span id="adminSettingsPexelsStatus" style="font-size:11px;color:#888;"></span>
+
+        <div class="settings-block">
+          <h3>Data &amp; backups</h3>
+          <div class="settings-row">
+            <button class="secondary" onclick="downloadDatabaseBackup()">⬇ Download full backup</button>
+            <button class="secondary" onclick="document.getElementById('restoreBackupFile').click()">↥ Restore from backup</button>
+            <input id="restoreBackupFile" type="file" accept="application/json,.json" hidden onchange="restoreDatabaseBackup(this)">
+          </div>
+          <span class="data-safety-note">Backs up saved flyers, products, settings, and subscribers in one file.</span>
         </div>
-        <div id="adminSettingsStatus" style="min-height:16px;margin-top:10px;font-size:12px;font-weight:bold;"></div>
+
+        <div class="settings-block">
+          <h3>Software updates</h3>
+          <div class="update-panel" id="updatePanel"><strong id="updateTitle">Update available</strong><p id="updateNotes"></p><button type="button" onclick="downloadAvailableUpdate()">Download update</button></div>
+          <div class="settings-row">
+            <button class="secondary" onclick="checkForUpdates(true)">↻ Check for updates</button>
+            <span class="update-version" id="appVersionLabel">Checking installed version…</span>
+          </div>
+        </div>
+
+        <div class="settings-block">
+          <h3>Account</h3>
+          <button class="secondary" onclick="doLogout()">Log out</button>
+        </div>
+
       </div>
       <div class="modal-foot">
-        <button onclick="saveAdminSettings()" style="background:var(--red);color:#fff;border:none;">Save</button>
         <button onclick="closeAdminSettings()">Close</button>
       </div>
     </div>
@@ -1149,6 +1203,23 @@ async function doLogin(){
 function toggleDrawer(){
   document.getElementById('toolsDrawer').classList.toggle('open');
   document.getElementById('drawerBackdrop').classList.toggle('open');
+}
+
+function toggleDrawerRail(){
+  const drawer = document.getElementById('toolsDrawer');
+  const collapsed = drawer.classList.toggle('rail');
+  const toggle = document.getElementById('drawerRailToggle');
+  toggle.textContent = collapsed ? '»' : '«';
+  toggle.title = collapsed ? 'Expand sidebar' : 'Collapse to icons';
+}
+
+// Rail icons/summaries call this instead of duplicating the expand logic --
+// clicking any of them (other than the two direct-action buttons, which stay
+// fully clickable in rail mode) just needs the full sidebar back.
+function expandDrawerRail(){
+  const drawer = document.getElementById('toolsDrawer');
+  drawer.classList.remove('rail');
+  document.getElementById('drawerRailToggle').textContent = '«';
 }
 
 async function doLogout(){
@@ -2774,6 +2845,7 @@ let availableUpdateUrl = '';
 async function checkForUpdates(manual = false){
   const label = document.getElementById('appVersionLabel');
   const panel = document.getElementById('updatePanel');
+  const banner = document.getElementById('updateBanner');
   if(manual) label.textContent = 'Checking for updates…';
   try{
     const res = await fetch('/api/update-status');
@@ -2782,6 +2854,7 @@ async function checkForUpdates(manual = false){
     label.textContent = `Installed version ${result.currentVersion || 'unknown'}`;
     if(!result.configured){
       panel.classList.remove('open');
+      banner.style.display = 'none';
       if(manual) setStatus('Update service is not configured on this installation.');
       return;
     }
@@ -2790,15 +2863,20 @@ async function checkForUpdates(manual = false){
       document.getElementById('updateTitle').textContent = `Version ${result.latestVersion} is available`;
       document.getElementById('updateNotes').textContent = result.releaseNotes || 'A newer version of Weekly Ad Builder is ready.';
       panel.classList.add('open');
-      document.getElementById('updatesGroup')?.setAttribute('open', ''); // collapsed-by-default group shouldn't hide a real update
+      // Settings holds the actual update details/download button now, so a plain
+      // banner is the only always-visible sign that something is waiting.
+      document.getElementById('updateBannerText').textContent = `Version ${result.latestVersion} is available — click to install`;
+      banner.style.display = 'flex';
       if(manual) setStatus(`Update ${result.latestVersion} is available.`);
     } else {
       availableUpdateUrl = '';
       panel.classList.remove('open');
+      banner.style.display = 'none';
       if(manual) setStatus('You already have the latest version ✓');
     }
   } catch(err){
     panel.classList.remove('open');
+    banner.style.display = 'none';
     label.textContent = 'Could not check for updates';
     if(manual) setStatus('Could not check for updates. Internet may be unavailable.');
   }
