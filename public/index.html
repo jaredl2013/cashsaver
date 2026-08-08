@@ -1455,6 +1455,8 @@ function buildLayoutDom(layoutId, existingData){
     sections.forEach(section => {
       const grid = document.createElement('div');
       grid.className = 'grid ' + colsClass(section.cols) + (section.variant ? ' ' + section.variant : '');
+      grid.dataset.baseCount = section.count;
+      grid.dataset.hero = section.hero ? '1' : '';
       for(let i=0;i<section.count;i++){
         const cell = makeCell(section.hero);
         if(existingData) fillCellData(cell, existingData[dataIdx++]);
@@ -1627,6 +1629,20 @@ function startDragAutoScroll(){
   dragState.scrollRAF = requestAnimationFrame(step);
 }
 
+// If a cell gets dragged out of a section, that section is left with fewer cells
+// than its layout template defines — without this it just stays short, showing as
+// dead white space instead of a normal empty "click to add" slot.
+function backfillGridIfShort(grid){
+  if(!grid || !grid.dataset.baseCount) return;
+  const base = parseInt(grid.dataset.baseCount, 10) || 0;
+  const current = Array.from(grid.children).filter(c => c.classList.contains('cell')).length;
+  if(current >= base) return;
+  const cell = makeCell(grid.dataset.hero === '1');
+  cell.dataset.autoBackfill = '1';
+  grid.appendChild(cell);
+  cell.querySelectorAll('.drag-handle').forEach(h => h.addEventListener('pointerdown', onDragHandleDown));
+}
+
 function onDragUp(e){
   if(!dragState || e.pointerId !== dragState.pointerId) return;
   window.removeEventListener('pointermove', onDragMove);
@@ -1635,6 +1651,7 @@ function onDragUp(e){
   if(dragState.scrollRAF) cancelAnimationFrame(dragState.scrollRAF);
 
   if(dragState.moved){
+    const sourceContainer = dragState.container;
     const targetContainer = dragState.placeholder.parentElement;
     dragState.placeholder.replaceWith(dragState.cell);
     dragState.cell.classList.remove('drag-floating', 'dragging');
@@ -1643,11 +1660,12 @@ function onDragUp(e){
     dragState.cell.style.width = '';
     // moving into/out of the hero row changes how big the cell should look —
     // it adopts whichever style matches its new home automatically
-    if(targetContainer && targetContainer.id === 'gridHero'){
+    if(targetContainer && targetContainer.dataset.hero === '1'){
       dragState.cell.classList.add('hero');
     } else {
       dragState.cell.classList.remove('hero');
     }
+    backfillGridIfShort(sourceContainer);
     lastMoveSnapshot = dragState.preDragSnapshot;
     document.getElementById('undoMoveBtn').style.display = 'block';
     scheduleRowAlign();
@@ -1671,7 +1689,10 @@ function clearMoveHistory(){
 }
 function undoLastMove(){
   if(!lastMoveSnapshot) return;
-  lastMoveSnapshot.forEach(({ grid, order }) => { order.forEach(cell => grid.appendChild(cell)); });
+  lastMoveSnapshot.forEach(({ grid, order }) => {
+    grid.querySelectorAll(':scope > .cell[data-auto-backfill]').forEach(c => c.remove());
+    order.forEach(cell => grid.appendChild(cell));
+  });
   clearMoveHistory();
   scheduleRowAlign();
   markFlyerDirty();
