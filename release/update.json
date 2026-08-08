@@ -1,7 +1,7 @@
 {
-  "version": "1.0.6",
-  "downloadUrl": "https://github.com/jaredl2013/cashsaver/releases/download/v1.0.6/CashSaver-Ad-Builder-Setup-1.0.6.exe",
-  "sha256": "f12eb20687e94a40153d6a36881c13965077d30db98bff8fbb469e4f2aca8349",
-  "releaseNotes": "Fixed: dragging a product out of a section left a permanent blank gap instead of a normal empty slot. Fixed: dragging a big-ad (hero) item, even just to reorder it within its own row, was silently shrinking it back to a normal-size item.",
-  "publishedAt": "2026-08-08T01:07:30.3872480Z"
+  "version": "1.0.7",
+  "downloadUrl": "https://github.com/jaredl2013/cashsaver/releases/download/v1.0.7/CashSaver-Ad-Builder-Setup-1.0.7.exe",
+  "sha256": "a87040222317deca097c1b23e5152de2dc83c6155f0a60953d08c0e99f1e9b07",
+  "releaseNotes": "Fixed: dragging a product between sections could grow one section past its normal row count. Drag-and-drop is now strictly reorder-within-section, which also fully resolves the empty-slot issue from 1.0.6. Fixed: the store logo could appear cropped/zoomed in the Ad Preview window.",
+  "publishedAt": "2026-08-08T01:18:33.8923887Z"
 }
