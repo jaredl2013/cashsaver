@@ -167,7 +167,7 @@
   /* ---------- Page ---------- */
   .page{
     width:816px; min-height:1032px; margin:0 auto; background:#fff;
-    box-shadow:0 4px 24px rgba(0,0,0,.35); padding:18px;
+    box-shadow:0 4px 24px rgba(0,0,0,.35); padding:18px; position:relative;
   }
 
   [contenteditable="true"]{ outline:none; cursor:text; }
@@ -194,6 +194,12 @@
   .store-align-btn:hover{ border-color:var(--red); color:var(--red); }
   .render-clean .store-align-btn{ display:none !important; }
   .render-clean .resize-btn{ display:none !important; }
+  .render-clean .overlay-drag-handle,
+  .render-clean .overlay-remove-btn,
+  .render-clean .overlay-resize-handle{ display:none !important; }
+  .render-clean .overlay-text{ border-color:transparent !important; background:transparent !important; }
+  .render-clean .overlay-image:not(.has-img){ border-color:transparent !important; background:transparent !important; }
+  .render-clean .overlay-image .overlay-image-lbl{ display:none !important; }
 
   .tagline{ background:var(--red); color:#fff; text-align:center; padding:8px 10px; margin:8px 0; }
   .tagline .line1{ font-size:15px; font-weight:900; }
@@ -484,6 +490,46 @@
     font-size:13px; letter-spacing:.02em; padding:5px 10px; margin:10px 0 0;
   }
 
+  /* Free-floating overlays (text or image) -- positioned/sized independent of the
+     grid, so they can sit on top of anything, e.g. a "SALE!" burst over a corner. */
+  .overlay-box{ position:absolute; z-index:40; box-sizing:border-box; }
+  .overlay-box.dragging{ opacity:.85; }
+  .overlay-box .overlay-drag-handle{
+    position:absolute; top:-11px; left:-11px; width:20px; height:20px; border-radius:50%;
+    background:#222; color:#fff; display:flex; align-items:center; justify-content:center;
+    font-size:12px; cursor:grab; z-index:2; opacity:0; transition:opacity .12s; touch-action:none;
+  }
+  .overlay-box .overlay-remove-btn{
+    position:absolute; top:-11px; right:-11px; width:20px; height:20px; border-radius:50%;
+    background:var(--red); color:#fff; border:none; cursor:pointer; font-size:13px; line-height:1;
+    display:flex; align-items:center; justify-content:center; z-index:2; opacity:0; transition:opacity .12s;
+  }
+  .overlay-box .overlay-resize-handle{
+    position:absolute; bottom:-2px; right:-2px; width:16px; height:16px; background:#222; color:#fff;
+    border-radius:3px; display:flex; align-items:center; justify-content:center; font-size:10px;
+    cursor:nwse-resize; z-index:2; opacity:0; transition:opacity .12s; touch-action:none;
+  }
+  .overlay-box:hover .overlay-drag-handle,
+  .overlay-box:hover .overlay-remove-btn,
+  .overlay-box:hover .overlay-resize-handle{ opacity:1; }
+  @media (hover:none){
+    .overlay-box .overlay-drag-handle,
+    .overlay-box .overlay-remove-btn,
+    .overlay-box .overlay-resize-handle{ opacity:1; }
+  }
+  .overlay-text{
+    width:100%; height:100%; display:flex; align-items:center; justify-content:center; text-align:center;
+    font-weight:900; font-style:italic; font-size:26px; color:var(--red); line-height:1.1;
+    border:2px dashed rgba(226,35,26,.45); padding:6px; overflow:hidden; background:rgba(255,255,255,.6);
+  }
+  .overlay-image{
+    width:100%; height:100%; display:flex; align-items:center; justify-content:center; text-align:center;
+    font-size:10px; color:#888; border:2px dashed #bbb; background:#f4f4f4 no-repeat center;
+    background-size:contain; cursor:pointer; overflow:hidden;
+  }
+  .overlay-image.has-img{ border-style:solid; color:transparent; background-color:#fff; }
+  .overlay-image input[type=file]{ position:absolute; inset:0; opacity:0; cursor:pointer; }
+
   .footer{ background:var(--red); color:#fff; text-align:center; font-weight:900; font-size:15px; padding:9px; margin-top:8px; }
   .footer [contenteditable]{ display:inline-block; min-width:60px; }
 
@@ -647,7 +693,7 @@
     @page{ size:letter; margin:0; }
     .photo{ border-style:solid; }
     .price-wrap, .unit-select, .unit-custom{ background:transparent; border-color:transparent; }
-    .db-badge, .cell-hover-menu, .drag-handle, .container-resize-handle, .undo-container-size-btn, .remove-photo-btn, .undo-photo-btn, .store-align-btn, .resize-btn{ display:none !important; }
+    .db-badge, .cell-hover-menu, .drag-handle, .container-resize-handle, .undo-container-size-btn, .remove-photo-btn, .undo-photo-btn, .store-align-btn, .resize-btn, .overlay-drag-handle, .overlay-remove-btn, .overlay-resize-handle{ display:none !important; }
   }
   @media (max-width:1180px){
     body{ padding-left:304px; }
@@ -734,6 +780,15 @@
           <label class="tlabel">Template / layout:</label>
           <select id="layoutSelect" onchange="onLayoutSelectChange()"></select>
           <div id="layoutBlurb" style="font-size:11.5px;color:#777;margin-top:2px;"></div>
+        </div>
+
+        <div class="drawer-section">
+          <label class="tlabel">Overlays:</label>
+          <div class="drawer-row">
+            <button class="secondary" onclick="addTextOverlay()">＋ Text overlay</button>
+            <button class="secondary" onclick="addImageOverlay()">＋ Image overlay</button>
+          </div>
+          <span style="font-size:11px;color:#777;">Drag the ⠿ handle to move, the ↘ corner to resize. These float on top of everything and print/export with the flyer.</span>
         </div>
 
         <div class="drawer-section">
@@ -1740,6 +1795,163 @@ function undoLastMove(){
   scheduleRowAlign();
   markFlyerDirty();
   setStatus('Move undone.');
+}
+
+/* ================= FREE OVERLAYS (text / image, float above everything) ================= */
+function enableOverlayDrag(overlay){
+  const handle = overlay.querySelector('.overlay-drag-handle');
+  handle.addEventListener('pointerdown', e => {
+    if(e.button !== undefined && e.button !== 0) return;
+    e.preventDefault();
+    const page = document.getElementById('page');
+    const startLeft = overlay.offsetLeft, startTop = overlay.offsetTop;
+    const startX = e.clientX, startY = e.clientY;
+    overlay.classList.add('dragging');
+    const onMove = ev => {
+      const dx = ev.clientX - startX, dy = ev.clientY - startY;
+      const maxLeft = Math.max(0, page.clientWidth - overlay.offsetWidth);
+      const maxTop = Math.max(0, page.clientHeight - overlay.offsetHeight);
+      overlay.style.left = Math.min(Math.max(0, startLeft + dx), maxLeft) + 'px';
+      overlay.style.top = Math.min(Math.max(0, startTop + dy), maxTop) + 'px';
+    };
+    const onUp = () => {
+      overlay.classList.remove('dragging');
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
+      document.removeEventListener('pointercancel', onUp);
+      markFlyerDirty();
+    };
+    document.addEventListener('pointermove', onMove);
+    document.addEventListener('pointerup', onUp);
+    document.addEventListener('pointercancel', onUp);
+  });
+}
+
+function enableOverlayResize(overlay){
+  const handle = overlay.querySelector('.overlay-resize-handle');
+  handle.addEventListener('pointerdown', e => {
+    if(e.button !== undefined && e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation(); // don't also trigger the drag handle's ancestor logic
+    const startWidth = overlay.offsetWidth, startHeight = overlay.offsetHeight;
+    const startX = e.clientX, startY = e.clientY;
+    const onMove = ev => {
+      overlay.style.width = Math.max(40, startWidth + (ev.clientX - startX)) + 'px';
+      overlay.style.height = Math.max(30, startHeight + (ev.clientY - startY)) + 'px';
+    };
+    const onUp = () => {
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
+      document.removeEventListener('pointercancel', onUp);
+      markFlyerDirty();
+    };
+    document.addEventListener('pointermove', onMove);
+    document.addEventListener('pointerup', onUp);
+    document.addEventListener('pointercancel', onUp);
+  });
+}
+
+function readAndDownscaleImage(file, maxDim){
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        let { width, height } = img;
+        if(width > maxDim || height > maxDim){
+          const scale = maxDim / Math.max(width, height);
+          width = Math.round(width * scale);
+          height = Math.round(height * scale);
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width; canvas.height = height;
+        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', .88));
+      };
+      img.onerror = () => reject(new Error('Could not read that image.'));
+      img.src = reader.result;
+    };
+    reader.onerror = () => reject(new Error('Could not read that file.'));
+    reader.readAsDataURL(file);
+  });
+}
+
+async function setOverlayImage(input){
+  const file = input.files[0];
+  if(!file) return;
+  const label = input.closest('.overlay-image');
+  try{
+    const dataUrl = await readAndDownscaleImage(file, 1000);
+    label.style.backgroundImage = `url(${dataUrl})`;
+    label.dataset.img = dataUrl;
+    label.classList.add('has-img');
+    markFlyerDirty();
+  } catch(e){
+    alert(e.message || 'Could not load that image.');
+  }
+  input.value = ''; // allow picking the same file again later
+}
+
+function createOverlay(type, opts = {}){
+  const page = document.getElementById('page');
+  const overlay = document.createElement('div');
+  overlay.className = 'overlay-box';
+  overlay.dataset.type = type;
+  overlay.style.left = (opts.x ?? 260) + 'px';
+  overlay.style.top = (opts.y ?? 260) + 'px';
+  overlay.style.width = (opts.width ?? (type === 'text' ? 200 : 160)) + 'px';
+  overlay.style.height = (opts.height ?? (type === 'text' ? 70 : 160)) + 'px';
+  if(type === 'text'){
+    overlay.innerHTML = `
+      <span class="overlay-drag-handle" title="Drag to move">⠿</span>
+      <button type="button" class="overlay-remove-btn" title="Remove this overlay" onclick="removeOverlay(this)">×</button>
+      <div class="overlay-text" contenteditable="true">${sanitizeStoredHtml(opts.content || 'SALE!')}</div>
+      <span class="overlay-resize-handle" title="Drag to resize">↘</span>
+    `;
+  } else {
+    overlay.innerHTML = `
+      <span class="overlay-drag-handle" title="Drag to move">⠿</span>
+      <button type="button" class="overlay-remove-btn" title="Remove this overlay" onclick="removeOverlay(this)">×</button>
+      <label class="overlay-image">
+        <span class="overlay-image-lbl">Click to<br>add image</span>
+        <input type="file" accept="image/*" onchange="setOverlayImage(this)">
+      </label>
+      <span class="overlay-resize-handle" title="Drag to resize">↘</span>
+    `;
+    if(opts.img){
+      const imgLabel = overlay.querySelector('.overlay-image');
+      imgLabel.style.backgroundImage = `url(${opts.img})`;
+      imgLabel.dataset.img = opts.img;
+      imgLabel.classList.add('has-img');
+    }
+  }
+  page.appendChild(overlay);
+  enableOverlayDrag(overlay);
+  enableOverlayResize(overlay);
+  return overlay;
+}
+
+function addTextOverlay(){ createOverlay('text'); markFlyerDirty(); }
+function addImageOverlay(){ createOverlay('image'); markFlyerDirty(); }
+
+function removeOverlay(btn){
+  btn.closest('.overlay-box').remove();
+  markFlyerDirty();
+}
+
+function collectOverlays(){
+  return Array.from(document.querySelectorAll('.overlay-box')).map(overlay => {
+    const type = overlay.dataset.type;
+    const data = { type, x: overlay.offsetLeft, y: overlay.offsetTop, width: overlay.offsetWidth, height: overlay.offsetHeight };
+    if(type === 'text') data.content = overlay.querySelector('.overlay-text').innerHTML;
+    else data.img = overlay.querySelector('.overlay-image').dataset.img || null;
+    return data;
+  });
+}
+
+function restoreOverlays(overlays){
+  document.querySelectorAll('.overlay-box').forEach(el => el.remove());
+  (overlays || []).forEach(o => createOverlay(o.type, o));
 }
 
 /* ================= PRODUCT DATABASE (server-backed) ================= */
@@ -3009,7 +3221,7 @@ function buildCleanPreviewClone(){
   const clone = document.getElementById('page').cloneNode(true);
   clone.removeAttribute('id');
   clone.classList.add('render-clean', 'preview-page');
-  clone.querySelectorAll('.db-badge,.cell-hover-menu,.drag-handle,.container-resize-handle,.undo-container-size-btn,.remove-photo-btn,.undo-photo-btn,.store-align-btn,.resize-btn,.suggest-list,input[type=file]').forEach(el => el.remove());
+  clone.querySelectorAll('.db-badge,.cell-hover-menu,.drag-handle,.container-resize-handle,.undo-container-size-btn,.remove-photo-btn,.undo-photo-btn,.store-align-btn,.resize-btn,.suggest-list,.overlay-drag-handle,.overlay-remove-btn,.overlay-resize-handle,input[type=file]').forEach(el => el.remove());
   clone.querySelectorAll('[contenteditable]').forEach(el => el.removeAttribute('contenteditable'));
   clone.querySelectorAll('.price-input').forEach(input => {
     const amount = Number.parseFloat(input.value);
@@ -3101,7 +3313,7 @@ function captureFlyerCanvas(scale = 1.4){
     onclone: clonedDocument => {
       const clonedPage = clonedDocument.getElementById('page');
       clonedPage.classList.add('render-clean');
-      clonedPage.querySelectorAll('.db-badge,.cell-hover-menu,.drag-handle,.container-resize-handle,.undo-container-size-btn,.remove-photo-btn,.undo-photo-btn,.store-align-btn,.resize-btn,.suggest-list,input[type=file]').forEach(el => el.remove());
+      clonedPage.querySelectorAll('.db-badge,.cell-hover-menu,.drag-handle,.container-resize-handle,.undo-container-size-btn,.remove-photo-btn,.undo-photo-btn,.store-align-btn,.resize-btn,.suggest-list,.overlay-drag-handle,.overlay-remove-btn,.overlay-resize-handle,input[type=file]').forEach(el => el.remove());
       clonedPage.querySelectorAll('[contenteditable]').forEach(el => el.removeAttribute('contenteditable'));
       clonedPage.querySelectorAll('.price-input').forEach((input, index) => {
         const amount = Number.parseFloat(prices[index]);
@@ -3365,7 +3577,8 @@ function serializeState(){
   };
   const sched = getScheduleTimestamps();
   const scheduling = sched ? { start: sched.startMs, end: sched.endMs } : { start: null, end: null };
-  return { header, cells, scheduling };
+  const overlays = collectOverlays();
+  return { header, cells, scheduling, overlays };
 }
 
 function applyState(state){
@@ -3418,6 +3631,8 @@ function applyState(state){
       if(state.header.sectionLabels[i] != null) el.innerHTML = sanitizeStoredHtml(state.header.sectionLabels[i]);
     });
   }
+
+  restoreOverlays(state.overlays);
 }
 
 async function refreshSavedList(){
