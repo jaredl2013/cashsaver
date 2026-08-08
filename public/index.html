@@ -226,8 +226,11 @@
   .photo input{ position:absolute; top:0; left:0; right:16px; bottom:16px; opacity:0; cursor:pointer; }
   .photo.has-img{ border-style:solid; border-color:transparent; color:transparent; background-size:cover; background-repeat:no-repeat; background-position:center; background-color:#fff; }
   /* The store logo is a wordmark, not a product photo — it should never be
-     cropped to fill the box, even if its aspect ratio doesn't match. */
-  #logoPhoto.has-img{ background-size:contain; }
+     cropped to fill the box, even if its aspect ratio doesn't match. Selector is
+     class-based (not #logoPhoto) because the Ad Preview modal clones this element
+     and strips every id attribute off the clone -- an id-based rule would silently
+     stop applying there and fall back to the cover rule above, cropping the logo. */
+  .logo-photo.has-img{ background-size:contain; }
   .photo .lbl{ pointer-events:none; padding:2px; }
   /* The header logo photo keeps its own always-visible crop/resize button —
      it lives outside any .cell, so it isn't part of the per-cell hover menu below. */
@@ -1592,7 +1595,11 @@ function updateDragTarget(clientX, clientY){
   let overCell = null;
   for(const el of stack){
     const c = el.closest ? el.closest('.cell') : null;
-    if(c && c !== dragState.cell){ overCell = c; break; }
+    // reordering only ever happens within the section a drag started in. Each section's
+    // slot count is fixed by the layout template, so letting a cell cross into a different
+    // section either strands an empty gap behind it or spills an extra row into the one
+    // it lands in -- restricting the target to dragState.container keeps both intact.
+    if(c && c !== dragState.cell && c.parentElement === dragState.container){ overCell = c; break; }
   }
   if(overCell && overCell !== dragState.placeholder){
     const rect = overCell.getBoundingClientRect();
