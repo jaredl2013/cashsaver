@@ -114,15 +114,35 @@
   .drawer-header h1{ font-size:15px; margin:0; line-height:1.25; }
   .drawer-header p{ margin:3px 0 0; color:var(--sidebar-muted); font-size:10.5px; letter-spacing:.08em; text-transform:uppercase; }
   .drawer-close{ display:none; }
-  .drawer-body{ padding:14px 14px 28px; display:flex; flex-direction:column; gap:8px; }
-  .drawer-section{ display:flex; flex-direction:column; gap:8px; padding:13px; border:1px solid var(--sidebar-line); border-radius:12px; background:rgba(255,255,255,.035); }
+  .drawer-body{ padding:16px 14px 30px; display:flex; flex-direction:column; gap:12px; }
+  .drawer-section{ display:flex; flex-direction:column; gap:10px; padding:16px; border:1px solid var(--sidebar-line); border-radius:12px; background:rgba(255,255,255,.035); }
   .drawer-section:last-child{ border-bottom:none; }
   .drawer-section button{ width:100%; }
   .drawer-section select, .drawer-section input[type=date], .drawer-section input[type=time]{ width:100%; }
-  .drawer-row{ display:flex; gap:6px; }
+  .drawer-row{ display:flex; gap:8px; }
   .drawer-row button{ flex:1; }
-  .drawer-section .tlabel{ color:#d1d5db; font-size:10.5px; text-transform:uppercase; letter-spacing:.08em; }
-  .drawer-section button{ border:1px solid transparent; border-radius:8px; padding:9px 10px; background:var(--red); color:#fff; font-weight:700; font-size:12px; cursor:pointer; transition:transform .15s ease, background .15s ease, border-color .15s ease; }
+  .drawer-section .tlabel{ color:#d1d5db; font-size:11px; text-transform:uppercase; letter-spacing:.08em; }
+  .drawer-section button{ border:1px solid transparent; border-radius:8px; padding:11px 12px; background:var(--red); color:#fff; font-weight:700; font-size:12.5px; cursor:pointer; transition:transform .15s ease, background .15s ease, border-color .15s ease; }
+
+  /* Collapsible groups for less-frequently-used tools — native <details>/<summary>
+     needs no toggle JS, and the chevron rotates via the [open] attribute selector. */
+  .drawer-group{ border:1px solid var(--sidebar-line); border-radius:12px; background:rgba(255,255,255,.035); overflow:hidden; }
+  .drawer-group summary{
+    list-style:none; cursor:pointer; padding:15px 16px; font-size:12.5px; font-weight:800;
+    color:#e5e7eb; display:flex; align-items:center; justify-content:space-between;
+    text-transform:uppercase; letter-spacing:.06em; user-select:none;
+  }
+  .drawer-group summary::-webkit-details-marker{ display:none; }
+  .drawer-group summary::after{ content:'▾'; font-size:11px; color:#9ca3af; transition:transform .15s; }
+  .drawer-group[open] summary::after{ transform:rotate(180deg); }
+  .drawer-group summary:hover{ background:rgba(255,255,255,.05); }
+  .drawer-group-body{ display:flex; flex-direction:column; gap:10px; padding:2px 16px 16px; }
+  .drawer-group-body button{ width:100%; border:1px solid transparent; border-radius:8px; padding:11px 12px; background:var(--red); color:#fff; font-weight:700; font-size:12.5px; cursor:pointer; }
+  .drawer-group-body button.secondary{ background:var(--sidebar-soft); border-color:rgba(255,255,255,.12); color:#f3f4f6; }
+  .drawer-group-body button.secondary:hover{ background:#374151; }
+  .drawer-group-body button:not(.secondary):hover{ background:var(--red-dark); }
+  .drawer-group-body select{ width:100%; border:1px solid rgba(255,255,255,.14); border-radius:8px; padding:8px 9px; background:#0b1220; color:#f9fafb; font-size:12px; color-scheme:dark; }
+  .drawer-group-body .tlabel{ color:#d1d5db; font-size:11px; text-transform:uppercase; letter-spacing:.08em; }
   .drawer-section button:hover{ background:var(--red-dark); transform:translateY(-1px); }
   .drawer-section button.secondary{ background:var(--sidebar-soft); border-color:rgba(255,255,255,.12); color:#f3f4f6; }
   .drawer-section button.secondary:hover{ background:#374151; }
@@ -757,20 +777,6 @@
       <div class="drawer-body">
 
         <div class="drawer-section">
-          <label class="tlabel">Goes live:</label>
-          <input type="date" id="weekPicker" onchange="applyWeek()">
-          <input type="time" id="startTime" value="07:00" onchange="applyWeek()">
-          <label style="font-size:12px;color:#555;display:flex;align-items:center;gap:6px;">
-            <input type="checkbox" id="multiWeekToggle" onchange="onMultiWeekToggle()"> 2-week / holiday ad
-          </label>
-          <span id="endDateWrap" style="display:none;flex-direction:column;gap:4px;">
-            <label class="tlabel" style="margin:0;">through:</label>
-            <input type="date" id="endDatePicker" onchange="applyWeek()">
-          </span>
-          <span id="weekPreview" style="font-size:11.5px;color:#555;"></span>
-        </div>
-
-        <div class="drawer-section">
           <label class="tlabel">This flyer:</label>
           <span id="currentNameLabel" style="font-size:13px;">(unsaved)</span>
           <span id="saveState" class="save-state">Save once to enable auto-save</span>
@@ -804,47 +810,77 @@
         </div>
 
         <div class="drawer-section">
-          <button class="secondary" onclick="openProductDB()">📋 Product Database</button>
-          <button class="secondary" onclick="openScheduleList()">📅 Scheduled Ads</button>
-          <!-- Subscribers / Send Now hidden for now (not ready for real use yet) — functionality
-               is untouched, just remove this comment + the style="display:none" below to bring
-               these back. -->
-          <button class="secondary" onclick="openSubscribers()" style="display:none;">👥 Subscribers</button>
-          <button class="secondary" onclick="openTrash()">🗑 Trash</button>
-          <button class="secondary" onclick="window.open('/how-to.html','_blank','noopener')">❓ Quick How-To</button>
-          <button onclick="sendNow()" style="display:none;">📣 Send Now</button>
+          <label class="tlabel">Goes live:</label>
+          <input type="date" id="weekPicker" onchange="applyWeek()">
+          <input type="time" id="startTime" value="07:00" onchange="applyWeek()">
+          <label style="font-size:12px;color:#555;display:flex;align-items:center;gap:6px;">
+            <input type="checkbox" id="multiWeekToggle" onchange="onMultiWeekToggle()"> 2-week / holiday ad
+          </label>
+          <span id="endDateWrap" style="display:none;flex-direction:column;gap:4px;">
+            <label class="tlabel" style="margin:0;">through:</label>
+            <input type="date" id="endDatePicker" onchange="applyWeek()">
+          </span>
+          <span id="weekPreview" style="font-size:11.5px;color:#555;"></span>
         </div>
 
         <div class="drawer-section">
-          <label class="tlabel">Print size:</label>
-          <select id="printPageSize">
-            <option value="letter">Letter (8.5" x 11")</option>
-            <option value="tabloid">Tabloid / newspaper insert (11" x 17")</option>
-          </select>
-          <button class="secondary" onclick="openAdPreview()">👁 Ad Preview</button>
-          <button onclick="printFlyer()">🖨️ Print / Save as PDF</button>
-          <button onclick="shareOrExportImage()">📤 Share to Facebook / Save Image</button>
+          <button onclick="openProductDB()">📋 Product Database</button>
         </div>
 
-        <div class="drawer-section">
-          <label class="tlabel">Data safety:</label>
-          <button class="secondary" onclick="downloadDatabaseBackup()">⬇ Download full backup</button>
-          <button class="secondary" onclick="document.getElementById('restoreBackupFile').click()">↥ Restore from backup</button>
-          <input id="restoreBackupFile" type="file" accept="application/json,.json" hidden onchange="restoreDatabaseBackup(this)">
-          <span class="data-safety-note">Backs up saved flyers, products, settings, and subscribers in one file.</span>
-        </div>
+        <details class="drawer-group">
+          <summary>More tools</summary>
+          <div class="drawer-group-body">
+            <button class="secondary" onclick="openScheduleList()">📅 Scheduled Ads</button>
+            <!-- Subscribers / Send Now hidden for now (not ready for real use yet) — functionality
+                 is untouched, just remove this comment + the style="display:none" below to bring
+                 these back. -->
+            <button class="secondary" onclick="openSubscribers()" style="display:none;">👥 Subscribers</button>
+            <button class="secondary" onclick="openTrash()">🗑 Trash</button>
+            <button class="secondary" onclick="window.open('/how-to.html','_blank','noopener')">❓ Quick How-To</button>
+            <button onclick="sendNow()" style="display:none;">📣 Send Now</button>
+          </div>
+        </details>
 
-        <div class="drawer-section">
-          <label class="tlabel">Software updates:</label>
-          <div class="update-panel" id="updatePanel"><strong id="updateTitle">Update available</strong><p id="updateNotes"></p><button type="button" onclick="downloadAvailableUpdate()">Download update</button></div>
-          <button class="secondary" onclick="checkForUpdates(true)">↻ Check for updates</button>
-          <span class="update-version" id="appVersionLabel">Checking installed version…</span>
-        </div>
+        <details class="drawer-group" open>
+          <summary>Print &amp; export</summary>
+          <div class="drawer-group-body">
+            <label class="tlabel">Print size:</label>
+            <select id="printPageSize">
+              <option value="letter">Letter (8.5" x 11")</option>
+              <option value="tabloid">Tabloid / newspaper insert (11" x 17")</option>
+            </select>
+            <button class="secondary" onclick="openAdPreview()">👁 Ad Preview</button>
+            <button onclick="printFlyer()">🖨️ Print / Save as PDF</button>
+            <button onclick="shareOrExportImage()">📤 Share to Facebook / Save Image</button>
+          </div>
+        </details>
 
-        <div class="drawer-section">
-          <button class="secondary" onclick="openAdminSettings()">⚙ Admin Settings</button>
-          <button class="secondary" onclick="doLogout()">Log out</button>
-        </div>
+        <details class="drawer-group">
+          <summary>Data &amp; backups</summary>
+          <div class="drawer-group-body">
+            <button class="secondary" onclick="downloadDatabaseBackup()">⬇ Download full backup</button>
+            <button class="secondary" onclick="document.getElementById('restoreBackupFile').click()">↥ Restore from backup</button>
+            <input id="restoreBackupFile" type="file" accept="application/json,.json" hidden onchange="restoreDatabaseBackup(this)">
+            <span class="data-safety-note">Backs up saved flyers, products, settings, and subscribers in one file.</span>
+          </div>
+        </details>
+
+        <details class="drawer-group" id="updatesGroup">
+          <summary>Software updates</summary>
+          <div class="drawer-group-body">
+            <div class="update-panel" id="updatePanel"><strong id="updateTitle">Update available</strong><p id="updateNotes"></p><button type="button" onclick="downloadAvailableUpdate()">Download update</button></div>
+            <button class="secondary" onclick="checkForUpdates(true)">↻ Check for updates</button>
+            <span class="update-version" id="appVersionLabel">Checking installed version…</span>
+          </div>
+        </details>
+
+        <details class="drawer-group">
+          <summary>Account</summary>
+          <div class="drawer-group-body">
+            <button class="secondary" onclick="openAdminSettings()">⚙ Admin Settings</button>
+            <button class="secondary" onclick="doLogout()">Log out</button>
+          </div>
+        </details>
 
         <div class="hint" style="margin:0;">
           <b>Saving:</b> flyers and the product list are stored on the server now, so anyone with the password sees the same saved list. <b>Product Database:</b> Save updates it automatically — type a name that's been used before and it offers to fill in the photo/price. <b>Photo search:</b> click "🔎 find photo" on any image box to search free stock photos instead of uploading your own.
@@ -2754,6 +2790,7 @@ async function checkForUpdates(manual = false){
       document.getElementById('updateTitle').textContent = `Version ${result.latestVersion} is available`;
       document.getElementById('updateNotes').textContent = result.releaseNotes || 'A newer version of Weekly Ad Builder is ready.';
       panel.classList.add('open');
+      document.getElementById('updatesGroup')?.setAttribute('open', ''); // collapsed-by-default group shouldn't hide a real update
       if(manual) setStatus(`Update ${result.latestVersion} is available.`);
     } else {
       availableUpdateUrl = '';
