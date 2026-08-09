@@ -252,7 +252,7 @@
   .save-state.saving{ color:#93c5fd; }
   .save-state.saved{ color:#86efac; }
   .save-state.error{ color:#fca5a5; }
-  #layoutBlurb, #weekPreview{ color:var(--sidebar-muted) !important; line-height:1.45; }
+  #weekPreview{ color:var(--sidebar-muted) !important; line-height:1.45; }
   #toolsDrawer .status{ color:#86efac; }
   #toolsDrawer .hint{ color:#cbd5e1 !important; background:#0b1220 !important; border-color:var(--sidebar-line) !important; line-height:1.45; }
   #toolsDrawer label[style*="color:#555"]{ color:#d1d5db !important; }
@@ -822,6 +822,7 @@
   .sub-type{ font-size:10px; font-weight:bold; padding:2px 7px; border-radius:8px; }
   .sub-type.email{ background:#e6f0ff; color:#1a4d8a; }
   .sub-type.sms{ background:#f0e6ff; color:#5a1a8a; }
+  .sub-name{ font-weight:bold; color:#333; }
   .sub-contact{ flex:1; }
   .sub-inactive{ opacity:0.45; }
 
@@ -998,7 +999,6 @@
           <div class="topbar-menu" id="editMenu">
             <label class="tlabel">Template / layout:</label>
             <select id="layoutSelect" onchange="onLayoutSelectChange()"></select>
-            <div id="layoutBlurb" style="font-size:11.5px;color:#9ca3af;margin:-2px 0 4px;"></div>
             <button class="secondary" onclick="addTextOverlay(); toggleTopbarMenu('editMenu');">＋ Text overlay</button>
             <button class="secondary" onclick="addImageOverlay(); toggleTopbarMenu('editMenu');">＋ Image overlay</button>
           </div>
@@ -1074,11 +1074,11 @@
     </div>
   </div>
 
-  <!-- Subscribers modal -->
+  <!-- Customer Database modal -->
   <div class="modal-overlay" id="subsModal">
     <div class="modal">
       <div class="modal-head">
-        <h2>Subscribers</h2>
+        <h2>Customer Database</h2>
       </div>
       <div class="modal-body">
         <div style="display:flex;gap:8px;margin-bottom:10px;">
@@ -1086,6 +1086,7 @@
             <option value="email">Email</option>
             <option value="sms">SMS (phone number)</option>
           </select>
+          <input type="text" id="subName" placeholder="name (optional)" style="width:130px;padding:7px;border-radius:6px;border:1px solid #bbb;">
           <input type="text" id="subContact" placeholder="email address or phone number" style="flex:1;padding:7px;border-radius:6px;border:1px solid #bbb;">
           <button onclick="addSubscriber()" style="background:var(--red);color:#fff;border:none;border-radius:6px;padding:8px 12px;">Add</button>
         </div>
@@ -1097,17 +1098,6 @@
         <div id="subsList"></div>
       </div>
       <div class="modal-foot"><button onclick="closeSubscribers()">Close</button></div>
-    </div>
-  </div>
-
-  <!-- Scheduled Ads modal -->
-  <div class="modal-overlay" id="scheduleModal">
-    <div class="modal">
-      <div class="modal-head">
-        <h2>Scheduled Ads</h2>
-      </div>
-      <div class="modal-body" id="scheduleList"></div>
-      <div class="modal-foot"><button onclick="closeScheduleList()">Close</button></div>
     </div>
   </div>
 
@@ -1149,14 +1139,37 @@
         <div class="settings-block">
           <h3>Tools</h3>
           <div class="settings-row">
-            <button class="secondary" onclick="closeAdminSettings(); openScheduleList();">📅 Scheduled Ads</button>
             <button class="secondary" onclick="closeAdminSettings(); openTrash();">🗑 Trash</button>
-            <!-- Subscribers / Send Now hidden for now (not ready for real use yet) — functionality
-                 is untouched, just remove this comment + the style="display:none" below to bring
-                 these back. -->
-            <button class="secondary" onclick="closeAdminSettings(); openSubscribers();" style="display:none;">👥 Subscribers</button>
-            <button onclick="sendNow()" style="display:none;">📣 Send Now</button>
           </div>
+        </div>
+
+        <div class="settings-block">
+          <h3>Auto Push</h3>
+          <span style="font-size:11px;color:#888;display:block;margin-bottom:10px;">Automatically texts/emails your customer list when a flyer's scheduled date arrives. Set up SMS and/or email below, then add customers.</span>
+          <div class="settings-row" style="margin-bottom:16px;">
+            <button class="secondary" onclick="closeAdminSettings(); openSubscribers();">👥 Customer Database</button>
+            <button class="secondary" onclick="sendNow()">📣 Send current ad now</button>
+          </div>
+
+          <label style="font-size:11px;font-weight:bold;color:#555;display:block;margin-bottom:6px;">SMS settings (Twilio) — <span id="smsConfiguredBadge" style="font-weight:normal;color:#888;"></span></label>
+          <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px;">
+            <input type="text" id="smsSid" placeholder="Account SID" style="padding:8px;border-radius:6px;border:1px solid #bbb;">
+            <input type="password" id="smsToken" placeholder="Auth token (leave blank to keep the current one)" style="padding:8px;border-radius:6px;border:1px solid #bbb;">
+            <input type="text" id="smsFrom" placeholder="From phone number, e.g. +15551234567" style="padding:8px;border-radius:6px;border:1px solid #bbb;">
+          </div>
+          <button onclick="saveSmsSettings()" style="background:var(--red);color:#fff;border:none;">Save SMS settings</button>
+          <div id="smsSettingsStatus" style="min-height:16px;margin:6px 0 14px;font-size:12px;font-weight:bold;"></div>
+
+          <label style="font-size:11px;font-weight:bold;color:#555;display:block;margin-bottom:6px;">Email settings (SMTP) — <span id="emailConfiguredBadge" style="font-weight:normal;color:#888;"></span></label>
+          <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px;">
+            <input type="text" id="emailHost" placeholder="SMTP host, e.g. smtp.gmail.com" style="padding:8px;border-radius:6px;border:1px solid #bbb;">
+            <input type="number" id="emailPort" placeholder="Port (587 is typical)" style="padding:8px;border-radius:6px;border:1px solid #bbb;">
+            <input type="text" id="emailUser" placeholder="SMTP username" style="padding:8px;border-radius:6px;border:1px solid #bbb;">
+            <input type="password" id="emailPass" placeholder="Password (leave blank to keep the current one)" style="padding:8px;border-radius:6px;border:1px solid #bbb;">
+            <input type="text" id="emailFrom" placeholder="From address" style="padding:8px;border-radius:6px;border:1px solid #bbb;">
+          </div>
+          <button onclick="saveEmailSettings()" style="background:var(--red);color:#fff;border:none;">Save email settings</button>
+          <div id="emailSettingsStatus" style="min-height:16px;margin-top:6px;font-size:12px;font-weight:bold;"></div>
         </div>
 
         <div class="settings-block">
@@ -1858,7 +1871,6 @@ function populateLayoutSelect(){
     `<option value="${id}">${l.name}</option>`
   ).join('');
   sel.value = currentLayoutId;
-  document.getElementById('layoutBlurb').textContent = LAYOUTS[currentLayoutId].blurb;
 }
 
 function onLayoutSelectChange(){
@@ -1875,7 +1887,6 @@ function onLayoutSelectChange(){
     return;
   }
   switchLayout(newId);
-  document.getElementById('layoutBlurb').textContent = LAYOUTS[newId].blurb;
 }
 
 let gridsBuilt = false;
@@ -3437,51 +3448,6 @@ function initWeekPicker(){
   document.getElementById('endDateWrap').style.display = 'none';
 }
 
-/* ---------------- Scheduled Ads list ---------------- */
-function openScheduleList(){
-  document.getElementById('scheduleModal').classList.add('open');
-  renderScheduleList();
-}
-function closeScheduleList(){ document.getElementById('scheduleModal').classList.remove('open'); }
-
-async function renderScheduleList(){
-  const res = await fetch('/api/flyers');
-  const rows = await res.json();
-  const list = document.getElementById('scheduleList');
-  const scheduled = rows.filter(r => r.scheduled_start);
-  const unscheduled = rows.filter(r => !r.scheduled_start);
-
-  if(rows.length === 0){
-    list.innerHTML = '<div class="empty-db">No flyers saved yet.</div>';
-    return;
-  }
-
-  const fmt = ms => new Date(ms).toLocaleString([], { month:'short', day:'numeric', hour:'numeric', minute:'2-digit' });
-  const pillLabel = { scheduled: 'Scheduled', live: 'Live now', past: 'Past', unscheduled: 'No schedule set' };
-
-  let html = scheduled
-    .sort((a,b) => a.scheduled_start - b.scheduled_start)
-    .map(r => `
-      <div class="sched-row">
-        <div class="sched-name">${r.name}</div>
-        <div class="sched-dates">${fmt(r.scheduled_start)} → ${r.scheduled_end ? fmt(r.scheduled_end) : '—'}</div>
-        <span class="sched-pill ${r.status}">${pillLabel[r.status]}</span>
-      </div>
-    `).join('');
-
-  if(unscheduled.length){
-    html += unscheduled.map(r => `
-      <div class="sched-row">
-        <div class="sched-name">${r.name}</div>
-        <div class="sched-dates" style="color:#aaa;">no go-live date set</div>
-        <span class="sched-pill unscheduled">${pillLabel.unscheduled}</span>
-      </div>
-    `).join('');
-  }
-
-  list.innerHTML = html;
-}
-
 /* ---------------- Trash (7-day undo for deleted flyers/products) ---------------- */
 function openTrash(){
   document.getElementById('trashModal').classList.add('open');
@@ -3495,12 +3461,24 @@ async function openAdminSettings(){
   document.getElementById('adminSettingsPassword').value = '';
   document.getElementById('adminSettingsPexelsKey').value = '';
   document.getElementById('adminSettingsStatus').textContent = '';
+  document.getElementById('smsToken').value = '';
+  document.getElementById('emailPass').value = '';
+  document.getElementById('smsSettingsStatus').textContent = '';
+  document.getElementById('emailSettingsStatus').textContent = '';
   const status = document.getElementById('adminSettingsPexelsStatus');
   status.textContent = 'Checking…';
   try{
     const res = await fetch('/api/settings');
     const data = await res.json();
     status.textContent = data.pexelsConfigured ? 'A key is currently configured.' : 'No key configured yet — photo search is off.';
+    document.getElementById('smsSid').value = data.twilioSid || '';
+    document.getElementById('smsFrom').value = data.twilioFrom || '';
+    document.getElementById('smsConfiguredBadge').textContent = data.smsConfigured ? 'configured' : 'not configured';
+    document.getElementById('emailHost').value = data.smtpHost || '';
+    document.getElementById('emailPort').value = data.smtpPort || 587;
+    document.getElementById('emailUser').value = data.smtpUser || '';
+    document.getElementById('emailFrom').value = data.smtpFrom || '';
+    document.getElementById('emailConfiguredBadge').textContent = data.emailConfigured ? 'configured' : 'not configured';
   } catch(err){
     status.textContent = '';
   }
@@ -3535,6 +3513,64 @@ async function saveAdminSettings(){
   statusEl.textContent = 'Saved. Photo search is now configured.';
   document.getElementById('adminSettingsPexelsKey').value = '';
   document.getElementById('adminSettingsPexelsStatus').textContent = 'A key is currently configured.';
+}
+
+async function saveSmsSettings(){
+  const adminPassword = document.getElementById('adminSettingsPassword').value;
+  const sid = document.getElementById('smsSid').value.trim();
+  const token = document.getElementById('smsToken').value;
+  const from = document.getElementById('smsFrom').value.trim();
+  const statusEl = document.getElementById('smsSettingsStatus');
+  if(!adminPassword){
+    statusEl.style.color = '#a32720';
+    statusEl.textContent = 'Enter the admin password at the top to save.';
+    return;
+  }
+  const res = await fetch('/api/settings/sms', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ adminPassword, sid, token, from })
+  });
+  if(!res.ok){
+    const err = await res.json().catch(() => ({}));
+    statusEl.style.color = '#a32720';
+    statusEl.textContent = err.error === 'wrong_admin_password' ? 'Wrong admin password.' : 'Could not save SMS settings.';
+    return;
+  }
+  const data = await res.json();
+  statusEl.style.color = '#287a3d';
+  statusEl.textContent = data.smsConfigured ? 'Saved. SMS is now configured.' : 'Saved.';
+  document.getElementById('smsToken').value = '';
+  document.getElementById('smsConfiguredBadge').textContent = data.smsConfigured ? 'configured' : 'not configured';
+}
+
+async function saveEmailSettings(){
+  const adminPassword = document.getElementById('adminSettingsPassword').value;
+  const host = document.getElementById('emailHost').value.trim();
+  const port = document.getElementById('emailPort').value;
+  const user = document.getElementById('emailUser').value.trim();
+  const pass = document.getElementById('emailPass').value;
+  const from = document.getElementById('emailFrom').value.trim();
+  const statusEl = document.getElementById('emailSettingsStatus');
+  if(!adminPassword){
+    statusEl.style.color = '#a32720';
+    statusEl.textContent = 'Enter the admin password at the top to save.';
+    return;
+  }
+  const res = await fetch('/api/settings/email', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ adminPassword, host, port, user, pass, from })
+  });
+  if(!res.ok){
+    const err = await res.json().catch(() => ({}));
+    statusEl.style.color = '#a32720';
+    statusEl.textContent = err.error === 'wrong_admin_password' ? 'Wrong admin password.' : 'Could not save email settings.';
+    return;
+  }
+  const data = await res.json();
+  statusEl.style.color = '#287a3d';
+  statusEl.textContent = data.emailConfigured ? 'Saved. Email is now configured.' : 'Saved.';
+  document.getElementById('emailPass').value = '';
+  document.getElementById('emailConfiguredBadge').textContent = data.emailConfigured ? 'configured' : 'not configured';
 }
 
 async function renderTrash(){
@@ -3768,7 +3804,8 @@ async function renderSubsList(){
   list.innerHTML = rows.map(s => `
     <div class="sub-row ${s.active ? '' : 'sub-inactive'}">
       <span class="sub-type ${s.type}">${s.type === 'email' ? 'EMAIL' : 'SMS'}</span>
-      <span class="sub-contact">${s.contact}</span>
+      ${s.name ? `<span class="sub-name">${escapeHtml(s.name)}</span>` : ''}
+      <span class="sub-contact">${escapeHtml(s.contact)}</span>
       <button class="secondary" style="border-radius:5px;padding:4px 8px;font-size:11px;" onclick="toggleSubscriber(${s.id})">${s.active ? 'Pause' : 'Resume'}</button>
       <button style="background:#8a1410;color:#fff;border:none;border-radius:5px;padding:4px 8px;font-size:11px;cursor:pointer;" onclick="removeSubscriber(${s.id})">Delete</button>
     </div>
@@ -3778,11 +3815,13 @@ async function renderSubsList(){
 async function addSubscriber(){
   const type = document.getElementById('subType').value;
   const contact = document.getElementById('subContact').value.trim();
+  const name = document.getElementById('subName').value.trim();
   if(!contact) return;
   await fetch('/api/subscribers', {
-    method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({type, contact})
+    method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({type, contact, name})
   });
   document.getElementById('subContact').value = '';
+  document.getElementById('subName').value = '';
   renderSubsList();
 }
 
@@ -3824,6 +3863,10 @@ async function sendNow(){
     const data = await res.json();
     if(!res.ok){ alert('Could not send: ' + (data.message || 'unknown error')); return; }
     const r = data.results;
+    if(!r.emailConfigured && !r.smsConfigured){
+      alert('Nothing was sent — SMS and email aren\'t configured yet. Set them up under Settings → Auto Push.');
+      return;
+    }
     setStatus(`Sent — ${r.emailSent} email(s), ${r.smsSent} text(s). (${r.emailFailed} email + ${r.smsFailed} text failures)`);
   } catch(e){
     alert('Could not send. Check the server is running and try again.');

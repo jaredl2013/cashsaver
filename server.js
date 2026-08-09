@@ -190,10 +190,18 @@ function getPexelsApiKey() {
 }
 
 app.get('/api/settings', requireAuth, (req, res) => {
-  // Never return stored settings wholesale: some values may be secrets.
+  // Never return stored settings wholesale: some values may be secrets. Auth
+  // tokens/passwords are write-only (never sent back); host/user/SID/from aren't
+  // secret and are returned so the settings form can show what's configured.
+  const smtp = getSmtpConfig();
+  const twilio = getTwilioConfig();
   res.json({
     adFree: getSetting('adFree') === 'true',
-    pexelsConfigured: Boolean(getPexelsApiKey())
+    pexelsConfigured: Boolean(getPexelsApiKey()),
+    emailConfigured: isEmailConfigured(),
+    smtpHost: smtp.host, smtpPort: smtp.port, smtpUser: smtp.user, smtpFrom: smtp.from,
+    smsConfigured: isTwilioConfigured(),
+    twilioSid: twilio.sid, twilioFrom: twilio.from
   });
 });
 
@@ -207,6 +215,26 @@ app.post('/api/settings/pexels-key', requireAuth, (req, res) => {
   if (adminPassword !== ADMIN_PASSWORD) return res.status(401).json({ error: 'wrong_admin_password' });
   setSetting('pexelsKey', String(pexelsKey || '').trim());
   res.json({ ok: true, pexelsConfigured: Boolean(getPexelsApiKey()) });
+});
+
+app.post('/api/settings/email', requireAuth, (req, res) => {
+  const { adminPassword, host, port, user, pass, from } = req.body || {};
+  if (adminPassword !== ADMIN_PASSWORD) return res.status(401).json({ error: 'wrong_admin_password' });
+  setSetting('smtpHost', String(host || '').trim());
+  setSetting('smtpPort', String(parseInt(port, 10) || 587));
+  setSetting('smtpUser', String(user || '').trim());
+  if (pass) setSetting('smtpPass', String(pass)); // blank leaves the existing password alone
+  setSetting('smtpFrom', String(from || '').trim());
+  res.json({ ok: true, emailConfigured: isEmailConfigured() });
+});
+
+app.post('/api/settings/sms', requireAuth, (req, res) => {
+  const { adminPassword, sid, token, from } = req.body || {};
+  if (adminPassword !== ADMIN_PASSWORD) return res.status(401).json({ error: 'wrong_admin_password' });
+  setSetting('twilioSid', String(sid || '').trim());
+  if (token) setSetting('twilioToken', String(token)); // blank leaves the existing token alone
+  setSetting('twilioFrom', String(from || '').trim());
+  res.json({ ok: true, smsConfigured: isTwilioConfigured() });
 });
 
 // Search is proxied through the server so the Pexels API key never reaches the browser.
@@ -696,33 +724,59 @@ app.delete('/api/subscribers/:id', requireAuth, (req, res) => {
   res.json({ ok: true });
 });
 
-/* ---------------- Email transport (internal reminders + subscriber broadcast) ---------------- */
-let mailTransport = null;
-if (SMTP_HOST && SMTP_USER && SMTP_PASS) {
+/* ---------------- Email transport (internal reminders + subscriber broadcast) ----------------
+   Like the Pexels key, a value saved in-app (settings table) takes priority over .env, and is
+   read fresh on every send rather than baked into a startup constant -- so saving new
+   credentials from Settings takes effect immediately, no server restart required. */
+function getSmtpConfig() {
+  return {
+    host: getSetting('smtpHost') || SMTP_HOST,
+    port: parseInt(getSetting('smtpPort') || String(SMTP_PORT), 10) || 587,
+    user: getSetting('smtpUser') || SMTP_USER,
+    pass: getSetting('smtpPass') || SMTP_PASS,
+    from: getSetting('smtpFrom') || getSetting('smtpUser') || SMTP_FROM
+  };
+}
+function isEmailConfigured() {
+  const cfg = getSmtpConfig();
+  return !!(cfg.host && cfg.user && cfg.pass);
+}
+function getMailTransport() {
+  if (!isEmailConfigured()) return null;
+  const cfg = getSmtpConfig();
   try {
     const nodemailer = require('nodemailer');
-    mailTransport = nodemailer.createTransport({
-      host: SMTP_HOST, port: SMTP_PORT, secure: SMTP_PORT === 465,
-      auth: { user: SMTP_USER, pass: SMTP_PASS }
+    return nodemailer.createTransport({
+      host: cfg.host, port: cfg.port, secure: cfg.port === 465,
+      auth: { user: cfg.user, pass: cfg.pass }
     });
-    console.log('[email] SMTP configured and active.');
   } catch (err) {
     console.warn('[email] nodemailer not installed — run "npm install nodemailer" to enable email.');
+    return null;
   }
-} else {
-  console.log('[email] SMTP not configured — email features are off (this is fine, they are optional).');
 }
+console.log(isEmailConfigured() ? '[email] SMTP configured and active.' : '[email] SMTP not configured — email features are off (this is fine, they are optional).');
 
 /* ---------------- SMS/MMS via Twilio (optional, costs money per message) ---------------- */
-const twilioConfigured = !!(TWILIO_ACCOUNT_SID && TWILIO_AUTH_TOKEN && TWILIO_FROM_NUMBER);
-if (twilioConfigured) console.log('[sms] Twilio configured and active.');
-else console.log('[sms] Twilio not configured — SMS features are off (this is fine, they are optional).');
+function getTwilioConfig() {
+  return {
+    sid: getSetting('twilioSid') || TWILIO_ACCOUNT_SID,
+    token: getSetting('twilioToken') || TWILIO_AUTH_TOKEN,
+    from: getSetting('twilioFrom') || TWILIO_FROM_NUMBER
+  };
+}
+function isTwilioConfigured() {
+  const cfg = getTwilioConfig();
+  return !!(cfg.sid && cfg.token && cfg.from);
+}
+console.log(isTwilioConfigured() ? '[sms] Twilio configured and active.' : '[sms] Twilio not configured — SMS features are off (this is fine, they are optional).');
 
 async function sendSms(to, body, mediaUrl) {
-  const auth = Buffer.from(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`).toString('base64');
-  const params = new URLSearchParams({ To: to, From: TWILIO_FROM_NUMBER, Body: body });
+  const cfg = getTwilioConfig();
+  const auth = Buffer.from(`${cfg.sid}:${cfg.token}`).toString('base64');
+  const params = new URLSearchParams({ To: to, From: cfg.from, Body: body });
   if (mediaUrl) params.append('MediaUrl', mediaUrl);
-  const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`, {
+  const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${cfg.sid}/Messages.json`, {
     method: 'POST',
     headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/x-www-form-urlencoded' },
     body: params
@@ -736,10 +790,20 @@ async function broadcastFlyer(name) {
   const flyer = db.prepare('SELECT rendered_image FROM flyers WHERE name = ?').get(name);
   if (!flyer) throw new Error('flyer not found');
 
+  const mailTransport = getMailTransport();
+  const smsReady = isTwilioConfigured();
+  const smtpConfig = getSmtpConfig();
+
   const subs = db.prepare('SELECT * FROM subscribers WHERE active = 1').all();
   const emailSubs = subs.filter(s => s.type === 'email');
   const smsSubs = subs.filter(s => s.type === 'sms');
-  const results = { emailSent: 0, emailFailed: 0, smsSent: 0, smsFailed: 0 };
+  // emailConfigured/smsConfigured let the caller tell "sent to nobody" apart from
+  // "never even attempted because nothing's configured" -- both used to report as an
+  // identical 0-sent success, which read as a false positive.
+  const results = {
+    emailSent: 0, emailFailed: 0, smsSent: 0, smsFailed: 0,
+    emailConfigured: !!mailTransport, smsConfigured: smsReady
+  };
 
   if (mailTransport && emailSubs.length) {
     const attachments = flyer.rendered_image
@@ -748,7 +812,7 @@ async function broadcastFlyer(name) {
     for (const s of emailSubs) {
       try {
         await mailTransport.sendMail({
-          from: SMTP_FROM,
+          from: smtpConfig.from,
           to: s.contact,
           subject: `This week's deals!`,
           text: `Check out this week's ad — attached as a picture.`,
@@ -762,7 +826,7 @@ async function broadcastFlyer(name) {
     }
   }
 
-  if (twilioConfigured && smsSubs.length) {
+  if (smsReady && smsSubs.length) {
     const mediaUrl = (PUBLIC_BASE_URL && flyer.rendered_image)
       ? `${PUBLIC_BASE_URL}/api/public/flyer-image/${encodeURIComponent(name)}`
       : null;
@@ -777,7 +841,12 @@ async function broadcastFlyer(name) {
     }
   }
 
-  db.prepare('UPDATE flyers SET broadcast_sent = 1 WHERE name = ?').run(name);
+  // Only mark as sent if at least one channel was actually configured -- otherwise this
+  // flag would permanently block a retry once SMS/email get set up later, since the
+  // scheduled job only looks at flyers where broadcast_sent is still 0.
+  if (mailTransport || smsReady) {
+    db.prepare('UPDATE flyers SET broadcast_sent = 1 WHERE name = ?').run(name);
+  }
   return results;
 }
 
@@ -794,12 +863,13 @@ app.post('/api/flyers/:name/send-now', requireAuth, async (req, res) => {
 /* ---------------- Scheduled jobs: internal reminder + subscriber broadcast at go-live ---------------- */
 function checkScheduledJobs() {
   const now = Date.now();
+  const mailTransport = getMailTransport();
 
   if (mailTransport && REMINDER_TO.length) {
     const due = db.prepare('SELECT name FROM flyers WHERE scheduled_start IS NOT NULL AND scheduled_start <= ? AND notified = 0').all(now);
     for (const row of due) {
       mailTransport.sendMail({
-        from: SMTP_FROM,
+        from: getSmtpConfig().from,
         to: REMINDER_TO.join(','),
         subject: `Weekly Ad Builder: "${row.name}" is now live`,
         text: `Your scheduled ad "${row.name}" just went live.`
@@ -810,7 +880,7 @@ function checkScheduledJobs() {
     }
   }
 
-  if ((mailTransport || twilioConfigured)) {
+  if (mailTransport || isTwilioConfigured()) {
     const due = db.prepare('SELECT name FROM flyers WHERE scheduled_start IS NOT NULL AND scheduled_start <= ? AND broadcast_sent = 0').all(now);
     for (const row of due) {
       broadcastFlyer(row.name)
