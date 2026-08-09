@@ -21,17 +21,17 @@
     font-family:Arial, Helvetica, sans-serif;
     background:#5a5a5a;
     margin:0;
-    padding:96px 24px 24px 324px;
+    padding:96px 24px 24px 384px;
     padding-bottom:60px; /* room for the credit bar */
     transition:padding-left .18s ease;
   }
-  body.rail-collapsed{ padding-left:84px; }
+  body.rail-collapsed{ padding-left:24px; }
   #topBar{
-    position:fixed; top:0; left:300px; right:0; min-height:56px; z-index:60;
+    position:fixed; top:0; left:360px; right:0; min-height:56px; z-index:60;
     background:#1f2937; border-bottom:1px solid #2d3748; display:flex; align-items:center;
     padding:10px 16px; gap:14px; transition:left .18s ease;
   }
-  body.rail-collapsed #topBar{ left:60px; }
+  body.rail-collapsed #topBar{ left:0; }
   .topbar-left, .topbar-right{ display:flex; align-items:center; gap:8px; flex:1; }
   .topbar-right{ justify-content:flex-end; }
   .topbar-center{
@@ -161,7 +161,7 @@
     box-shadow:2px 0 8px rgba(0,0,0,.3); letter-spacing:1px;
   }
   #toolsDrawer{
-    position:fixed; top:0; left:0; bottom:0; width:300px; background:var(--sidebar); color:#f9fafb; z-index:70;
+    position:fixed; top:0; left:0; bottom:0; width:360px; background:var(--sidebar); color:#f9fafb; z-index:70;
     transform:none; display:flex; flex-direction:column; overflow-y:auto; overflow-x:hidden;
     scrollbar-width:thin; scrollbar-color:#4b5563 transparent; transition:width .18s ease;
   }
@@ -192,6 +192,23 @@
   .update-banner:hover{ background:rgba(226,35,26,.26); }
   .drawer-body{ padding:6px 18px 30px; display:flex; flex-direction:column; }
   .drawer-section{ display:flex; flex-direction:column; gap:9px; padding:16px 0; border-bottom:1px solid var(--sidebar-line); }
+
+  /* The product database's markup/CSS was built for a white modal (dark text on
+     light backgrounds) and is reused as-is here rather than re-themed -- wrapping
+     it in its own white card keeps all of that legible inside the dark sidebar. */
+  .db-sidebar-section{
+    background:#fff; color:#222; border-radius:12px; padding:14px; margin:14px 0;
+    border-bottom:none; gap:0;
+  }
+  .db-sidebar-section > .tlabel{ color:#888 !important; margin-bottom:6px; }
+  .db-sidebar-section #dbSearch{
+    width:100%; border:1px solid #ccc; border-radius:8px; padding:10px 11px; font-size:13.5px;
+    margin-bottom:10px; background:#fff; color:#222;
+  }
+  .db-sidebar-section .db-editor-grid{ grid-template-columns:1fr !important; }
+  .db-sidebar-section .db-editor-lower{ flex-direction:column; align-items:stretch; gap:12px; }
+  .db-sidebar-section .db-editor-lower .db-size-field{ margin-left:0; }
+  .db-sidebar-section .db-save{ width:100%; }
   .drawer-section:last-child{ border-bottom:none; }
   .drawer-section button{ width:100%; }
   .drawer-section select, .drawer-section input[type=date], .drawer-section input[type=time]{ width:100%; }
@@ -225,30 +242,10 @@
   .drawer-section button.danger{ background:transparent; border-color:rgba(248,113,113,.35); color:#fca5a5; }
   .drawer-section select, .drawer-section input[type=date], .drawer-section input[type=time]{ border:1px solid rgba(255,255,255,.14); border-radius:8px; padding:8px 9px; background:#0b1220; color:#f9fafb; font-size:12px; color-scheme:dark; }
 
-  /* Icon-rail mode: shrink to a slim strip showing only each section's leading icon.
-     Clicking any of it expands back to the full sidebar via expandDrawerRail(), except
-     .rail-passthrough sections (Product Database, Settings) whose button still opens
-     its modal directly -- those never needed the full sidebar to be usable. */
-  .rail-icon{ display:none; cursor:pointer; }
-  #toolsDrawer.rail{ width:60px; }
-  #toolsDrawer.rail .drawer-header{ padding:16px 0; justify-content:center; }
-  #toolsDrawer.rail .drawer-rail-toggle{ order:0; }
-  #toolsDrawer.rail .drawer-brand > div, #toolsDrawer.rail .update-banner span{ display:none; }
-  #toolsDrawer.rail .update-banner{ padding:10px 0; }
-  #toolsDrawer.rail .drawer-body{ padding:6px 0 30px; align-items:center; }
-  #toolsDrawer.rail .drawer-section, #toolsDrawer.rail .drawer-group{ width:100%; }
-  #toolsDrawer.rail .drawer-section:not(.rail-passthrough) > *:not(.rail-icon),
-  #toolsDrawer.rail .drawer-group-body, #toolsDrawer.rail .drawer-group summary::after{ display:none; }
-  #toolsDrawer.rail .rail-icon{
-    display:flex; align-items:center; justify-content:center; font-size:17px; padding:12px 0; width:100%;
-  }
-  #toolsDrawer.rail .drawer-group summary{ justify-content:center; padding:12px 0; }
-  #toolsDrawer.rail .drawer-group summary::before{ content:attr(data-icon); font-size:17px; }
-  #toolsDrawer.rail .drawer-group .summary-label{ display:none; }
-  #toolsDrawer.rail .rail-passthrough{ padding:16px 0; }
-  #toolsDrawer.rail .rail-action{ display:flex; align-items:center; justify-content:center; padding:10px 0; }
-  #toolsDrawer.rail .rail-action .rail-emoji{ font-size:16px; }
-  #toolsDrawer.rail .rail-action .btn-label{ display:none; }
+  /* The sidebar is the product database now, not an overflow menu -- hiding it
+     just hides the whole panel (reclaiming width for the flyer) rather than
+     shrinking to an icon strip, which never made sense for a search+list view. */
+  #toolsDrawer.rail{ width:0; border:none; }
   #currentNameLabel{ color:#fff; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .save-state{ display:block; min-height:15px; margin-top:3px; color:#94a3b8; font-size:10.5px; font-weight:700; }
   .save-state.dirty{ color:#fbbf24; }
@@ -831,9 +828,10 @@
     .db-badge, .cell-hover-menu, .drag-handle, .container-resize-handle, .undo-container-size-btn, .remove-photo-btn, .undo-photo-btn, .store-align-btn, .resize-btn, .overlay-drag-handle, .overlay-remove-btn, .overlay-resize-handle, .add-box-tile{ display:none !important; }
   }
   @media (max-width:1180px){
-    body{ padding-left:304px; }
-    #toolsDrawer{ width:280px; }
-    #topBar{ left:280px; }
+    body{ padding-left:344px; }
+    #toolsDrawer{ width:320px; }
+    #topBar{ left:320px; }
+    .db-editor-grid{ grid-template-columns:1fr 1fr !important; }
   }
   /* Touch devices (tablets, phones) have no real hover, so the hover-reveal
      controls above would otherwise be unreachable — keep them visible. */
@@ -842,7 +840,7 @@
   }
 </style>
 </head>
-<body class="rail-collapsed">
+<body>
 
   <!-- ---------- Login ---------- -->
   <div id="loginScreen">
@@ -870,12 +868,12 @@
 
     <button id="drawerTab" onclick="toggleDrawer()">☰ Tools</button>
     <div id="drawerBackdrop" onclick="toggleDrawer()"></div>
-    <div id="toolsDrawer" class="rail">
+    <div id="toolsDrawer">
       <div class="drawer-header">
-        <button class="drawer-rail-toggle" onclick="toggleDrawerRail()" title="Expand sidebar" id="drawerRailToggle">»</button>
+        <button class="drawer-rail-toggle" onclick="toggleDrawerRail()" title="Hide database panel" id="drawerRailToggle">«</button>
         <div class="drawer-brand">
           <div class="drawer-brand-mark">%</div>
-          <div><h1>Weekly Ad Builder</h1><p>Flyer workspace</p></div>
+          <div><h1>Weekly Ad Builder</h1><p>Product database</p></div>
         </div>
         <button class="drawer-close" onclick="toggleDrawer()">✕</button>
       </div>
@@ -884,33 +882,44 @@
       </button>
       <div class="drawer-body">
 
-        <div class="drawer-section">
-          <span class="rail-icon" onclick="expandDrawerRail()" title="Template / layout">🧩</span>
-          <label class="tlabel">Template / layout:</label>
-          <select id="layoutSelect" onchange="onLayoutSelectChange()"></select>
-          <div id="layoutBlurb" style="font-size:11.5px;color:#777;margin-top:2px;"></div>
-        </div>
-
-        <div class="drawer-section rail-passthrough">
-          <button class="rail-action" onclick="openProductDB()" title="Product Database"><span class="rail-emoji">📋</span><span class="btn-label"> Product Database</span></button>
-        </div>
-
-        <details class="drawer-group" data-icon="🧰">
-          <summary><span class="summary-label">More tools</span></summary>
-          <div class="drawer-group-body">
-            <button class="secondary" onclick="openScheduleList()">📅 Scheduled Ads</button>
-            <!-- Subscribers / Send Now hidden for now (not ready for real use yet) — functionality
-                 is untouched, just remove this comment + the style="display:none" below to bring
-                 these back. -->
-            <button class="secondary" onclick="openSubscribers()" style="display:none;">👥 Subscribers</button>
-            <button class="secondary" onclick="openTrash()">🗑 Trash</button>
-            <button class="secondary" onclick="window.open('/how-to.html','_blank','noopener')">❓ Quick How-To</button>
-            <button onclick="sendNow()" style="display:none;">📣 Send Now</button>
+        <div class="drawer-section db-sidebar-section">
+          <label class="tlabel">Product database:</label>
+          <input type="text" id="dbSearch" placeholder="Search products…" oninput="renderDbList()">
+          <div class="db-replace-banner" id="dbReplaceBanner"><span>Replacing:</span><strong id="dbReplaceName"></strong><button type="button" onclick="cancelCatalogReplace()">Cancel replacement</button></div>
+          <div class="db-list-head">
+            <strong id="dbCount"></strong>
+            <div class="db-list-tools">
+              <a class="db-import-btn" href="/product-import-template.xlsx" download>Excel template</a>
+              <button type="button" class="db-import-btn" onclick="document.getElementById('productImportFile').click()">Import Excel / CSV</button>
+              <input id="productImportFile" type="file" accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv" hidden onchange="importProductSheet(this)">
+            </div>
           </div>
-        </details>
-
-        <div class="hint" style="margin:0;">
-          <b>Saving:</b> flyers and the product list are stored on the server now, so anyone with the password sees the same saved list. <b>Product Database:</b> Save updates it automatically — type a name that's been used before and it offers to fill in the photo/price. <b>Photo search:</b> click "🔎 find photo" on any image box to search free stock photos instead of uploading your own.
+          <div id="dbImportStatus" class="db-import-status"></div>
+          <div id="dbList"></div>
+          <form class="db-editor" onsubmit="saveDbProduct(event)">
+            <div class="db-editor-head">
+              <strong id="dbEditorTitle">Add a product</strong>
+            </div>
+            <div class="db-editor-grid">
+              <div class="db-field"><label>Product name</label><input id="dbProductName" required placeholder="e.g. Boneless Ribeye Steaks"></div>
+              <div class="db-field"><label>Size / description</label><input id="dbProductDescription" placeholder="e.g. USDA Choice, family pack"></div>
+              <div class="db-field"><label>Price</label><input id="dbProductPrice" required inputmode="decimal" placeholder="9.99"></div>
+              <div class="db-field"><label>Unit</label><select id="dbProductUnit" onchange="toggleDbCustomUnit()"></select></div>
+              <div class="db-field" id="dbCustomUnitField" style="display:none;"><label>Custom unit</label><input id="dbProductUnitCustom" placeholder="2 for"></div>
+            </div>
+            <div class="db-editor-lower">
+              <div class="db-photo-editor">
+                <label>Product photo</label>
+                <div class="photo db-catalog-photo" id="dbProductPhotoPreview"><span class="lbl">No photo</span></div>
+                <input type="file" accept="image/*" style="display:none" onchange="uploadDbPhoto(this)">
+                <button type="button" class="db-photo-find" onclick="this.previousElementSibling.click()">⬆ Upload photo</button>
+                <button type="button" class="db-photo-find" onclick="openCatalogPhotoSearch()">🔎 Find / change photo</button>
+              </div>
+              <div class="db-field db-size-field"><label>Default ad size</label><div class="db-size-options"><label><input type="checkbox" id="dbBigAd" onchange="setDbAdSize('big')"> Big ad</label><label><input type="checkbox" id="dbSmallAd" checked onchange="setDbAdSize('small')"> Small ad</label></div></div>
+              <button class="db-save" type="submit">Save product</button>
+            </div>
+            <div id="dbEditorStatus"></div>
+          </form>
         </div>
 
       </div>
@@ -954,6 +963,9 @@
         <div class="topbar-menu-wrap">
           <button onclick="toggleTopbarMenu('editMenu')">✎ Edit</button>
           <div class="topbar-menu" id="editMenu">
+            <label class="tlabel">Template / layout:</label>
+            <select id="layoutSelect" onchange="onLayoutSelectChange()"></select>
+            <div id="layoutBlurb" style="font-size:11.5px;color:#9ca3af;margin:-2px 0 4px;"></div>
             <button class="secondary" onclick="addTextOverlay(); toggleTopbarMenu('editMenu');">＋ Text overlay</button>
             <button class="secondary" onclick="addImageOverlay(); toggleTopbarMenu('editMenu');">＋ Image overlay</button>
           </div>
@@ -972,6 +984,7 @@
             <button class="secondary" onclick="downloadFlyerImage('jpeg'); toggleTopbarMenu('exportMenu');">Export as JPEG</button>
           </div>
         </div>
+        <button class="icon-btn" onclick="window.open('/how-to.html','_blank','noopener')" title="Quick how-to guide">❓</button>
         <div class="topbar-save-wrap">
           <button class="primary" onclick="saveFlyer()" title="Save">💾 Save</button>
           <span class="save-state" id="saveState" title="Save status"></span>
@@ -1104,6 +1117,19 @@
         </div>
 
         <div class="settings-block">
+          <h3>Tools</h3>
+          <div class="settings-row">
+            <button class="secondary" onclick="closeAdminSettings(); openScheduleList();">📅 Scheduled Ads</button>
+            <button class="secondary" onclick="closeAdminSettings(); openTrash();">🗑 Trash</button>
+            <!-- Subscribers / Send Now hidden for now (not ready for real use yet) — functionality
+                 is untouched, just remove this comment + the style="display:none" below to bring
+                 these back. -->
+            <button class="secondary" onclick="closeAdminSettings(); openSubscribers();" style="display:none;">👥 Subscribers</button>
+            <button onclick="sendNow()" style="display:none;">📣 Send Now</button>
+          </div>
+        </div>
+
+        <div class="settings-block">
           <h3>Data &amp; backups</h3>
           <div class="settings-row">
             <button class="secondary" onclick="downloadDatabaseBackup()">⬇ Download full backup</button>
@@ -1134,53 +1160,6 @@
     </div>
   </div>
 
-  <!-- Product Database modal -->
-  <div class="modal-overlay" id="dbModal">
-    <div class="modal catalog-modal">
-      <div class="modal-head">
-        <h2>Product Catalog</h2>
-        <input type="text" id="dbSearch" placeholder="Search products…" oninput="renderDbList()">
-      </div>
-      <div class="modal-body">
-        <div class="db-replace-banner" id="dbReplaceBanner"><span>Replacing:</span><strong id="dbReplaceName"></strong><button type="button" onclick="cancelCatalogReplace()">Cancel replacement</button></div>
-        <div class="db-list-head">
-          <strong>Saved products <span class="db-count" id="dbCount"></span></strong>
-          <div class="db-list-tools">
-            <a class="db-import-btn" href="/product-import-template.xlsx" download>Download Excel template</a>
-            <button type="button" class="db-import-btn" onclick="document.getElementById('productImportFile').click()">Import Excel / CSV</button>
-            <input id="productImportFile" type="file" accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv" hidden onchange="importProductSheet(this)">
-          </div>
-        </div>
-        <div id="dbImportStatus" class="db-import-status"></div>
-        <div id="dbList"></div>
-        <form class="db-editor" onsubmit="saveDbProduct(event)">
-          <div class="db-editor-head">
-            <strong id="dbEditorTitle">Add a product</strong>
-          </div>
-          <div class="db-editor-grid">
-            <div class="db-field"><label>Product name</label><input id="dbProductName" required placeholder="e.g. Boneless Ribeye Steaks"></div>
-            <div class="db-field"><label>Size / description</label><input id="dbProductDescription" placeholder="e.g. USDA Choice, family pack"></div>
-            <div class="db-field"><label>Price</label><input id="dbProductPrice" required inputmode="decimal" placeholder="9.99"></div>
-            <div class="db-field"><label>Unit</label><select id="dbProductUnit" onchange="toggleDbCustomUnit()"></select></div>
-            <div class="db-field" id="dbCustomUnitField" style="display:none;"><label>Custom unit</label><input id="dbProductUnitCustom" placeholder="2 for"></div>
-          </div>
-          <div class="db-editor-lower">
-            <div class="db-photo-editor">
-              <label>Product photo</label>
-              <div class="photo db-catalog-photo" id="dbProductPhotoPreview"><span class="lbl">No photo</span></div>
-              <input type="file" accept="image/*" style="display:none" onchange="uploadDbPhoto(this)">
-              <button type="button" class="db-photo-find" onclick="this.previousElementSibling.click()">⬆ Upload photo</button>
-              <button type="button" class="db-photo-find" onclick="openCatalogPhotoSearch()">🔎 Find / change photo</button>
-            </div>
-            <div class="db-field db-size-field"><label>Default ad size</label><div class="db-size-options"><label><input type="checkbox" id="dbBigAd" onchange="setDbAdSize('big')"> Big ad</label><label><input type="checkbox" id="dbSmallAd" checked onchange="setDbAdSize('small')"> Small ad</label></div></div>
-            <button class="db-save" type="submit">Save product</button>
-          </div>
-          <div id="dbEditorStatus"></div>
-        </form>
-      </div>
-      <div class="modal-foot"><button onclick="closeProductDB()">Close</button></div>
-    </div>
-  </div>
 
   <!-- Crop / resize modal -->
   <div class="modal-overlay" id="cropModal">
@@ -1277,7 +1256,7 @@ function toggleDrawerRail(){
   document.body.classList.toggle('rail-collapsed', collapsed);
   const toggle = document.getElementById('drawerRailToggle');
   toggle.textContent = collapsed ? '»' : '«';
-  toggle.title = collapsed ? 'Expand sidebar' : 'Collapse to icons';
+  toggle.title = collapsed ? 'Show database panel' : 'Hide database panel';
 }
 
 // Rail icons/summaries call this instead of duplicating the expand logic --
@@ -2585,10 +2564,17 @@ function sanitizeStoredHtml(html){
   return tpl.innerHTML;
 }
 
+// The product database lives permanently in the sidebar now (not a modal) --
+// "opening" it just means expanding the sidebar if it's hidden, scrolling it
+// into view, and focusing search. Still called from "+ Replace" on a cell,
+// which is why targetCell/replaceTargetCell still matter here.
 function openProductDB(targetCell = null){
   replaceTargetCell = targetCell;
-  document.getElementById('dbModal').classList.add('open');
-  document.getElementById('dbSearch').value = '';
+  expandDrawerRail();
+  const search = document.getElementById('dbSearch');
+  search.value = '';
+  search.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  search.focus();
   editingDbKey = null;
   const unitSelect = document.getElementById('dbProductUnit');
   if(!unitSelect.options.length){
@@ -2599,7 +2585,6 @@ function openProductDB(targetCell = null){
   renderDbList();
 }
 function closeProductDB(){
-  document.getElementById('dbModal').classList.remove('open');
   replaceTargetCell = null;
   updateCatalogReplaceMode();
 }
@@ -4252,6 +4237,9 @@ async function boot(){
   refreshSavedList();
   initWeekPicker();
   applyWeek();
+  const unitSelect = document.getElementById('dbProductUnit');
+  unitSelect.innerHTML = UNIT_OPTIONS.map(u => `<option value="${u}">${u === 'other' ? 'Other…' : u}</option>`).join('');
+  renderDbList();
   await loadLastFlyerIfAny();
   initAutoSaveTracking();
   resetFlyerDirtyState();
