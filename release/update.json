@@ -1,7 +1,7 @@
 {
-  "version": "1.0.14",
-  "downloadUrl": "https://github.com/jaredl2013/cashsaver/releases/download/v1.0.14/CashSaver-Ad-Builder-Setup-1.0.14.exe",
-  "sha256": "99f7ab1032760cd6752cf6cca7d05b7657a162b47da375e077d74499d6f31cd7",
-  "releaseNotes": "Major redesign: almost everything moved out of the sidebar into a new top bar -- Undo/Redo, flyer title (click to rename, dropdown to switch flyers), goes-live dates, Edit (overlays), Preview, Export (PDF/PNG/JPEG), and Save. Settings moved to a top-left icon. The app now remembers and reopens your last flyer on login instead of starting blank.",
-  "publishedAt": "2026-08-09T15:18:28.6367346Z"
+  "version": "1.0.15",
+  "downloadUrl": "https://github.com/jaredl2013/cashsaver/releases/download/v1.0.15/CashSaver-Ad-Builder-Setup-1.0.15.exe",
+  "sha256": "ee080abc174ce1ed91024335887cf657664f7ab02da71be65b6acba807f0833e",
+  "releaseNotes": "Redesigned the per-item popup menu: separate Upload and Search photo buttons, clicking an existing photo now opens the crop editor directly (no more separate crop button), text size is just a number box, and 'Remove Item' replaces 'x delete'. Also removed the small save-status text under the Save button.",
+  "publishedAt": "2026-08-09T15:24:09.0101923Z"
 }
