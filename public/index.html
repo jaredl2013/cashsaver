@@ -37,22 +37,22 @@
   .topbar-center{
     flex:none; max-width:42%; display:flex; flex-direction:column; align-items:center; gap:4px;
   }
-  .icon-btn{ font-size:16px !important; padding:8px 10px !important; }
+  .icon-btn{ font-size:19px !important; padding:9px 12px !important; }
   .topbar-title-row{ display:flex; align-items:center; gap:2px; max-width:100%; }
   #topBarFlyerName{
-    color:#f3f4f6; font-size:14px; font-weight:700; white-space:nowrap; overflow:hidden;
-    text-overflow:ellipsis; cursor:pointer; padding:3px 6px; border-radius:6px;
+    color:#f3f4f6; font-size:16px; font-weight:700; white-space:nowrap; overflow:hidden;
+    text-overflow:ellipsis; cursor:pointer; padding:4px 7px; border-radius:6px;
   }
   #topBarFlyerName:hover{ background:rgba(255,255,255,.08); }
   .topbar-title-input{
-    color:#f3f4f6; font-size:14px; font-weight:700; background:#111827; border:1px solid var(--red);
-    border-radius:6px; padding:2px 6px; width:180px;
+    color:#f3f4f6; font-size:16px; font-weight:700; background:#111827; border:1px solid var(--red);
+    border-radius:6px; padding:3px 7px; width:180px;
   }
-  .topbar-caret{ padding:4px 6px !important; font-size:10px !important; color:#9ca3af !important; }
-  .topbar-goeslive-btn{ font-size:11px !important; padding:4px 10px !important; color:#9ca3af !important; }
+  .topbar-caret{ padding:6px 8px !important; font-size:12px !important; color:#9ca3af !important; }
+  .topbar-goeslive-btn{ font-size:12.5px !important; padding:5px 11px !important; color:#9ca3af !important; }
   #topBar button, #topBar select{
     border:1px solid rgba(255,255,255,.14); border-radius:8px; background:transparent; color:#e5e7eb;
-    font-size:12.5px; font-weight:600; padding:8px 12px; cursor:pointer; white-space:nowrap;
+    font-size:14.5px; font-weight:600; padding:10px 15px; cursor:pointer; white-space:nowrap;
   }
   #topBar button:hover{ background:rgba(255,255,255,.08); border-color:rgba(255,255,255,.26); }
   #topBar button:disabled{ opacity:.35; cursor:default; }
@@ -61,7 +61,7 @@
   #topBar button.primary:hover{ background:var(--red-dark); }
   #topBar select{ appearance:auto; color-scheme:dark; }
   .topbar-save-wrap{ display:flex; flex-direction:column; align-items:flex-end; gap:2px; }
-  .topbar-save-wrap .save-state{ font-size:10px; color:#9ca3af; font-weight:700; }
+  .topbar-save-wrap .save-state{ font-size:11.5px; color:#9ca3af; font-weight:700; }
   .topbar-save-wrap .save-state.dirty{ color:#fbbf24; }
   .topbar-save-wrap .save-state.saving{ color:#93c5fd; }
   .topbar-save-wrap .save-state.saved{ color:#86efac; }
@@ -198,13 +198,13 @@
   .drawer-row{ display:flex; gap:8px; }
   .drawer-row button{ flex:1; }
   .drawer-section .tlabel{ color:#9ca3af; font-size:11px; text-transform:uppercase; letter-spacing:.08em; font-weight:700; }
-  .drawer-section button{ border:1px solid transparent; border-radius:8px; padding:10px 12px; background:var(--red); color:#fff; font-weight:700; font-size:12.5px; cursor:pointer; transition:background .15s ease, border-color .15s ease; }
+  .drawer-section button{ border:1px solid transparent; border-radius:8px; padding:12px 14px; background:var(--red); color:#fff; font-weight:700; font-size:14.5px; cursor:pointer; transition:background .15s ease, border-color .15s ease; }
 
   /* Collapsible groups for less-frequently-used tools — native <details>/<summary>
      needs no toggle JS, and the chevron rotates via the [open] attribute selector. */
   .drawer-group{ border-bottom:1px solid var(--sidebar-line); }
   .drawer-group summary{
-    list-style:none; cursor:pointer; padding:14px 0; font-size:11px; font-weight:700;
+    list-style:none; cursor:pointer; padding:15px 0; font-size:12.5px; font-weight:700;
     color:#9ca3af; display:flex; align-items:center; justify-content:space-between;
     text-transform:uppercase; letter-spacing:.08em; user-select:none;
   }
@@ -213,7 +213,7 @@
   .drawer-group[open] summary::after{ transform:rotate(180deg); }
   .drawer-group summary:hover{ color:#e5e7eb; }
   .drawer-group-body{ display:flex; flex-direction:column; gap:9px; padding:2px 0 14px; }
-  .drawer-group-body button{ width:100%; border:1px solid transparent; border-radius:8px; padding:10px 12px; background:var(--red); color:#fff; font-weight:700; font-size:12.5px; cursor:pointer; }
+  .drawer-group-body button{ width:100%; border:1px solid transparent; border-radius:8px; padding:12px 14px; background:var(--red); color:#fff; font-weight:700; font-size:14.5px; cursor:pointer; }
   .drawer-group-body button.secondary{ background:transparent; border-color:var(--sidebar-line); color:#e5e7eb; font-weight:600; }
   .drawer-group-body button.secondary:hover{ background:rgba(255,255,255,.06); border-color:rgba(255,255,255,.24); }
   .drawer-group-body button:not(.secondary):hover{ background:var(--red-dark); }
@@ -273,7 +273,7 @@
   .flyer-status-pill.unscheduled{ background:#374151; color:#d1d5db; }
   .flyer-card-dates{ margin:3px 0 7px; color:#9ca3af; font-size:9.5px; line-height:1.35; }
   .flyer-card-actions{ display:flex; gap:4px; }
-  .flyer-card-actions button{ padding:5px 6px; font-size:9px; }
+  .flyer-card-actions button{ padding:7px 9px; font-size:11.5px; }
   .flyer-card-actions .open{ flex:1; background:#374151; }
   .flyer-card-actions .duplicate{ flex:1; background:#1d4ed8; }
   .flyer-card-actions .rename{ width:auto; background:transparent; border-color:rgba(255,255,255,.18); color:#d1d5db; }
@@ -564,7 +564,7 @@
   .cell:hover .cell-hover-menu, .cell-hover-menu:focus-within{ opacity:1; pointer-events:auto; }
   .cell-hover-menu button{
     border:1px solid #ddd; border-radius:6px; background:#fafafa; color:#333;
-    font-size:10.5px; font-weight:800; padding:6px 9px; height:26px; line-height:1;
+    font-size:12px; font-weight:800; padding:7px 11px; height:30px; line-height:1;
     cursor:pointer; white-space:nowrap;
   }
   .cell-hover-menu button:hover{ border-color:var(--red); color:var(--red); background:#fff; }
@@ -583,8 +583,8 @@
   .add-box-tile:hover{ border-color:var(--red); color:var(--red); background:#fff5f4; }
   .render-clean .add-box-tile{ display:none !important; }
   .name-size-input{
-    width:38px; height:26px; padding:0 2px; border:1px solid #ddd; border-radius:6px;
-    font-size:10.5px; font-weight:800; color:#333; text-align:center; -moz-appearance:textfield;
+    width:44px; height:30px; padding:0 2px; border:1px solid #ddd; border-radius:6px;
+    font-size:12px; font-weight:800; color:#333; text-align:center; -moz-appearance:textfield;
   }
   .name-size-input::-webkit-inner-spin-button, .name-size-input::-webkit-outer-spin-button{ margin:0; }
   .render-clean .cell-hover-menu{ display:none !important; }
@@ -706,7 +706,7 @@
   .db-row .db-name{ font-weight:bold; font-size:13px; flex:1; }
   .db-row .db-price{ font-size:13px; color:var(--red); font-weight:bold; width:90px; }
   .db-row .db-updated{ font-size:10px; color:#888; width:110px; }
-  .db-row button{ background:#8a1410; color:#fff; border:none; border-radius:5px; padding:5px 9px; font-size:11px; cursor:pointer; }
+  .db-row button{ background:#8a1410; color:#fff; border:none; border-radius:6px; padding:7px 12px; font-size:13px; cursor:pointer; }
   .catalog-modal{ width:940px; }
   .db-editor{ margin:8px 0 14px; padding:14px; border:1px solid #e4e4e4; border-radius:10px; background:#fafafa; }
   .db-editor-head{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px; }
@@ -727,7 +727,7 @@
   .db-photo-find{ background:#333; color:#fff; }
   .db-editor-lower .db-size-field{ margin-left:auto; }
   .db-editor-lower .db-save{ min-width:130px; min-height:36px; }
-  .db-editor button, .db-action{ border:none; border-radius:6px; padding:8px 10px; font-size:11px; font-weight:bold; cursor:pointer; white-space:nowrap; }
+  .db-editor button, .db-action{ border:none; border-radius:6px; padding:10px 13px; font-size:13px; font-weight:bold; cursor:pointer; white-space:nowrap; }
   .db-save{ background:var(--red); color:#fff; }
   .db-cancel{ background:#eee; color:#333; }
   .db-list-head{ display:flex; align-items:center; justify-content:space-between; padding:4px 0 7px; border-bottom:1px solid #eee; }
@@ -771,7 +771,7 @@
   #dbEditorStatus{ min-height:15px; margin-top:8px; font-size:11px; font-weight:bold; color:#287a3d; }
   @media(max-width:820px){ .db-editor-grid{ grid-template-columns:1fr 1fr; } .db-editor-lower{ align-items:stretch; flex-direction:column; gap:10px; } .db-editor-lower .db-size-field{ margin-left:0; } .db-row .db-description,.db-row .db-updated{ display:none; } .db-row.db-row-editing{ grid-template-columns:1fr 1fr; } }
   .modal-foot{ padding:12px 18px; border-top:1px solid #eee; text-align:right; }
-  .modal-foot button{ background:#fff; border:1px solid #bbb; border-radius:6px; padding:8px 14px; font-weight:bold; cursor:pointer; }
+  .modal-foot button{ background:#fff; border:1px solid #bbb; border-radius:6px; padding:11px 18px; font-size:14px; font-weight:bold; cursor:pointer; }
   .empty-db{ color:#888; font-size:13px; padding:20px 0; text-align:center; }
 
   .layout-option{
@@ -974,6 +974,7 @@
         </div>
         <div class="topbar-save-wrap">
           <button class="primary" onclick="saveFlyer()" title="Save">💾 Save</button>
+          <span class="save-state" id="saveState" title="Save status"></span>
         </div>
       </div>
     </div>
@@ -1304,10 +1305,10 @@ document.addEventListener('click', e => {
 });
 
 function startTitleEdit(span){
-  if(!currentName) return; // an unsaved flyer has nothing to rename yet -- Save/Save As names it
   const input = document.createElement('input');
   input.type = 'text';
-  input.value = currentName;
+  input.value = currentName || '';
+  input.placeholder = 'Name this ad…';
   input.id = 'topBarFlyerNameInput';
   input.className = 'topbar-title-input';
   span.replaceWith(input);
@@ -1316,7 +1317,7 @@ function startTitleEdit(span){
   input.addEventListener('blur', () => commitTitleEdit(input));
   input.addEventListener('keydown', e => {
     if(e.key === 'Enter'){ e.preventDefault(); input.blur(); }
-    if(e.key === 'Escape'){ input.value = currentName; input.blur(); }
+    if(e.key === 'Escape'){ input.value = currentName || ''; input.blur(); }
   });
 }
 async function commitTitleEdit(input){
@@ -1326,9 +1327,17 @@ async function commitTitleEdit(input){
   span.id = 'topBarFlyerName';
   span.title = 'Click to rename';
   span.onclick = () => startTitleEdit(span);
-  span.textContent = oldName;
+  span.textContent = oldName || '(unsaved)';
   input.replaceWith(span);
   if(!newName || newName === oldName) return;
+
+  if(!oldName){
+    // Google Docs-style: naming an unsaved ad is what saves it -- no separate
+    // Save/Save As step needed.
+    await saveFlyerAs(newName);
+    return;
+  }
+
   const res = await fetch('/api/flyers/' + encodeURIComponent(oldName) + '/rename', {
     method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({newName})
   });
@@ -3803,7 +3812,7 @@ function markFlyerDirty(){
   flyerChangeVersion++;
   const hasDuplicates = updateDuplicateMarkers().length > 0;
   if(hasDuplicates){
-    showSaveState('Duplicate item — fix before saving', 'error');
+    showSaveState('Fix duplicate item', 'error');
     clearTimeout(autoSaveTimer);
     return;
   }
@@ -3811,7 +3820,7 @@ function markFlyerDirty(){
     showSaveState('Unsaved changes…', 'dirty');
     scheduleAutoSave();
   } else {
-    showSaveState('Not saved — click Save once', 'dirty');
+    showSaveState('Not saved yet', 'dirty');
   }
 }
 
@@ -3830,7 +3839,7 @@ function resetFlyerDirtyState(){
   clearTimeout(autoSaveTimer);
   flyerDirty = false;
   flyerChangeVersion = 0;
-  showSaveState(currentName ? 'Saved ✓' : 'Save once to enable auto-save', currentName ? 'saved' : '');
+  showSaveState(currentName ? 'Saved ✓' : 'Not saved yet', currentName ? 'saved' : '');
 }
 
 async function autoSaveFlyer(){
@@ -4004,13 +4013,11 @@ function renderFlyerImage(){
   return captureFlyerCanvas(1.35).then(canvas => canvas.toDataURL('image/jpeg', .9));
 }
 
-async function saveFlyer(){
-  if(!validateNoDuplicateFlyerItems(true)) return;
-  let name = currentName;
-  if(!name){
-    name = prompt('Name this flyer (e.g. "Aug 5 - Aug 11"):');
-    if(!name) return;
-  }
+// Shared by the Save button (once a name is known) and the title field's
+// Google-Docs-style behavior, where typing a name for an unsaved flyer saves
+// it right then instead of requiring a separate Save step afterward.
+async function saveFlyerAs(name){
+  if(!validateNoDuplicateFlyerItems(true)) return false;
   clearTimeout(autoSaveTimer);
   const versionAtStart = flyerChangeVersion;
   showSaveState('Saving…', 'saving');
@@ -4024,10 +4031,21 @@ async function saveFlyer(){
   const res = await fetch('/api/flyers/' + encodeURIComponent(name), {
     method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)
   });
-  if(!res.ok){ flyerDirty = true; showSaveState('Save failed — try again', 'error'); alert('Could not save. Try again.'); return; }
+  if(!res.ok){ flyerDirty = true; showSaveState('Save failed — try again', 'error'); alert('Could not save. Try again.'); return false; }
   setCurrentName(name);
   markFlyerSaved(versionAtStart);
   setStatus(`Saved "${name}" ✓ — product database updated too.`);
+  return true;
+}
+
+async function saveFlyer(){
+  if(!validateNoDuplicateFlyerItems(true)) return;
+  let name = currentName;
+  if(!name){
+    name = prompt('Name this flyer (e.g. "Aug 5 - Aug 11"):');
+    if(!name) return;
+  }
+  await saveFlyerAs(name);
 }
 
 async function saveAsFlyer(){
