@@ -1,7 +1,7 @@
 {
-  "version": "1.0.16",
-  "downloadUrl": "https://github.com/jaredl2013/cashsaver/releases/download/v1.0.16/CashSaver-Ad-Builder-Setup-1.0.16.exe",
-  "sha256": "f46a177930655b49018be45458c57194102ace1255bfee319367fe2a9564afc1",
-  "releaseNotes": "Big update: sidebar is now a permanent Product Database panel instead of an overflow menu (always visible, no more auto-hiding). Template/layout moved into the top bar's Edit menu; Scheduled Ads/Trash moved into Settings; Quick How-To is now a top-right '?' button. New: reusable templates (Save as template / Use) with two starter templates included (Christmas, Thanksgiving). Overlays can now be rotated and text overlays get a size control. Bigger buttons throughout, and naming an unsaved ad now saves it immediately like Google Docs.",
-  "publishedAt": "2026-08-09T15:57:01.7380955Z"
+  "version": "1.0.17",
+  "downloadUrl": "https://github.com/jaredl2013/cashsaver/releases/download/v1.0.17/CashSaver-Ad-Builder-Setup-1.0.17.exe",
+  "sha256": "5b36619c5c95a9a2b96397569485f17ac0b5e3a70471fe7d1badcb6e0e2674cb",
+  "releaseNotes": "Fixed: the sidebar's hide toggle became unreachable once hidden (moved to the top bar). Fixed: Save button wasn't aligned with Edit/Preview/Export. Fixed: switching flyers didn't always update the goes-live dates shown. Cell popup menu is now a single condensed icon-only row (Replace/clear/remove-box) that opens above the box instead of beside it; text is centered by default instead of a manual toggle.",
+  "publishedAt": "2026-08-09T21:20:45.2862523Z"
 }
