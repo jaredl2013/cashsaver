@@ -314,7 +314,9 @@
   .render-clean .resize-btn{ display:none !important; }
   .render-clean .overlay-drag-handle,
   .render-clean .overlay-remove-btn,
-  .render-clean .overlay-resize-handle{ display:none !important; }
+  .render-clean .overlay-resize-handle,
+  .render-clean .overlay-rotate-handle,
+  .render-clean .overlay-font-controls{ display:none !important; }
   .render-clean .overlay-text{ border-color:transparent !important; background:transparent !important; }
   .render-clean .overlay-image:not(.has-img){ border-color:transparent !important; background:transparent !important; }
   .render-clean .overlay-image .overlay-image-lbl{ display:none !important; }
@@ -637,13 +639,32 @@
     border-radius:3px; display:flex; align-items:center; justify-content:center; font-size:10px;
     cursor:nwse-resize; z-index:2; opacity:0; transition:opacity .12s; touch-action:none;
   }
+  .overlay-box .overlay-rotate-handle{
+    position:absolute; bottom:-11px; left:-11px; width:20px; height:20px; border-radius:50%;
+    background:#222; color:#fff; display:flex; align-items:center; justify-content:center;
+    font-size:12px; cursor:grab; z-index:2; opacity:0; transition:opacity .12s; touch-action:none;
+  }
+  .overlay-box .overlay-font-controls{
+    position:absolute; top:-38px; left:50%; transform:translateX(-50%); display:flex; align-items:center;
+    gap:4px; background:#222; border-radius:7px; padding:4px; z-index:2; opacity:0;
+    transition:opacity .12s; white-space:nowrap;
+  }
+  .overlay-font-controls input{
+    width:38px; height:22px; border:1px solid #555; border-radius:4px; background:#333; color:#fff;
+    font-size:11px; text-align:center;
+  }
+  .overlay-font-controls label{ color:#ccc; font-size:10px; font-weight:700; padding:0 2px; }
   .overlay-box:hover .overlay-drag-handle,
   .overlay-box:hover .overlay-remove-btn,
-  .overlay-box:hover .overlay-resize-handle{ opacity:1; }
+  .overlay-box:hover .overlay-resize-handle,
+  .overlay-box:hover .overlay-rotate-handle,
+  .overlay-box:hover .overlay-font-controls{ opacity:1; }
   @media (hover:none){
     .overlay-box .overlay-drag-handle,
     .overlay-box .overlay-remove-btn,
-    .overlay-box .overlay-resize-handle{ opacity:1; }
+    .overlay-box .overlay-resize-handle,
+    .overlay-box .overlay-rotate-handle,
+    .overlay-box .overlay-font-controls{ opacity:1; }
   }
   .overlay-text{
     width:100%; height:100%; display:flex; align-items:center; justify-content:center; text-align:center;
@@ -731,6 +752,7 @@
   .db-list-head strong{ font-size:12px; }
   .db-list-tools{ display:flex; align-items:center; gap:7px; flex-wrap:wrap; }
   .db-import-btn{ border:1px solid #cbd5e1; border-radius:7px; background:#fff; color:#1f2937; padding:7px 10px; font-size:10.5px; font-weight:800; cursor:pointer; text-decoration:none; }
+  button.db-import-btn{ padding:7px 10px; font-size:10.5px; }
   .db-import-btn:hover{ background:#f3f4f6; }
   .db-import-status{ min-height:18px; margin:7px 0 3px; font-size:11px; font-weight:700; color:#287a3d; }
   .db-import-status.error{ color:#a32720; }
@@ -825,7 +847,7 @@
     @page{ size:letter; margin:0; }
     .photo{ border-style:solid; }
     .price-wrap, .unit-select, .unit-custom{ background:transparent; border-color:transparent; }
-    .db-badge, .cell-hover-menu, .drag-handle, .container-resize-handle, .undo-container-size-btn, .remove-photo-btn, .undo-photo-btn, .store-align-btn, .resize-btn, .overlay-drag-handle, .overlay-remove-btn, .overlay-resize-handle, .add-box-tile{ display:none !important; }
+    .db-badge, .cell-hover-menu, .drag-handle, .container-resize-handle, .undo-container-size-btn, .remove-photo-btn, .undo-photo-btn, .store-align-btn, .resize-btn, .overlay-drag-handle, .overlay-remove-btn, .overlay-resize-handle, .overlay-rotate-handle, .overlay-font-controls, .add-box-tile{ display:none !important; }
   }
   @media (max-width:1180px){
     body{ padding-left:344px; }
@@ -2174,6 +2196,43 @@ function enableOverlayResize(overlay){
   });
 }
 
+function enableOverlayRotate(overlay){
+  const handle = overlay.querySelector('.overlay-rotate-handle');
+  handle.addEventListener('pointerdown', e => {
+    if(e.button !== undefined && e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const rect = overlay.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2, centerY = rect.top + rect.height / 2;
+    const startAngle = Math.atan2(e.clientY - centerY, e.clientX - centerX) * 180 / Math.PI;
+    const startRotation = parseFloat(overlay.dataset.rotation || '0');
+    const onMove = ev => {
+      const angle = Math.atan2(ev.clientY - centerY, ev.clientX - centerX) * 180 / Math.PI;
+      const rotation = Math.round(startRotation + (angle - startAngle));
+      overlay.dataset.rotation = rotation;
+      overlay.style.transform = rotation ? `rotate(${rotation}deg)` : '';
+    };
+    const onUp = () => {
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
+      document.removeEventListener('pointercancel', onUp);
+      markFlyerDirty();
+    };
+    document.addEventListener('pointermove', onMove);
+    document.addEventListener('pointerup', onUp);
+    document.addEventListener('pointercancel', onUp);
+  });
+}
+
+function setOverlayFontSize(input){
+  const overlay = input.closest('.overlay-box');
+  const text = overlay.querySelector('.overlay-text');
+  const size = Math.max(8, Math.min(120, parseInt(input.value, 10) || 26));
+  input.value = size;
+  text.style.fontSize = size + 'px';
+  markFlyerDirty();
+}
+
 function readAndDownscaleImage(file, maxDim){
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -2224,12 +2283,21 @@ function createOverlay(type, opts = {}){
   overlay.style.top = (opts.y ?? 260) + 'px';
   overlay.style.width = (opts.width ?? (type === 'text' ? 200 : 160)) + 'px';
   overlay.style.height = (opts.height ?? (type === 'text' ? 70 : 160)) + 'px';
+  const rotation = opts.rotation || 0;
+  overlay.dataset.rotation = rotation;
+  if(rotation) overlay.style.transform = `rotate(${rotation}deg)`;
   if(type === 'text'){
+    const fontSize = opts.fontSize || 26;
     overlay.innerHTML = `
       <span class="overlay-drag-handle" title="Drag to move">⠿</span>
       <button type="button" class="overlay-remove-btn" title="Remove this overlay" onclick="removeOverlay(this)">×</button>
-      <div class="overlay-text" contenteditable="true">${sanitizeStoredHtml(opts.content || 'SALE!')}</div>
+      <div class="overlay-font-controls">
+        <label>Size</label>
+        <input type="number" min="8" max="120" value="${fontSize}" title="Text size (px)" onclick="event.stopPropagation()" onchange="setOverlayFontSize(this)">
+      </div>
+      <div class="overlay-text" contenteditable="true" style="font-size:${fontSize}px">${sanitizeStoredHtml(opts.content || 'SALE!')}</div>
       <span class="overlay-resize-handle" title="Drag to resize">↘</span>
+      <span class="overlay-rotate-handle" title="Drag to rotate">↻</span>
     `;
   } else {
     overlay.innerHTML = `
@@ -2240,6 +2308,7 @@ function createOverlay(type, opts = {}){
         <input type="file" accept="image/*" onchange="setOverlayImage(this)">
       </label>
       <span class="overlay-resize-handle" title="Drag to resize">↘</span>
+      <span class="overlay-rotate-handle" title="Drag to rotate">↻</span>
     `;
     if(opts.img){
       const imgLabel = overlay.querySelector('.overlay-image');
@@ -2251,6 +2320,7 @@ function createOverlay(type, opts = {}){
   page.appendChild(overlay);
   enableOverlayDrag(overlay);
   enableOverlayResize(overlay);
+  enableOverlayRotate(overlay);
   return overlay;
 }
 
@@ -2265,9 +2335,16 @@ function removeOverlay(btn){
 function collectOverlays(){
   return Array.from(document.querySelectorAll('.overlay-box')).map(overlay => {
     const type = overlay.dataset.type;
-    const data = { type, x: overlay.offsetLeft, y: overlay.offsetTop, width: overlay.offsetWidth, height: overlay.offsetHeight };
-    if(type === 'text') data.content = overlay.querySelector('.overlay-text').innerHTML;
-    else data.img = overlay.querySelector('.overlay-image').dataset.img || null;
+    const data = {
+      type, x: overlay.offsetLeft, y: overlay.offsetTop, width: overlay.offsetWidth, height: overlay.offsetHeight,
+      rotation: parseFloat(overlay.dataset.rotation || '0') || 0
+    };
+    if(type === 'text'){
+      data.content = overlay.querySelector('.overlay-text').innerHTML;
+      data.fontSize = parseInt(overlay.querySelector('.overlay-font-controls input').value, 10) || 26;
+    } else {
+      data.img = overlay.querySelector('.overlay-image').dataset.img || null;
+    }
     return data;
   });
 }
@@ -3547,7 +3624,7 @@ function buildCleanPreviewClone(){
   const clone = document.getElementById('page').cloneNode(true);
   clone.removeAttribute('id');
   clone.classList.add('render-clean', 'preview-page');
-  clone.querySelectorAll('.db-badge,.cell-hover-menu,.drag-handle,.container-resize-handle,.undo-container-size-btn,.remove-photo-btn,.undo-photo-btn,.store-align-btn,.resize-btn,.suggest-list,.overlay-drag-handle,.overlay-remove-btn,.overlay-resize-handle,.add-box-tile,input[type=file]').forEach(el => el.remove());
+  clone.querySelectorAll('.db-badge,.cell-hover-menu,.drag-handle,.container-resize-handle,.undo-container-size-btn,.remove-photo-btn,.undo-photo-btn,.store-align-btn,.resize-btn,.suggest-list,.overlay-drag-handle,.overlay-remove-btn,.overlay-resize-handle,.overlay-rotate-handle,.overlay-font-controls,.add-box-tile,input[type=file]').forEach(el => el.remove());
   clone.querySelectorAll('[contenteditable]').forEach(el => el.removeAttribute('contenteditable'));
   clone.querySelectorAll('.price-input').forEach(input => {
     const amount = Number.parseFloat(input.value);
@@ -3639,7 +3716,7 @@ function captureFlyerCanvas(scale = 1.4){
     onclone: clonedDocument => {
       const clonedPage = clonedDocument.getElementById('page');
       clonedPage.classList.add('render-clean');
-      clonedPage.querySelectorAll('.db-badge,.cell-hover-menu,.drag-handle,.container-resize-handle,.undo-container-size-btn,.remove-photo-btn,.undo-photo-btn,.store-align-btn,.resize-btn,.suggest-list,.overlay-drag-handle,.overlay-remove-btn,.overlay-resize-handle,.add-box-tile,input[type=file]').forEach(el => el.remove());
+      clonedPage.querySelectorAll('.db-badge,.cell-hover-menu,.drag-handle,.container-resize-handle,.undo-container-size-btn,.remove-photo-btn,.undo-photo-btn,.store-align-btn,.resize-btn,.suggest-list,.overlay-drag-handle,.overlay-remove-btn,.overlay-resize-handle,.overlay-rotate-handle,.overlay-font-controls,.add-box-tile,input[type=file]').forEach(el => el.remove());
       clonedPage.querySelectorAll('[contenteditable]').forEach(el => el.removeAttribute('contenteditable'));
       clonedPage.querySelectorAll('.price-input').forEach((input, index) => {
         const amount = Number.parseFloat(prices[index]);
