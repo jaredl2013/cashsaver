@@ -555,19 +555,19 @@
      instead of being scattered around the cell's corners. */
   .cell-hover-menu{
     position:absolute; top:2px; left:100%; margin-left:6px; z-index:9; width:max-content;
-    display:flex; flex-direction:column; align-items:stretch; gap:3px;
-    background:#fff; border:1px solid #ddd; border-radius:7px; padding:5px;
-    box-shadow:0 2px 8px rgba(0,0,0,.18);
+    display:flex; flex-direction:column; align-items:stretch; gap:5px;
+    background:#fff; border:none; border-radius:10px; padding:8px;
+    box-shadow:0 4px 18px rgba(0,0,0,.22);
     opacity:0; pointer-events:none; transition:opacity .15s;
   }
-  .cell-hover-menu .hover-menu-row{ display:flex; align-items:center; gap:3px; }
+  .cell-hover-menu .hover-menu-row{ display:flex; align-items:center; gap:5px; }
   .cell:hover .cell-hover-menu, .cell-hover-menu:focus-within{ opacity:1; pointer-events:auto; }
   .cell-hover-menu button{
-    border:1px solid #c7c7c7; border-radius:4px; background:#fff; color:#333;
-    font-size:9px; font-weight:800; padding:3px 5px; height:20px; line-height:1;
+    border:1px solid #ddd; border-radius:6px; background:#fafafa; color:#333;
+    font-size:10.5px; font-weight:800; padding:6px 9px; height:26px; line-height:1;
     cursor:pointer; white-space:nowrap;
   }
-  .cell-hover-menu button:hover{ border-color:var(--red); color:var(--red); }
+  .cell-hover-menu button:hover{ border-color:var(--red); color:var(--red); background:#fff; }
   .cell-hover-menu button.remove-item-btn{ color:#a32720; border-color:#d8a29e; }
   .cell-hover-menu button.remove-item-btn:hover{ background:#a32720; color:#fff; border-color:#a32720; }
   .cell-hover-menu button.remove-box-btn{ color:#a32720; border-color:#d8a29e; }
@@ -582,11 +582,9 @@
   }
   .add-box-tile:hover{ border-color:var(--red); color:var(--red); background:#fff5f4; }
   .render-clean .add-box-tile{ display:none !important; }
-  .name-size-box{ display:flex; align-items:center; gap:2px; }
-  .name-size-box .name-size-btn{ padding:3px 6px; }
   .name-size-input{
-    width:34px; height:20px; padding:0 2px; border:1px solid #c7c7c7; border-radius:4px;
-    font-size:9px; font-weight:800; color:#333; text-align:center; -moz-appearance:textfield;
+    width:38px; height:26px; padding:0 2px; border:1px solid #ddd; border-radius:6px;
+    font-size:10.5px; font-weight:800; color:#333; text-align:center; -moz-appearance:textfield;
   }
   .name-size-input::-webkit-inner-spin-button, .name-size-input::-webkit-outer-spin-button{ margin:0; }
   .render-clean .cell-hover-menu{ display:none !important; }
@@ -975,8 +973,7 @@
           </div>
         </div>
         <div class="topbar-save-wrap">
-          <button class="primary" onclick="saveFlyer()">💾 Save</button>
-          <span class="save-state" id="saveState">Save once to enable auto-save</span>
+          <button class="primary" onclick="saveFlyer()" title="Save">💾 Save</button>
         </div>
       </div>
     </div>
@@ -1381,26 +1378,22 @@ function makeCell(isHero){
     <span class="db-badge" title="Filled from Product Database">DB</span>
     <div class="cell-hover-menu" onmouseenter="syncNameSizeInput(this)">
       <div class="hover-menu-row">
-        <button type="button" class="search-btn" title="Find photo" onclick="event.preventDefault(); event.stopPropagation(); openPhotoSearch(this)">🔎 photo</button>
-        <button type="button" class="resize-btn" title="Crop / resize photo" onclick="event.preventDefault(); event.stopPropagation(); reopenCropper(this)">✂️ crop</button>
-        <button type="button" class="replace-item-btn" title="Replace this ad with a product from the catalog" onclick="openReplaceProduct(this)">↔ replace</button>
+        <button type="button" class="upload-btn" title="Upload a photo from this computer" onclick="event.preventDefault(); event.stopPropagation(); triggerPhotoUpload(this)">⬆ Upload</button>
+        <button type="button" class="search-btn" title="Search free stock photos" onclick="event.preventDefault(); event.stopPropagation(); openPhotoSearch(this)">🔍 Search</button>
+        <button type="button" class="replace-item-btn" title="Replace this ad with a different product from the catalog" onclick="openReplaceProduct(this)">↔ Replace</button>
       </div>
       <div class="hover-menu-row">
-        <span class="name-size-box" title="Product name font size (px)">
-          <button type="button" class="name-size-btn" title="Make product name smaller" onclick="changeProductNameSize(this,-1)">−</button>
-          <input type="number" class="name-size-input" min="8" max="32" onclick="event.stopPropagation()" onchange="setProductNameSize(this)">
-          <button type="button" class="name-size-btn" title="Make product name larger" onclick="changeProductNameSize(this,1)">+</button>
-        </span>
-        <button type="button" class="name-size-btn" title="Automatically fit product name" onclick="resetProductNameSize(this)">Auto</button>
+        <input type="number" class="name-size-input" min="8" max="32" title="Product name text size (px)" onclick="event.stopPropagation()" onchange="setProductNameSize(this)">
+        <button type="button" class="name-size-btn" title="Automatically fit the product name" onclick="resetProductNameSize(this)">Auto</button>
         <button type="button" class="text-align-btn" title="Center the product name and description" onclick="toggleProductTextAlignment(this)">Center</button>
       </div>
       <div class="hover-menu-row">
-        <button type="button" class="remove-item-btn" title="Clear this box's content (keeps the box)" onclick="clearFlyerCell(this)">× delete</button>
+        <button type="button" class="remove-item-btn" title="Clear this box's contents but keep the empty box" onclick="clearFlyerCell(this)">Remove Item</button>
         <button type="button" class="remove-box-btn" title="Remove this box from the row entirely" onclick="removeBoxFromGrid(this)">🗑 remove box</button>
       </div>
     </div>
     <div class="cell-top">
-      <label class="photo">
+      <label class="photo" title="Click to crop/reposition, or use Upload/Search above to change it" onclick="handlePhotoBoxClick(event, this)">
         <span class="lbl">Click to<br>add photo</span>
         <input type="file" accept="image/*" onchange="setPhoto(this)">
         <button type="button" class="remove-photo-btn" title="Remove photo" onclick="event.preventDefault();event.stopPropagation();removePhoto(this)">✕</button>
@@ -1520,6 +1513,26 @@ function setPhoto(input){
   reader.onload = e => openCropper(e.target.result, target, true);
   reader.readAsDataURL(file);
   input.value = ''; // allow picking the same file again later
+}
+
+// Hover-menu's explicit Upload button — bypasses the label's own click handling
+// entirely so it always opens the file picker, even when a photo already exists
+// (a direct click on the photo itself opens the crop editor instead, see below).
+function triggerPhotoUpload(btn){
+  const cell = btn.closest('.cell');
+  const input = cell && cell.querySelector('.photo input[type=file]');
+  if(input) input.click();
+}
+
+// A photo box with something in it already opens the crop/reposition editor on
+// click instead of the file picker -- Upload/Search in the hover menu are the
+// explicit way to change what's in it now, so a plain click can be reserved for
+// adjusting the existing image instead of accidentally replacing it.
+function handlePhotoBoxClick(e, photo){
+  if(photo.classList.contains('has-img') && photo.dataset.img){
+    e.preventDefault();
+    openCropper(photo.dataset.originalImg || photo.dataset.img, photo, false);
+  }
 }
 
 // Re-open the crop/zoom editor on a photo that's already placed — lets you shrink it
@@ -2334,19 +2347,6 @@ function syncNameSizeInput(menu){
   const input = menu.querySelector('.name-size-input');
   const nameEl = menu.closest('.cell').querySelector('.pname');
   if(input && nameEl) input.value = Math.round(parseFloat(getComputedStyle(nameEl).fontSize) || 14);
-}
-
-function changeProductNameSize(button, direction){
-  const cell = button.closest('.cell');
-  const nameEl = cell.querySelector('.pname');
-  const current = parseFloat(getComputedStyle(nameEl).fontSize) || 14;
-  const next = Math.max(8, Math.min(32, current + direction));
-  nameEl.dataset.manualSize = String(next);
-  nameEl.style.fontSize = `${next}px`;
-  const input = cell.querySelector('.name-size-input');
-  if(input) input.value = Math.round(next);
-  scheduleRowAlign();
-  markFlyerDirty();
 }
 
 function setProductNameSize(input){
