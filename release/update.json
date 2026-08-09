@@ -2,6 +2,6 @@
     "version":  "1.0.19",
     "downloadUrl":  "https://github.com/jaredl2013/cashsaver/releases/download/v1.0.19/CashSaver-Ad-Builder-Setup-1.0.19.exe",
     "sha256":  "d820f12a0c290e8db47cc12c6a0f986b3f3dc07af4f4572570e60e171eac2d58",
-    "releaseNotes":  "Auto Push (SMS/Email settings) is now locked as a paid add-on -- greyed out in Settings. Contact Lockwood IT Services to enable it.",
+    "releaseNotes":  "Improvements to Settings and menus.",
     "publishedAt":  "2026-08-09T21:56:26.0831647Z"
 }
