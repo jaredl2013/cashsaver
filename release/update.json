@@ -1,7 +1,7 @@
 {
-  "version": "1.0.13",
-  "downloadUrl": "https://github.com/jaredl2013/cashsaver/releases/download/v1.0.13/CashSaver-Ad-Builder-Setup-1.0.13.exe",
-  "sha256": "1061ffebd35fcc34818686589df36db83cad509d02622903a3d143673fb44faf",
-  "releaseNotes": "New top bar: Undo/Redo on the left, the flyer name in the middle, Preview/Export/Share on the right. Undo/redo now actually supports redo, not just a single undo. Sidebar starts collapsed to a slim icon strip by default (click the arrow to expand it) to free up screen space.",
-  "publishedAt": "2026-08-08T06:30:12.2879385Z"
+  "version": "1.0.14",
+  "downloadUrl": "https://github.com/jaredl2013/cashsaver/releases/download/v1.0.14/CashSaver-Ad-Builder-Setup-1.0.14.exe",
+  "sha256": "99f7ab1032760cd6752cf6cca7d05b7657a162b47da375e077d74499d6f31cd7",
+  "releaseNotes": "Major redesign: almost everything moved out of the sidebar into a new top bar -- Undo/Redo, flyer title (click to rename, dropdown to switch flyers), goes-live dates, Edit (overlays), Preview, Export (PDF/PNG/JPEG), and Save. Settings moved to a top-left icon. The app now remembers and reopens your last flyer on login instead of starting blank.",
+  "publishedAt": "2026-08-09T15:18:28.6367346Z"
 }
