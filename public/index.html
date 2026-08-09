@@ -21,21 +21,35 @@
     font-family:Arial, Helvetica, sans-serif;
     background:#5a5a5a;
     margin:0;
-    padding:80px 24px 24px 324px;
+    padding:96px 24px 24px 324px;
     padding-bottom:60px; /* room for the credit bar */
     transition:padding-left .18s ease;
   }
   body.rail-collapsed{ padding-left:84px; }
   #topBar{
-    position:fixed; top:0; left:300px; right:0; height:56px; z-index:60;
+    position:fixed; top:0; left:300px; right:0; min-height:56px; z-index:60;
     background:#1f2937; border-bottom:1px solid #2d3748; display:flex; align-items:center;
-    padding:0 16px; gap:14px; transition:left .18s ease;
+    padding:10px 16px; gap:14px; transition:left .18s ease;
   }
   body.rail-collapsed #topBar{ left:60px; }
   .topbar-left, .topbar-right{ display:flex; align-items:center; gap:8px; flex:1; }
   .topbar-right{ justify-content:flex-end; }
-  .topbar-center{ flex:none; max-width:38%; overflow:hidden; text-align:center; }
-  .topbar-center span{ color:#f3f4f6; font-size:13.5px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .topbar-center{
+    flex:none; max-width:42%; display:flex; flex-direction:column; align-items:center; gap:4px;
+  }
+  .icon-btn{ font-size:16px !important; padding:8px 10px !important; }
+  .topbar-title-row{ display:flex; align-items:center; gap:2px; max-width:100%; }
+  #topBarFlyerName{
+    color:#f3f4f6; font-size:14px; font-weight:700; white-space:nowrap; overflow:hidden;
+    text-overflow:ellipsis; cursor:pointer; padding:3px 6px; border-radius:6px;
+  }
+  #topBarFlyerName:hover{ background:rgba(255,255,255,.08); }
+  .topbar-title-input{
+    color:#f3f4f6; font-size:14px; font-weight:700; background:#111827; border:1px solid var(--red);
+    border-radius:6px; padding:2px 6px; width:180px;
+  }
+  .topbar-caret{ padding:4px 6px !important; font-size:10px !important; color:#9ca3af !important; }
+  .topbar-goeslive-btn{ font-size:11px !important; padding:4px 10px !important; color:#9ca3af !important; }
   #topBar button, #topBar select{
     border:1px solid rgba(255,255,255,.14); border-radius:8px; background:transparent; color:#e5e7eb;
     font-size:12.5px; font-weight:600; padding:8px 12px; cursor:pointer; white-space:nowrap;
@@ -46,6 +60,36 @@
   #topBar button.primary{ background:var(--red); border-color:transparent; color:#fff; }
   #topBar button.primary:hover{ background:var(--red-dark); }
   #topBar select{ appearance:auto; color-scheme:dark; }
+  .topbar-save-wrap{ display:flex; flex-direction:column; align-items:flex-end; gap:2px; }
+  .topbar-save-wrap .save-state{ font-size:10px; color:#9ca3af; font-weight:700; }
+  .topbar-save-wrap .save-state.dirty{ color:#fbbf24; }
+  .topbar-save-wrap .save-state.saving{ color:#93c5fd; }
+  .topbar-save-wrap .save-state.saved{ color:#86efac; }
+  .topbar-save-wrap .save-state.error{ color:#fca5a5; }
+
+  .topbar-menu-wrap{ position:relative; }
+  .topbar-menu{
+    display:none; position:absolute; top:calc(100% + 8px); left:0; background:#1f2937;
+    border:1px solid #374151; border-radius:10px; padding:10px; box-shadow:0 14px 30px rgba(0,0,0,.4);
+    z-index:80; min-width:210px; flex-direction:column; gap:8px;
+  }
+  .topbar-menu.open{ display:flex; }
+  .topbar-menu button{ width:100%; }
+  .topbar-menu-center{ left:50%; transform:translateX(-50%); }
+  .topbar-menu .tlabel{ color:#9ca3af; font-size:11px; text-transform:uppercase; letter-spacing:.06em; font-weight:700; }
+  .topbar-menu select, .topbar-menu input[type=date], .topbar-menu input[type=time]{
+    width:100%; border:1px solid rgba(255,255,255,.14); border-radius:8px; padding:8px 9px;
+    background:#0b1220; color:#f9fafb; font-size:12px; color-scheme:dark;
+  }
+  .topbar-menu .saved-flyer-list{ max-height:280px; overflow-y:auto; margin-top:4px; }
+
+  .status-toast{
+    position:fixed; top:66px; left:50%; transform:translateX(-50%); z-index:90;
+    background:#111827; color:#86efac; font-size:12.5px; font-weight:700; padding:8px 16px;
+    border-radius:20px; box-shadow:0 8px 20px rgba(0,0,0,.3); pointer-events:none;
+    opacity:0; transition:opacity .2s ease;
+  }
+  .status-toast:not(:empty){ opacity:1; }
 
   /* ---------- Login screen ---------- */
   #loginScreen{
@@ -843,54 +887,10 @@
       <div class="drawer-body">
 
         <div class="drawer-section">
-          <span class="rail-icon" onclick="expandDrawerRail()" title="This flyer">💾</span>
-          <label class="tlabel">This flyer:</label>
-          <span id="currentNameLabel" style="font-size:13px;">(unsaved)</span>
-          <span id="saveState" class="save-state">Save once to enable auto-save</span>
-          <div class="drawer-row">
-            <button onclick="saveFlyer()">💾 Save</button>
-            <button class="secondary" onclick="saveAsFlyer()">Save As…</button>
-          </div>
-          <button class="secondary" onclick="if(confirm('Clear everything and start a blank flyer?')) newBlank()">＋ New blank flyer</button>
-          <span class="status" id="statusMsg"></span>
-        </div>
-
-        <div class="drawer-section">
-          <span class="rail-icon" onclick="expandDrawerRail()" title="Saved flyers">📑</span>
-          <label class="tlabel">Saved flyers:</label>
-          <div class="saved-flyer-list" id="savedFlyerList"><div class="saved-flyer-empty">No saved flyers yet.</div></div>
-        </div>
-
-        <div class="drawer-section">
           <span class="rail-icon" onclick="expandDrawerRail()" title="Template / layout">🧩</span>
           <label class="tlabel">Template / layout:</label>
           <select id="layoutSelect" onchange="onLayoutSelectChange()"></select>
           <div id="layoutBlurb" style="font-size:11.5px;color:#777;margin-top:2px;"></div>
-        </div>
-
-        <div class="drawer-section">
-          <span class="rail-icon" onclick="expandDrawerRail()" title="Overlays">🖼</span>
-          <label class="tlabel">Overlays:</label>
-          <div class="drawer-row">
-            <button class="secondary" onclick="addTextOverlay()">＋ Text overlay</button>
-            <button class="secondary" onclick="addImageOverlay()">＋ Image overlay</button>
-          </div>
-          <span style="font-size:11px;color:#777;">Drag the ⠿ handle to move, the ↘ corner to resize. These float on top of everything and print/export with the flyer.</span>
-        </div>
-
-        <div class="drawer-section">
-          <span class="rail-icon" onclick="expandDrawerRail()" title="Goes live">📅</span>
-          <label class="tlabel">Goes live:</label>
-          <input type="date" id="weekPicker" onchange="applyWeek()">
-          <input type="time" id="startTime" value="07:00" onchange="applyWeek()">
-          <label style="font-size:12px;color:#555;display:flex;align-items:center;gap:6px;">
-            <input type="checkbox" id="multiWeekToggle" onchange="onMultiWeekToggle()"> 2-week / holiday ad
-          </label>
-          <span id="endDateWrap" style="display:none;flex-direction:column;gap:4px;">
-            <label class="tlabel" style="margin:0;">through:</label>
-            <input type="date" id="endDatePicker" onchange="applyWeek()">
-          </span>
-          <span id="weekPreview" style="font-size:11.5px;color:#555;"></span>
         </div>
 
         <div class="drawer-section rail-passthrough">
@@ -911,20 +911,6 @@
           </div>
         </details>
 
-        <div class="drawer-section">
-          <span class="rail-icon" onclick="expandDrawerRail()" title="Print size">🖨️</span>
-          <label class="tlabel">Print size:</label>
-          <select id="printPageSize">
-            <option value="letter">Letter (8.5" x 11")</option>
-            <option value="tabloid">Tabloid / newspaper insert (11" x 17")</option>
-          </select>
-          <span style="font-size:11px;color:#777;">Preview, export, and share have moved to the bar at the top.</span>
-        </div>
-
-        <div class="drawer-section rail-passthrough">
-          <button class="rail-action secondary" onclick="openAdminSettings()" title="Settings"><span class="rail-emoji">⚙</span><span class="btn-label"> Settings</span></button>
-        </div>
-
         <div class="hint" style="margin:0;">
           <b>Saving:</b> flyers and the product list are stored on the server now, so anyone with the password sees the same saved list. <b>Product Database:</b> Save updates it automatically — type a name that's been used before and it offers to fill in the photo/price. <b>Photo search:</b> click "🔎 find photo" on any image box to search free stock photos instead of uploading your own.
         </div>
@@ -934,20 +920,67 @@
 
     <div id="topBar">
       <div class="topbar-left">
-        <button id="topUndoBtn" onclick="undoLastMove()" title="Undo last move" disabled>↶ Undo</button>
-        <button id="topRedoBtn" onclick="redoLastMove()" title="Redo last move" disabled>↷ Redo</button>
+        <button class="icon-btn" onclick="openAdminSettings()" title="Settings">⚙</button>
+        <button id="topUndoBtn" onclick="undoLastMove()" title="Undo last move" disabled>↶</button>
+        <button id="topRedoBtn" onclick="redoLastMove()" title="Redo last move" disabled>↷</button>
       </div>
-      <div class="topbar-center"><span id="topBarFlyerName">(unsaved)</span></div>
+      <div class="topbar-center">
+        <div class="topbar-title-row">
+          <span id="topBarFlyerName" title="Click to rename" onclick="startTitleEdit(this)">(unsaved)</span>
+          <div class="topbar-menu-wrap">
+            <button class="topbar-caret" onclick="toggleTopbarMenu('savedFlyerMenu')" title="Switch flyer">▾</button>
+            <div class="topbar-menu topbar-menu-center" id="savedFlyerMenu">
+              <button class="secondary" onclick="if(confirm('Clear everything and start a blank flyer?')) newBlank()">＋ New blank flyer</button>
+              <div class="saved-flyer-list" id="savedFlyerList"><div class="saved-flyer-empty">No saved flyers yet.</div></div>
+            </div>
+          </div>
+        </div>
+        <div class="topbar-menu-wrap">
+          <button class="topbar-goeslive-btn" id="goesLiveSummary" onclick="toggleTopbarMenu('goesLiveMenu')">📅 Set dates</button>
+          <div class="topbar-menu topbar-menu-center" id="goesLiveMenu">
+            <label class="tlabel">Goes live:</label>
+            <input type="date" id="weekPicker" onchange="applyWeek()">
+            <input type="time" id="startTime" value="07:00" onchange="applyWeek()">
+            <label style="font-size:12px;color:#555;display:flex;align-items:center;gap:6px;">
+              <input type="checkbox" id="multiWeekToggle" onchange="onMultiWeekToggle()"> 2-week / holiday ad
+            </label>
+            <span id="endDateWrap" style="display:none;flex-direction:column;gap:4px;">
+              <label class="tlabel" style="margin:0;">through:</label>
+              <input type="date" id="endDatePicker" onchange="applyWeek()">
+            </span>
+            <span id="weekPreview" style="font-size:11px;color:#9ca3af;"></span>
+          </div>
+        </div>
+      </div>
       <div class="topbar-right">
+        <div class="topbar-menu-wrap">
+          <button onclick="toggleTopbarMenu('editMenu')">✎ Edit</button>
+          <div class="topbar-menu" id="editMenu">
+            <button class="secondary" onclick="addTextOverlay(); toggleTopbarMenu('editMenu');">＋ Text overlay</button>
+            <button class="secondary" onclick="addImageOverlay(); toggleTopbarMenu('editMenu');">＋ Image overlay</button>
+          </div>
+        </div>
         <button onclick="openAdPreview()">👁 Preview</button>
-        <select id="topExportSelect" onchange="handleTopExportChoice(this)" title="Export">
-          <option value="" selected>⭳ Export</option>
-          <option value="pdf">Export as PDF</option>
-          <option value="image">Export as image</option>
-        </select>
-        <button class="primary" onclick="shareOrExportImage(event.target)">📤 Share</button>
+        <div class="topbar-menu-wrap">
+          <button onclick="toggleTopbarMenu('exportMenu')">⭳ Export</button>
+          <div class="topbar-menu" id="exportMenu">
+            <label class="tlabel" style="padding:0 2px;">Page size for PDF:</label>
+            <select id="printPageSize">
+              <option value="letter">Letter (8.5" x 11")</option>
+              <option value="tabloid">Tabloid / newspaper insert (11" x 17")</option>
+            </select>
+            <button class="secondary" onclick="printFlyer(); toggleTopbarMenu('exportMenu');">Export as PDF</button>
+            <button class="secondary" onclick="downloadFlyerImage('png'); toggleTopbarMenu('exportMenu');">Export as PNG</button>
+            <button class="secondary" onclick="downloadFlyerImage('jpeg'); toggleTopbarMenu('exportMenu');">Export as JPEG</button>
+          </div>
+        </div>
+        <div class="topbar-save-wrap">
+          <button class="primary" onclick="saveFlyer()">💾 Save</button>
+          <span class="save-state" id="saveState">Save once to enable auto-save</span>
+        </div>
       </div>
     </div>
+    <div id="statusMsg" class="status-toast"></div>
 
     <div class="page" id="page">
 
@@ -1257,6 +1290,59 @@ function expandDrawerRail(){
   drawer.classList.remove('rail');
   document.body.classList.remove('rail-collapsed');
   document.getElementById('drawerRailToggle').textContent = '«';
+}
+
+// Generic dropdown-panel toggler for the top bar (saved-flyers switcher, goes-live
+// picker, edit/overlay menu, export menu) -- opening one closes any other that's
+// open, and clicking outside any of them closes whichever is open.
+function toggleTopbarMenu(id){
+  const target = document.getElementById(id);
+  const alreadyOpen = target.classList.contains('open');
+  document.querySelectorAll('.topbar-menu.open').forEach(m => m.classList.remove('open'));
+  if(!alreadyOpen) target.classList.add('open');
+}
+document.addEventListener('click', e => {
+  if(e.target.closest('.topbar-menu-wrap')) return;
+  document.querySelectorAll('.topbar-menu.open').forEach(m => m.classList.remove('open'));
+});
+
+function startTitleEdit(span){
+  if(!currentName) return; // an unsaved flyer has nothing to rename yet -- Save/Save As names it
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.value = currentName;
+  input.id = 'topBarFlyerNameInput';
+  input.className = 'topbar-title-input';
+  span.replaceWith(input);
+  input.focus();
+  input.select();
+  input.addEventListener('blur', () => commitTitleEdit(input));
+  input.addEventListener('keydown', e => {
+    if(e.key === 'Enter'){ e.preventDefault(); input.blur(); }
+    if(e.key === 'Escape'){ input.value = currentName; input.blur(); }
+  });
+}
+async function commitTitleEdit(input){
+  const newName = input.value.trim();
+  const oldName = currentName;
+  const span = document.createElement('span');
+  span.id = 'topBarFlyerName';
+  span.title = 'Click to rename';
+  span.onclick = () => startTitleEdit(span);
+  span.textContent = oldName;
+  input.replaceWith(span);
+  if(!newName || newName === oldName) return;
+  const res = await fetch('/api/flyers/' + encodeURIComponent(oldName) + '/rename', {
+    method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({newName})
+  });
+  if(!res.ok){
+    const err = await res.json().catch(() => ({}));
+    alert(err.error === 'name_taken' || err.error === 'name_taken_in_trash' ? 'A flyer with that name already exists.' : 'Could not rename that flyer.');
+    return;
+  }
+  setCurrentName(newName);
+  refreshSavedList();
+  setStatus(`Renamed "${oldName}" to "${newName}"`);
 }
 
 async function doLogout(){
@@ -3283,6 +3369,8 @@ function applyWeek(){
   const time12 = document.getElementById('startTime').value;
   document.getElementById('weekPreview').textContent =
     `= goes live ${formatShort(sched.startDate)} at ${time12}, runs ${dayCount} days through ${formatShort(sched.endDate)}, ${sched.endDate.getFullYear()}`;
+  const summary = document.getElementById('goesLiveSummary');
+  if(summary) summary.textContent = `📅 ${formatShort(sched.startDate)} – ${formatShort(sched.endDate)}`;
 }
 
 function initWeekPicker(){
@@ -3588,52 +3676,23 @@ function captureFlyerCanvas(scale = 1.4){
   });
 }
 
-function handleTopExportChoice(select){
-  const choice = select.value;
-  select.value = '';
-  if(choice === 'pdf') printFlyer();
-  else if(choice === 'image') shareOrExportImage(null, true);
-}
-
-function shareOrExportImage(btn, forceDownload){
-  const original = btn ? btn.textContent : null;
-  if(btn){ btn.textContent = 'Rendering…'; btn.disabled = true; }
-
+function downloadFlyerImage(format){
+  const mime = format === 'png' ? 'image/png' : 'image/jpeg';
+  const ext = format === 'png' ? 'png' : 'jpg';
   captureFlyerCanvas(1.4)
     .then(canvas => {
-      canvas.toBlob(async blob => {
-        const filename = (currentName || 'weekly-ad').replace(/[^a-z0-9\-_]+/gi,'_') + '.jpg';
-        const file = new File([blob], filename, { type: 'image/jpeg' });
-
-        // Native desktop share sheets can sit open indefinitely and make a normal
-        // image export look frozen. Share natively only on phones/tablets; desktop
-        // browsers download the finished image immediately.
-        const useNativeShare = !forceDownload && (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
-          || (navigator.maxTouchPoints > 1 && window.innerWidth < 900));
-        if (useNativeShare && navigator.canShare && navigator.canShare({ files: [file] })) {
-          try {
-            await navigator.share({ files: [file], title: 'Weekly Ad', text: "This week's deals!" });
-            if(btn){ btn.textContent = original; btn.disabled = false; }
-            return;
-          } catch (err) {
-            // user backed out of the share sheet, or it failed — fall through to download
-          }
-        }
-
-        // Fallback: just download the image. Facebook (and every other platform)
-        // can't accept a locally-generated image via a link — there's no way around
-        // a manual upload step here, this just gets the file into their hands fast.
+      canvas.toBlob(blob => {
+        if(!blob){ alert('Could not create the image. Try again, or use Export as PDF instead.'); return; }
+        const filename = (currentName || 'weekly-ad').replace(/[^a-z0-9\-_]+/gi,'_') + '.' + ext;
         const link = document.createElement('a');
         link.href = URL.createObjectURL(blob);
         link.download = filename;
         link.click();
-        setStatus(`Saved "${filename}" — upload it to Facebook like any other photo.`);
-        if(btn){ btn.textContent = original; btn.disabled = false; }
-      }, 'image/jpeg', .92);
+        setStatus(`Saved "${filename}".`);
+      }, mime, format === 'png' ? undefined : .92);
     })
     .catch(() => {
-      alert('Could not create the image. Try again, or use Print / Save as PDF instead.');
-      if(btn){ btn.textContent = original; btn.disabled = false; }
+      alert('Could not create the image. Try again, or use Export as PDF instead.');
     });
 }
 
@@ -3921,10 +3980,24 @@ function setStatus(msg){
 
 function setCurrentName(name){
   currentName = name;
-  document.getElementById('currentNameLabel').textContent = name ? name : '(unsaved)';
   document.getElementById('topBarFlyerName').textContent = name ? name : '(unsaved)';
+  if(name) localStorage.setItem('lastFlyerName', name);
+  else localStorage.removeItem('lastFlyerName');
   if(!name && !flyerDirty) showSaveState('Save once to enable auto-save');
   refreshSavedList();
+}
+
+async function loadLastFlyerIfAny(){
+  const name = localStorage.getItem('lastFlyerName');
+  if(!name) return;
+  try{
+    const res = await fetch('/api/flyers/' + encodeURIComponent(name));
+    if(!res.ok){ localStorage.removeItem('lastFlyerName'); return; }
+    const state = await res.json();
+    applyState(state);
+    setCurrentName(name);
+    resetFlyerDirtyState();
+  } catch(e){ /* stay on the blank default if this fails */ }
 }
 
 function renderFlyerImage(){
@@ -4070,7 +4143,7 @@ async function renameSavedFlyer(oldName){
   setStatus(`Renamed "${oldName}" to "${newName}"`);
 }
 
-function newBlank(){ flyerDirty = false; location.reload(); }
+function newBlank(){ flyerDirty = false; localStorage.removeItem('lastFlyerName'); location.reload(); }
 
 /* ================= CLEAN SINGLE-PAGE PRINTING ================= */
 async function printFlyer(){
@@ -4154,13 +4227,14 @@ function initAutoSaveTracking(){
 }
 
 /* ================= BOOT ================= */
-function boot(){
+async function boot(){
   buildGrids();
   enableContainerResize(document.getElementById('logoPhoto'));
   populateLayoutSelect();
   refreshSavedList();
   initWeekPicker();
   applyWeek();
+  await loadLastFlyerIfAny();
   initAutoSaveTracking();
   resetFlyerDirtyState();
   setTimeout(() => checkForUpdates(false), 1200);
