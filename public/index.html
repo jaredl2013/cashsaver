@@ -276,6 +276,11 @@
   .flyer-card-actions .rename{ width:auto; background:transparent; border-color:rgba(255,255,255,.18); color:#d1d5db; }
   .flyer-card-actions .delete{ width:auto; background:transparent; border-color:rgba(248,113,113,.35); color:#fca5a5; }
   .saved-flyer-empty{ color:#9ca3af; font-size:11px; text-align:center; padding:12px 4px; }
+  .saved-list-label{ color:#9ca3af; font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.08em; margin:8px 0 2px; }
+  .saved-list-label:first-child{ margin-top:0; }
+  .flyer-status-pill.template{ background:#a78bfa; color:#2e1065; }
+  .flyer-card.template-card{ border-color:rgba(167,139,250,.4); }
+  .flyer-card.template-card .open{ background:var(--red); }
 
   .hint{
     max-width:850px; margin:0 auto 18px auto; background:#fff3f2; border:1px solid #f3b9b4;
@@ -959,7 +964,10 @@
           <div class="topbar-menu-wrap">
             <button class="topbar-caret" onclick="toggleTopbarMenu('savedFlyerMenu')" title="Switch flyer">▾</button>
             <div class="topbar-menu topbar-menu-center" id="savedFlyerMenu">
-              <button class="secondary" onclick="if(confirm('Clear everything and start a blank flyer?')) newBlank()">＋ New blank flyer</button>
+              <div class="drawer-row">
+                <button class="secondary" onclick="if(confirm('Clear everything and start a blank flyer?')) newBlank()">＋ New blank flyer</button>
+                <button class="secondary" onclick="saveAsTemplate()" title="Save this ad's content as a reusable template">📋 Save as template</button>
+              </div>
               <div class="saved-flyer-list" id="savedFlyerList"><div class="saved-flyer-empty">No saved flyers yet.</div></div>
             </div>
           </div>
@@ -4012,35 +4020,136 @@ function applyState(state){
   restoreOverlays(state.overlays);
 }
 
+const TEMPLATE_PREFIX = '📋 Template: ';
+function isTemplateName(name){ return typeof name === 'string' && name.startsWith(TEMPLATE_PREFIX); }
+
 async function refreshSavedList(){
   const res = await fetch('/api/flyers');
-  const rows = await res.json();
+  const allRows = await res.json();
   const list = document.getElementById('savedFlyerList');
-  if(!rows.length){
-    list.innerHTML = '<div class="saved-flyer-empty">No saved flyers yet.</div>';
-    return;
+  const templates = allRows.filter(r => isTemplateName(r.name));
+  const rows = allRows.filter(r => !isTemplateName(r.name));
+
+  let html = '';
+
+  if(templates.length){
+    templates.sort((a,b) => a.name.localeCompare(b.name));
+    html += `<div class="saved-list-label">Templates</div>` + templates.map(row => {
+      const label = row.name.slice(TEMPLATE_PREFIX.length);
+      return `<div class="flyer-card template-card ${currentName === row.name ? 'is-editing' : ''}" data-name="${escapeHtml(row.name)}">
+        <div class="flyer-card-head"><div class="flyer-card-name" title="${escapeHtml(label)}">${escapeHtml(label)}</div><span class="flyer-status-pill template">Template</span></div>
+        <div class="flyer-card-actions">
+          <button class="open" title="Start a new ad from this template" onclick="useTemplate(this.closest('.flyer-card').dataset.name)">Use</button>
+          <button class="duplicate" title="Open the template itself to edit it" onclick="openSavedFlyer(this.closest('.flyer-card').dataset.name)">Edit template</button>
+          <button class="rename" title="Rename template" onclick="renameSavedFlyer(this.closest('.flyer-card').dataset.name)">✎</button>
+          <button class="delete" title="Delete template" onclick="deleteSavedFlyer(this.closest('.flyer-card').dataset.name)">✕</button>
+        </div>
+      </div>`;
+    }).join('');
   }
-  const order = {live:0,scheduled:1,unscheduled:2,past:3};
-  rows.sort((a,b) => (order[a.status] - order[b.status]) || ((b.scheduled_start || b.updated_at) - (a.scheduled_start || a.updated_at)));
-  const labels = {live:'Current',scheduled:'Upcoming',past:'Past',unscheduled:'No dates'};
-  list.innerHTML = rows.map(row => {
-    const start = row.scheduled_start ? new Date(row.scheduled_start) : null;
-    const end = row.scheduled_end ? new Date(row.scheduled_end) : null;
-    const dateOptions = {month:'short',day:'numeric',year:'numeric'};
-    const dates = start
-      ? `${start.toLocaleDateString(undefined,dateOptions)}${end ? ' – ' + end.toLocaleDateString(undefined,dateOptions) : ''}`
-      : 'No effective dates set';
-    return `<div class="flyer-card ${row.status} ${currentName === row.name ? 'is-editing' : ''}" data-name="${escapeHtml(row.name)}">
-      <div class="flyer-card-head"><div class="flyer-card-name" title="${escapeHtml(row.name)}">${escapeHtml(row.name)}</div><span class="flyer-status-pill ${row.status}">${labels[row.status]}</span></div>
-      <div class="flyer-card-dates">${dates}</div>
-      <div class="flyer-card-actions">
-        <button class="open" onclick="openSavedFlyer(this.closest('.flyer-card').dataset.name)">Open</button>
-        <button class="duplicate" onclick="duplicateSavedFlyer(this.closest('.flyer-card').dataset.name)">Duplicate</button>
-        <button class="rename" title="Rename flyer" onclick="renameSavedFlyer(this.closest('.flyer-card').dataset.name)">✎</button>
-        <button class="delete" title="Delete flyer" onclick="deleteSavedFlyer(this.closest('.flyer-card').dataset.name)">✕</button>
-      </div>
-    </div>`;
-  }).join('');
+
+  if(rows.length){
+    const order = {live:0,scheduled:1,unscheduled:2,past:3};
+    rows.sort((a,b) => (order[a.status] - order[b.status]) || ((b.scheduled_start || b.updated_at) - (a.scheduled_start || a.updated_at)));
+    const labels = {live:'Current',scheduled:'Upcoming',past:'Past',unscheduled:'No dates'};
+    if(templates.length) html += `<div class="saved-list-label">Flyers</div>`;
+    html += rows.map(row => {
+      const start = row.scheduled_start ? new Date(row.scheduled_start) : null;
+      const end = row.scheduled_end ? new Date(row.scheduled_end) : null;
+      const dateOptions = {month:'short',day:'numeric',year:'numeric'};
+      const dates = start
+        ? `${start.toLocaleDateString(undefined,dateOptions)}${end ? ' – ' + end.toLocaleDateString(undefined,dateOptions) : ''}`
+        : 'No effective dates set';
+      return `<div class="flyer-card ${row.status} ${currentName === row.name ? 'is-editing' : ''}" data-name="${escapeHtml(row.name)}">
+        <div class="flyer-card-head"><div class="flyer-card-name" title="${escapeHtml(row.name)}">${escapeHtml(row.name)}</div><span class="flyer-status-pill ${row.status}">${labels[row.status]}</span></div>
+        <div class="flyer-card-dates">${dates}</div>
+        <div class="flyer-card-actions">
+          <button class="open" onclick="openSavedFlyer(this.closest('.flyer-card').dataset.name)">Open</button>
+          <button class="duplicate" onclick="duplicateSavedFlyer(this.closest('.flyer-card').dataset.name)">Duplicate</button>
+          <button class="rename" title="Rename flyer" onclick="renameSavedFlyer(this.closest('.flyer-card').dataset.name)">✎</button>
+          <button class="delete" title="Delete flyer" onclick="deleteSavedFlyer(this.closest('.flyer-card').dataset.name)">✕</button>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  list.innerHTML = html || '<div class="saved-flyer-empty">No saved flyers yet.</div>';
+}
+
+async function saveAsTemplate(){
+  if(!validateNoDuplicateFlyerItems(true)) return;
+  const suggested = currentName && !isTemplateName(currentName) ? currentName : 'My Template';
+  const label = prompt('Name this template (e.g. "Christmas", "Weekly Special layout"):', suggested);
+  if(!label) return;
+  const name = TEMPLATE_PREFIX + label.trim();
+  const ok = await saveFlyerAs(name);
+  if(ok) setStatus(`Saved as template "${label}" — use "Use" on it to start a new ad without changing the template.`);
+}
+
+// Loading a template pre-fills the current ad from it but never touches the
+// template itself -- it's treated as unsaved (like a fresh ad) so naming and
+// saving it creates a brand new flyer instead of overwriting the template.
+function buildSeedTemplateState(theme){
+  const cellCount = 26; // classic layout: 2 hero + 8 + 16
+  const cells = Array.from({ length: cellCount }, () => ({
+    img: null, originalImg: null, previousImg: null, name: 'Product Name', nameSize: null,
+    textAlign: 'left', size: 'size / description', price: '1.99', unit: 'lb.', unitCustom: '',
+    foot: 'Plus 10% Added at Checkout.', photoWidth: null, photoHeight: null,
+    previousPhotoWidth: null, previousPhotoHeight: null, removed: false
+  }));
+  const copy = theme === 'christmas'
+    ? { line1: 'MERRY CHRISTMAS!', line2: 'Holiday savings all season long', wow1: 'HOLIDAY FAVORITES', wow2: 'STOCK UP FOR THE SEASON!', overlay: 'Happy Holidays!' }
+    : { line1: 'HAPPY THANKSGIVING!', line2: 'Everything for your holiday table', wow1: 'TURKEY DAY DEALS', wow2: "DON'T MISS OUT!", overlay: 'Give Thanks & Save!' };
+  return {
+    header: {
+      logoImage: null, logoOriginalImage: null, logoPreviousImage: null,
+      logoWidth: null, logoHeight: null, logoPreviousWidth: null, logoPreviousHeight: null,
+      layoutId: 'classic',
+      store: ['Your Store Name', '123 Main St', 'City, ST', '555-555-5555'],
+      storeAlign: 'left',
+      line1: copy.line1, line2: copy.line2, wow1: copy.wow1, wow2: copy.wow2,
+      footStart: '[START DATE]', footEnd: '[END DATE]',
+      weekPickerValue: null, startTime: '07:00', multiWeek: false, endDateValue: null,
+      sectionLabels: [], sectionCounts: [2, 8, 16]
+    },
+    cells,
+    scheduling: { start: null, end: null },
+    overlays: [
+      { type: 'text', x: 500, y: 40, width: 260, height: 90, rotation: -8, content: copy.overlay, fontSize: 30 }
+    ]
+  };
+}
+
+// Ships two starter templates (Christmas/Thanksgiving) so there's something to
+// work from out of the box -- only seeds them once; if a store deletes or
+// renames them, this won't recreate them (checks by exact name first).
+async function seedDefaultTemplatesIfMissing(){
+  const res = await fetch('/api/flyers');
+  if(!res.ok) return;
+  const rows = await res.json();
+  const names = new Set(rows.map(r => r.name));
+  const seeds = [
+    { key: 'christmas', name: TEMPLATE_PREFIX + 'Christmas' },
+    { key: 'thanksgiving', name: TEMPLATE_PREFIX + 'Thanksgiving' }
+  ];
+  for(const seed of seeds){
+    if(names.has(seed.name)) continue;
+    await fetch('/api/flyers/' + encodeURIComponent(seed.name), {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(buildSeedTemplateState(seed.key))
+    });
+  }
+}
+
+async function useTemplate(name){
+  if(flyerDirty && !confirm('You still have unsaved changes. Start a new ad from this template and discard them?')) return;
+  const res = await fetch('/api/flyers/' + encodeURIComponent(name));
+  if(!res.ok){ alert('Could not load that template.'); return; }
+  const state = await res.json();
+  applyState(state);
+  setCurrentName(null);
+  markFlyerDirty();
+  setStatus('Started a new ad from this template — name it to save your own copy.');
 }
 
 function setStatus(msg){
@@ -4321,6 +4430,7 @@ async function boot(){
   initAutoSaveTracking();
   resetFlyerDirtyState();
   setTimeout(() => checkForUpdates(false), 1200);
+  seedDefaultTemplatesIfMissing().then(refreshSavedList);
 }
 
 checkSession();
