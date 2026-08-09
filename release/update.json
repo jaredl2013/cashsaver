@@ -1,7 +1,7 @@
 {
-  "version": "1.0.15",
-  "downloadUrl": "https://github.com/jaredl2013/cashsaver/releases/download/v1.0.15/CashSaver-Ad-Builder-Setup-1.0.15.exe",
-  "sha256": "ee080abc174ce1ed91024335887cf657664f7ab02da71be65b6acba807f0833e",
-  "releaseNotes": "Redesigned the per-item popup menu: separate Upload and Search photo buttons, clicking an existing photo now opens the crop editor directly (no more separate crop button), text size is just a number box, and 'Remove Item' replaces 'x delete'. Also removed the small save-status text under the Save button.",
-  "publishedAt": "2026-08-09T15:24:09.0101923Z"
+  "version": "1.0.16",
+  "downloadUrl": "https://github.com/jaredl2013/cashsaver/releases/download/v1.0.16/CashSaver-Ad-Builder-Setup-1.0.16.exe",
+  "sha256": "f46a177930655b49018be45458c57194102ace1255bfee319367fe2a9564afc1",
+  "releaseNotes": "Big update: sidebar is now a permanent Product Database panel instead of an overflow menu (always visible, no more auto-hiding). Template/layout moved into the top bar's Edit menu; Scheduled Ads/Trash moved into Settings; Quick How-To is now a top-right '?' button. New: reusable templates (Save as template / Use) with two starter templates included (Christmas, Thanksgiving). Overlays can now be rotated and text overlays get a size control. Bigger buttons throughout, and naming an unsaved ad now saves it immediately like Google Docs.",
+  "publishedAt": "2026-08-09T15:57:01.7380955Z"
 }
