@@ -37,8 +37,7 @@
   .topbar-center{
     flex:none; max-width:42%; display:flex; flex-direction:column; align-items:center; gap:4px;
   }
-  .icon-btn{ font-size:19px !important; padding:9px 12px !important; }
-  .topbar-title-row{ display:flex; align-items:center; gap:2px; max-width:100%; }
+  .topbar-title-row{ display:flex; align-items:center; gap:6px; max-width:100%; }
   #topBarFlyerName{
     color:#f3f4f6; font-size:16px; font-weight:700; white-space:nowrap; overflow:hidden;
     text-overflow:ellipsis; cursor:pointer; padding:4px 7px; border-radius:6px;
@@ -48,24 +47,25 @@
     color:#f3f4f6; font-size:16px; font-weight:700; background:#111827; border:1px solid var(--red);
     border-radius:6px; padding:3px 7px; width:180px;
   }
-  .topbar-caret{ padding:6px 8px !important; font-size:12px !important; color:#9ca3af !important; }
-  .topbar-goeslive-btn{ font-size:12.5px !important; padding:5px 11px !important; color:#9ca3af !important; }
+  .topbar-title-row .save-state{ font-size:11px; color:#9ca3af; font-weight:700; white-space:nowrap; }
+  .topbar-title-row .save-state.dirty{ color:#fbbf24; }
+  .topbar-title-row .save-state.saving{ color:#93c5fd; }
+  .topbar-title-row .save-state.saved{ color:#86efac; }
+  .topbar-title-row .save-state.error{ color:#fca5a5; }
+  .topbar-caret{ padding:6px 8px !important; height:auto !important; font-size:12px !important; color:#9ca3af !important; }
+  .topbar-goeslive-btn{ font-size:12.5px !important; padding:5px 11px !important; height:auto !important; color:#9ca3af !important; }
   #topBar button, #topBar select{
     border:1px solid rgba(255,255,255,.14); border-radius:8px; background:transparent; color:#e5e7eb;
-    font-size:14.5px; font-weight:600; padding:10px 15px; cursor:pointer; white-space:nowrap;
+    font-size:14.5px; font-weight:600; padding:0 15px; height:40px; cursor:pointer; white-space:nowrap;
+    display:inline-flex; align-items:center; justify-content:center;
   }
   #topBar button:hover{ background:rgba(255,255,255,.08); border-color:rgba(255,255,255,.26); }
   #topBar button:disabled{ opacity:.35; cursor:default; }
   #topBar button:disabled:hover{ background:transparent; border-color:rgba(255,255,255,.14); }
   #topBar button.primary{ background:var(--red); border-color:transparent; color:#fff; }
   #topBar button.primary:hover{ background:var(--red-dark); }
-  #topBar select{ appearance:auto; color-scheme:dark; }
-  .topbar-save-wrap{ display:flex; flex-direction:column; align-items:flex-end; gap:2px; }
-  .topbar-save-wrap .save-state{ font-size:11.5px; color:#9ca3af; font-weight:700; }
-  .topbar-save-wrap .save-state.dirty{ color:#fbbf24; }
-  .topbar-save-wrap .save-state.saving{ color:#93c5fd; }
-  .topbar-save-wrap .save-state.saved{ color:#86efac; }
-  .topbar-save-wrap .save-state.error{ color:#fca5a5; }
+  #topBar select{ appearance:auto; color-scheme:dark; height:40px; }
+  .icon-btn{ font-size:19px !important; padding:0 12px !important; width:40px; }
 
   .topbar-menu-wrap{ position:relative; }
   .topbar-menu{
@@ -558,9 +558,10 @@
      name-size, delete) grouped into one cluster that reveals together on hover,
      instead of being scattered around the cell's corners. */
   .cell-hover-menu{
-    position:absolute; top:2px; left:100%; margin-left:6px; z-index:9; width:max-content;
-    display:flex; flex-direction:column; align-items:stretch; gap:5px;
-    background:#fff; border:none; border-radius:10px; padding:8px;
+    position:absolute; bottom:calc(100% + 6px); left:50%; transform:translateX(-50%);
+    z-index:9; width:max-content;
+    display:flex; align-items:stretch; gap:5px;
+    background:#fff; border:none; border-radius:10px; padding:6px;
     box-shadow:0 4px 18px rgba(0,0,0,.22);
     opacity:0; pointer-events:none; transition:opacity .15s;
   }
@@ -568,7 +569,8 @@
   .cell:hover .cell-hover-menu, .cell-hover-menu:focus-within{ opacity:1; pointer-events:auto; }
   .cell-hover-menu button{
     border:1px solid #ddd; border-radius:6px; background:#fafafa; color:#333;
-    font-size:12px; font-weight:800; padding:7px 11px; height:30px; line-height:1;
+    font-size:14px; font-weight:800; width:32px; height:32px; line-height:1;
+    display:flex; align-items:center; justify-content:center;
     cursor:pointer; white-space:nowrap;
   }
   .cell-hover-menu button:hover{ border-color:var(--red); color:var(--red); background:#fff; }
@@ -587,7 +589,7 @@
   .add-box-tile:hover{ border-color:var(--red); color:var(--red); background:#fff5f4; }
   .render-clean .add-box-tile{ display:none !important; }
   .name-size-input{
-    width:44px; height:30px; padding:0 2px; border:1px solid #ddd; border-radius:6px;
+    width:40px; height:32px; padding:0 2px; border:1px solid #ddd; border-radius:6px;
     font-size:12px; font-weight:800; color:#333; text-align:center; -moz-appearance:textfield;
   }
   .name-size-input::-webkit-inner-spin-button, .name-size-input::-webkit-outer-spin-button{ margin:0; }
@@ -897,7 +899,6 @@
     <div id="drawerBackdrop" onclick="toggleDrawer()"></div>
     <div id="toolsDrawer">
       <div class="drawer-header">
-        <button class="drawer-rail-toggle" onclick="toggleDrawerRail()" title="Hide database panel" id="drawerRailToggle">«</button>
         <div class="drawer-brand">
           <div class="drawer-brand-mark">%</div>
           <div><h1>Weekly Ad Builder</h1><p>Product database</p></div>
@@ -954,6 +955,7 @@
 
     <div id="topBar">
       <div class="topbar-left">
+        <button class="drawer-rail-toggle" onclick="toggleDrawerRail()" title="Hide database panel" id="drawerRailToggle">«</button>
         <button class="icon-btn" onclick="openAdminSettings()" title="Settings">⚙</button>
         <button id="topUndoBtn" onclick="undoLastMove()" title="Undo last move" disabled>↶</button>
         <button id="topRedoBtn" onclick="redoLastMove()" title="Redo last move" disabled>↷</button>
@@ -961,6 +963,7 @@
       <div class="topbar-center">
         <div class="topbar-title-row">
           <span id="topBarFlyerName" title="Click to rename" onclick="startTitleEdit(this)">(unsaved)</span>
+          <span class="save-state" id="saveState" title="Save status"></span>
           <div class="topbar-menu-wrap">
             <button class="topbar-caret" onclick="toggleTopbarMenu('savedFlyerMenu')" title="Switch flyer">▾</button>
             <div class="topbar-menu topbar-menu-center" id="savedFlyerMenu">
@@ -1015,10 +1018,7 @@
           </div>
         </div>
         <button class="icon-btn" onclick="window.open('/how-to.html','_blank','noopener')" title="Quick how-to guide">❓</button>
-        <div class="topbar-save-wrap">
-          <button class="primary" onclick="saveFlyer()" title="Save">💾 Save</button>
-          <span class="save-state" id="saveState" title="Save status"></span>
-        </div>
+        <button class="primary" onclick="saveFlyer()" title="Save">💾 Save</button>
       </div>
     </div>
     <div id="statusMsg" class="status-toast"></div>
@@ -1389,25 +1389,20 @@ async function recheckLicense(){
 /* ================= CELL BUILDING ================= */
 function makeCell(isHero){
   const cell = document.createElement('div');
-  cell.className = isHero ? 'cell hero' : 'cell';
+  // Centered is the only option now (no more manual left/center toggle in the
+  // hover menu) -- new boxes default to it; boxes restored from older saved
+  // data still respect whatever alignment they were actually saved with.
+  cell.className = (isHero ? 'cell hero' : 'cell') + ' text-centered';
   const unitOptionsHtml = UNIT_OPTIONS.map(u => `<option value="${u}">${u === 'other' ? 'Other…' : u}</option>`).join('');
   cell.innerHTML = `
     <span class="drag-handle" draggable="true" title="Drag to reorder">⠿</span>
     <span class="db-badge" title="Filled from Product Database">DB</span>
     <div class="cell-hover-menu" onmouseenter="syncNameSizeInput(this)">
       <div class="hover-menu-row">
-        <button type="button" class="upload-btn" title="Upload a photo from this computer" onclick="event.preventDefault(); event.stopPropagation(); triggerPhotoUpload(this)">⬆ Upload</button>
-        <button type="button" class="search-btn" title="Search free stock photos" onclick="event.preventDefault(); event.stopPropagation(); openPhotoSearch(this)">🔍 Search</button>
-        <button type="button" class="replace-item-btn" title="Replace this ad with a different product from the catalog" onclick="openReplaceProduct(this)">↔ Replace</button>
-      </div>
-      <div class="hover-menu-row">
+        <button type="button" class="replace-item-btn" title="Replace with a different product" onclick="openReplaceProduct(this)">↔</button>
         <input type="number" class="name-size-input" min="8" max="32" title="Product name text size (px)" onclick="event.stopPropagation()" onchange="setProductNameSize(this)">
-        <button type="button" class="name-size-btn" title="Automatically fit the product name" onclick="resetProductNameSize(this)">Auto</button>
-        <button type="button" class="text-align-btn" title="Center the product name and description" onclick="toggleProductTextAlignment(this)">Center</button>
-      </div>
-      <div class="hover-menu-row">
-        <button type="button" class="remove-item-btn" title="Clear this box's contents but keep the empty box" onclick="clearFlyerCell(this)">Remove Item</button>
-        <button type="button" class="remove-box-btn" title="Remove this box from the row entirely" onclick="removeBoxFromGrid(this)">🗑 remove box</button>
+        <button type="button" class="remove-item-btn" title="Clear this box's contents but keep the empty box" onclick="clearFlyerCell(this)">✕</button>
+        <button type="button" class="remove-box-btn" title="Remove this box from the row entirely" onclick="removeBoxFromGrid(this)">🗑</button>
       </div>
     </div>
     <div class="cell-top">
@@ -2430,26 +2425,6 @@ function setProductNameSize(input){
   nameEl.dataset.manualSize = String(size);
   nameEl.style.fontSize = `${size}px`;
   scheduleRowAlign();
-  markFlyerDirty();
-}
-
-function resetProductNameSize(button){
-  const cell = button.closest('.cell');
-  const nameEl = cell.querySelector('.pname');
-  delete nameEl.dataset.manualSize;
-  nameEl.style.fontSize = '';
-  autoFitProductName(nameEl);
-  const input = cell.querySelector('.name-size-input');
-  if(input) input.value = Math.round(parseFloat(getComputedStyle(nameEl).fontSize) || 14);
-  scheduleRowAlign();
-  markFlyerDirty();
-}
-
-function toggleProductTextAlignment(button){
-  const cell = button.closest('.cell');
-  const centered = cell.classList.toggle('text-centered');
-  button.textContent = centered ? 'Left' : 'Center';
-  button.title = centered ? 'Align the product name and description left' : 'Center the product name and description';
   markFlyerDirty();
 }
 
@@ -3997,11 +3972,20 @@ function applyState(state){
   document.querySelectorAll('.wow-banner div')[1].innerHTML = state.header.wow2;
   document.getElementById('footStart').textContent = state.header.footStart ?? '[START DATE]';
   document.getElementById('footEnd').textContent = state.header.footEnd ?? '[END DATE]';
-  if(state.header.weekPickerValue) document.getElementById('weekPicker').value = state.header.weekPickerValue;
-  document.getElementById('startTime').value = state.header.startTime || '07:00';
-  document.getElementById('multiWeekToggle').checked = !!state.header.multiWeek;
-  document.getElementById('endDateWrap').style.display = state.header.multiWeek ? 'flex' : 'none';
-  if(state.header.endDateValue) document.getElementById('endDatePicker').value = state.header.endDateValue;
+  // Always resolve every date field from this flyer's own data (falling back to the
+  // usual "next Wednesday" default when it has none) rather than only overwriting
+  // fields that happen to be present -- otherwise switching from a flyer that had
+  // dates to one that doesn't leaves the previous flyer's dates showing.
+  if(state.header.weekPickerValue){
+    document.getElementById('weekPicker').value = state.header.weekPickerValue;
+    document.getElementById('startTime').value = state.header.startTime || '07:00';
+    document.getElementById('multiWeekToggle').checked = !!state.header.multiWeek;
+    document.getElementById('endDateWrap').style.display = state.header.multiWeek ? 'flex' : 'none';
+    document.getElementById('endDatePicker').value = state.header.endDateValue || '';
+  } else {
+    initWeekPicker();
+  }
+  applyWeek(); // refreshes the "Set dates" summary button and footer dates to match the fields above
 
   // rebuild the grid structure to match this flyer's saved layout, then fill in
   // each cell's content as it's created — handles flyers saved under a different
