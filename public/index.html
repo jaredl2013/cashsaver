@@ -776,31 +776,82 @@
   .preview-viewport{ height:calc(94vh - 112px); overflow:auto; padding:18px; }
   .preview-stage{ position:relative; margin:0 auto; }
   .preview-page{ position:absolute; top:0; left:0; margin:0; transform-origin:top left; box-shadow:0 8px 30px rgba(0,0,0,.38); }
-  .db-row{ display:flex; align-items:center; flex-wrap:wrap; gap:12px; padding:12px 0; border-bottom:1px solid #f0f0f0; }
+  .db-row{
+    display:grid; grid-template-columns:46px minmax(110px,1fr) 34px 60px 54px 28px 28px; gap:5px 6px;
+    align-items:center; padding:10px 0; border-bottom:1px solid #f0f0f0; min-width:370px;
+  }
+  #dbList{ overflow-x:auto; }
   .db-row .price-history-toggle{
-    flex-basis:100%; text-align:left; margin-top:-4px; padding:2px 0 2px 54px;
+    grid-column:1/-1; text-align:left; margin-top:-2px; padding:2px 0 2px 60px;
     background:none; border:none; color:#9ca3af; font-size:10px; font-weight:700; cursor:pointer;
   }
   .db-row .price-history-toggle:hover{ color:#666; }
   .price-history-panel{
-    flex-basis:100%; max-height:0; overflow:hidden; margin-left:54px;
+    grid-column:1/-1; max-height:0; overflow:hidden; margin-left:60px;
     background:#f4f4f5; border-radius:6px; transition:max-height .22s ease;
   }
   .price-history-panel.open{ max-height:220px; overflow-y:auto; }
   .price-history-panel-inner{ padding:8px 10px; display:flex; flex-direction:column; gap:4px; }
   .price-history-row{ display:flex; justify-content:space-between; gap:10px; font-size:11px; color:#555; }
   .price-history-empty{ font-size:11px; color:#999; padding:8px 10px; }
-  .db-row img{ width:56px; height:56px; object-fit:cover; border-radius:6px; border:1px solid #ddd; background:#eee; }
-  .db-row .db-noimg{ width:56px; height:56px; border-radius:6px; border:1px dashed #ccc; background:#f5f5f5; }
-  .db-row .db-name{ font-weight:bold; font-size:15px; flex:1; }
-  .db-row .db-price{ font-size:15px; color:var(--red); font-weight:bold; width:100px; }
-  .db-row .db-updated{ font-size:11.5px; color:#888; width:110px; }
-  .db-row button{ background:#8a1410; color:#fff; border:none; border-radius:6px; padding:7px 12px; font-size:13px; cursor:pointer; }
+  .db-row-photo-wrap{ position:relative; width:52px; height:52px; flex:none; }
+  .db-row-photo{
+    width:52px; height:52px; border-radius:6px; border:1px solid #ddd; background:#eee no-repeat center;
+    background-size:cover; cursor:pointer; display:flex; align-items:center; justify-content:center;
+    color:#999; font-size:9px; text-align:center; overflow:hidden;
+  }
+  .db-row-photo.has-img{ border-style:solid; color:transparent; }
+  .db-row-photo input{ position:absolute; width:1px; height:1px; opacity:0; }
+  button.db-row-photo-find{
+    position:absolute; bottom:-4px; right:-4px; width:22px; height:22px; min-width:0; padding:0;
+    border-radius:50%; border:1px solid rgba(0,0,0,.2); background:#333; color:#fff; font-size:11px;
+    display:flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 2px 5px rgba(0,0,0,.2);
+  }
+  button.db-row-photo-find:hover{ background:var(--red); }
+  .db-row-fields{ display:flex; flex-direction:column; gap:2px; min-width:0; }
+  .db-row-fields input{
+    border:1px solid transparent; background:transparent; padding:2px 4px; border-radius:4px; width:100%; min-width:0;
+  }
+  .db-row-fields input:hover{ border-color:#ddd; background:#fafafa; }
+  .db-row-fields input:focus{ border-color:var(--red); background:#fff; outline:none; }
+  .db-row-name{ font-weight:bold; font-size:14px; }
+  .db-row-desc{ font-size:11.5px; color:#666; }
+  .db-row-category{ font-size:10.5px; color:#a56a00; }
+  /* tag-qualified (button.___ / select.___) to match the specificity of the
+     generic .drawer-section button/select rules (which would otherwise blow
+     these up into full-width red pills / dark selects) and win on source order */
+  select.db-row-size{
+    width:38px; height:30px; min-width:0; border-radius:6px; border:1px solid #ccc; background:#fff; color:#333;
+    font-weight:900; font-size:12px; padding:2px; cursor:pointer; color-scheme:light;
+  }
+  select.db-row-size:hover{ border-color:var(--red); color:var(--red); }
+  .db-row-price-wrap{ display:flex; align-items:center; gap:1px; min-width:0; }
+  .db-row-price-wrap span{ color:var(--red); font-weight:bold; font-size:13px; }
+  .db-row-price{
+    width:100%; min-width:0; border:1px solid transparent; background:transparent; font-weight:bold;
+    color:var(--red); font-size:13px; padding:2px; border-radius:4px;
+  }
+  .db-row-price:hover{ border-color:#ddd; background:#fafafa; }
+  .db-row-price:focus{ border-color:var(--red); background:#fff; outline:none; }
+  .db-row-unit-wrap{ display:flex; flex-direction:column; gap:2px; min-width:0; }
+  select.db-row-unit{
+    font-size:10.5px; border:1px solid #ddd; border-radius:4px; padding:3px; width:100%; min-width:0;
+    background:#fff; color:#222; color-scheme:light;
+  }
+  .db-row-custom-unit{ font-size:10px; border:1px solid #ddd; border-radius:4px; padding:3px; width:100%; min-width:0; }
+  .db-row-actions{ display:flex; flex-direction:column; gap:4px; }
+  button.db-row-add, button.db-row-delete{
+    width:32px; height:26px; min-width:0; border:none; border-radius:5px; padding:0; cursor:pointer; font-weight:900; font-size:14px;
+  }
+  button.db-row-add{ background:#287a3d; color:#fff; }
+  button.db-row-add:hover{ background:#1f6631; }
+  button.db-row-delete{ background:#8a1410; color:#fff; }
+  button.db-row-delete:hover{ background:#6f100c; }
   .catalog-modal{ width:940px; }
   .db-editor{ margin:8px 0 14px; padding:14px; border:1px solid #e4e4e4; border-radius:10px; background:#fafafa; }
   .db-editor-head{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px; }
   .db-editor-head strong{ font-size:13px; }
-  .db-editor-grid{ display:grid; grid-template-columns:1.8fr 1.8fr .7fr .85fr 1fr; gap:8px; align-items:end; }
+  .db-editor-grid{ display:grid; grid-template-columns:1.6fr 1.6fr 1.2fr .7fr .85fr 1fr; gap:8px; align-items:end; }
   .db-field{ display:flex; flex-direction:column; gap:4px; min-width:0; }
   .db-field label{ font-size:10px; color:#666; font-weight:bold; text-transform:uppercase; letter-spacing:.05em; }
   .db-field input, .db-field select{ min-width:0; width:100%; border:1px solid #bbb; border-radius:6px; padding:8px; font-size:12px; background:#fff; }
@@ -1317,9 +1368,11 @@
           <div class="db-editor-grid">
             <div class="db-field"><label>Product name</label><input id="dbProductName" required placeholder="e.g. Boneless Ribeye Steaks"></div>
             <div class="db-field"><label>Size / description</label><input id="dbProductDescription" placeholder="e.g. USDA Choice, family pack"></div>
+            <div class="db-field"><label>Category</label><input id="dbProductCategory" list="dbCategoryList" placeholder="e.g. Fresh Produce"></div>
             <div class="db-field"><label>Price</label><input id="dbProductPrice" required inputmode="decimal" placeholder="9.99"></div>
             <div class="db-field"><label>Unit</label><select id="dbProductUnit" onchange="toggleDbCustomUnit()"></select></div>
             <div class="db-field" id="dbCustomUnitField" style="display:none;"><label>Custom unit</label><input id="dbProductUnitCustom" placeholder="2 for"></div>
+            <datalist id="dbCategoryList"></datalist>
           </div>
           <div class="db-editor-lower">
             <div class="db-photo-editor">
@@ -2888,7 +2941,6 @@ function onNameBlur(div){
   }, 150);
 }
 
-let editingDbKey = null;
 let replaceTargetCell = null;
 
 function escapeHtml(value){
@@ -2964,7 +3016,6 @@ function openProductDB(targetCell = null){
   search.value = '';
   search.scrollIntoView({ block: 'start', behavior: 'smooth' });
   search.focus();
-  editingDbKey = null;
   const unitSelect = document.getElementById('dbProductUnit');
   if(!unitSelect.options.length){
     unitSelect.innerHTML = UNIT_OPTIONS.map(u => `<option value="${u}">${u === 'other' ? 'Other…' : u}</option>`).join('');
@@ -3037,9 +3088,9 @@ function uploadDbPhoto(input){
 }
 
 function resetDbEditor(clearStatus = true){
-  document.getElementById('dbEditorTitle').textContent = 'Add a product';
   document.getElementById('dbProductName').value = '';
   document.getElementById('dbProductDescription').value = '';
+  document.getElementById('dbProductCategory').value = '';
   document.getElementById('dbProductPrice').value = '';
   document.getElementById('dbProductUnit').value = 'lb.';
   document.getElementById('dbProductUnitCustom').value = '';
@@ -3050,7 +3101,6 @@ function resetDbEditor(clearStatus = true){
 }
 
 function openProductEditorModal(){
-  editingDbKey = null;
   resetDbEditor();
   document.getElementById('productEditorModal').classList.add('open');
   document.getElementById('dbProductName').focus();
@@ -3058,12 +3108,11 @@ function openProductEditorModal(){
 
 function closeProductEditorModal(){
   document.getElementById('productEditorModal').classList.remove('open');
-  editingDbKey = null;
 }
 
-// Shared by both "+ Add product" and each row's "Edit" -- editingDbKey (null vs
-// a product key) is what decides whether this POSTs a new product or PUTs an
-// update to an existing one.
+// Existing products are edited inline in the list now (each field saves on its
+// own) -- this modal is only for adding brand new ones. It stays open after
+// saving since adding several products in a row shouldn't require reopening it.
 async function submitDbProductModal(event){
   event.preventDefault();
   const name = document.getElementById('dbProductName').value.trim();
@@ -3078,6 +3127,7 @@ async function submitDbProductModal(event){
   const payload = {
     displayName:name,
     description:document.getElementById('dbProductDescription').value.trim(),
+    category:document.getElementById('dbProductCategory').value.trim(),
     price:parsedPrice.toFixed(2),
     unit:document.getElementById('dbProductUnit').value,
     unitCustom:document.getElementById('dbProductUnitCustom').value.trim(),
@@ -3085,78 +3135,159 @@ async function submitDbProductModal(event){
     img:document.getElementById('dbProductPhotoPreview').dataset.img || null,
     originalImg:document.getElementById('dbProductPhotoPreview').dataset.originalImg || null
   };
-  const isEdit = !!editingDbKey;
-  const url = isEdit ? '/api/products/' + encodeURIComponent(editingDbKey) : '/api/products';
-  const res = await fetch(url, {method: isEdit ? 'PUT' : 'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)});
+  const res = await fetch('/api/products', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)});
   if(!res.ok){
     status.style.color = '#a32720';
-    status.textContent = `Could not ${isEdit ? 'update' : 'save'} that product.`;
+    status.textContent = 'Could not save that product.';
     return;
   }
-  // stays open instead of closing -- adding several products in a row shouldn't
-  // require reopening the modal every time
-  editingDbKey = null;
   resetDbEditor(false);
   status.style.color = '#287a3d';
-  status.textContent = isEdit ? 'Product updated.' : 'Product added — add another or close when done.';
+  status.textContent = 'Product added — add another or close when done.';
   document.getElementById('dbSearch').value = '';
   document.getElementById('dbProductName').focus();
   renderDbList();
 }
 
-async function editDbProduct(key){
-  const res = await fetch('/api/products/' + encodeURIComponent(key));
-  if(!res.ok) return;
-  const v = await res.json();
-  editingDbKey = key;
-  document.getElementById('dbEditorTitle').textContent = 'Edit product';
-  document.getElementById('dbProductName').value = v.display_name;
-  document.getElementById('dbProductDescription').value = v.description || '';
-  document.getElementById('dbProductPrice').value = v.price;
-  document.getElementById('dbProductUnit').value = v.unit || 'lb.';
-  document.getElementById('dbProductUnitCustom').value = v.unit_custom || '';
-  setDbAdSize(v.ad_size === 'big' ? 'big' : 'small');
-  toggleDbCustomUnit();
-  setDbPhotoPreview(v.img || null, v.original_img || v.img || null);
-  document.getElementById('dbEditorStatus').textContent = '';
-  document.getElementById('productEditorModal').classList.add('open');
-}
-
 async function addDbProductToFlyer(key){
-  const status = document.getElementById('dbEditorStatus');
   const res = await fetch('/api/products/' + encodeURIComponent(key));
   if(!res.ok) return;
   const product = await res.json();
   const existing = findProductOnFlyer(product.display_name, replaceTargetCell);
   if(existing){
-    status.style.color = '#a56a00';
-    status.textContent = `${product.display_name} is already on this flyer — no second copy was added.`;
+    setStatus(`${product.display_name} is already on this flyer — no second copy was added.`);
     highlightExistingFlyerItem(existing);
     return;
   }
   if(replaceTargetCell){
     const oldName = replaceTargetCell.querySelector('.pname').textContent.trim();
     if(!fillCellFromProduct(replaceTargetCell, product, {replace:true})) return;
-    status.style.color = '#287a3d';
-    status.textContent = `${oldName && oldName !== 'Product Name' ? oldName : 'Ad slot'} replaced with ${product.display_name}.`;
-    setStatus(status.textContent);
+    setStatus(`${oldName && oldName !== 'Product Name' ? oldName : 'Ad slot'} replaced with ${product.display_name}.`);
     closeProductDB();
     return;
   }
-  const wantsBig = product.ad_size === 'big';
-  const target = Array.from(document.querySelectorAll('.cell')).find(cell => {
+  const isEmptyCell = cell => {
     const name = cell.querySelector('.pname').textContent.trim();
-    const isEmpty = !name || name === 'Product Name';
-    return isEmpty && cell.classList.contains('hero') === wantsBig;
-  });
+    return !name || name === 'Product Name';
+  };
+
+  // Category-aware placement: a labeled section (e.g. Store Circular's "FRESH
+  // PRODUCE" row) whose label matches this product's category wins over just
+  // grabbing the next open slot anywhere on the flyer.
+  let target = null;
+  let matchedLabelText = null;
+  const category = (product.category || '').trim().toLowerCase();
+  if(category){
+    const matchedLabel = Array.from(document.querySelectorAll('.section-label'))
+      .find(l => l.textContent.trim().toLowerCase() === category);
+    const grid = matchedLabel && matchedLabel.nextElementSibling;
+    if(grid && grid.classList.contains('grid')){
+      target = Array.from(grid.querySelectorAll('.cell')).find(isEmptyCell);
+      if(target) matchedLabelText = matchedLabel.textContent.trim();
+    }
+  }
+
+  const wantsBig = product.ad_size === 'big';
   if(!target){
-    status.style.color = '#a32720';
-    status.textContent = `This flyer has no empty ${wantsBig ? 'big' : 'small'} ad slots.`;
+    target = Array.from(document.querySelectorAll('.cell')).find(cell => isEmptyCell(cell) && cell.classList.contains('hero') === wantsBig);
+  }
+  if(!target){
+    setStatus(`This flyer has no empty ${wantsBig ? 'big' : 'small'} ad slots.`);
     return;
   }
   if(!fillCellFromProduct(target, product)) return;
-  status.style.color = '#287a3d';
-  status.textContent = `${product.display_name} added to the next empty flyer slot.`;
+  setStatus(matchedLabelText
+    ? `${product.display_name} added to the "${matchedLabelText}" row.`
+    : `${product.display_name} added to the next empty flyer slot.`);
+}
+
+/* ================= INLINE PRODUCT ROW EDITING ================= */
+// Every field in a catalog row saves itself (no separate Edit screen) -- this
+// reads the whole row's current values and PUTs them together, since the
+// product endpoint takes the full record rather than a single-field patch.
+async function saveDbRowInline(fieldEl){
+  const row = fieldEl.closest('.db-row');
+  if(!row) return;
+  const oldKey = row.dataset.key;
+  const nameBeforeThisEdit = row.dataset.originalName;
+  const name = row.querySelector('.db-row-name').value.trim();
+  const rawPrice = row.querySelector('.db-row-price').value.trim();
+  const parsedPrice = parseFloat(rawPrice.replace(/[^0-9.]/g,''));
+  if(!name || Number.isNaN(parsedPrice)){
+    setStatus('Enter a product name and a valid price before that saves.');
+    return;
+  }
+  const unit = row.querySelector('.db-row-unit').value;
+  const photo = row.querySelector('.db-row-photo');
+  const payload = {
+    displayName: name,
+    description: row.querySelector('.db-row-desc').value.trim(),
+    category: row.querySelector('.db-row-category').value.trim(),
+    price: parsedPrice.toFixed(2),
+    unit,
+    unitCustom: unit === 'other' ? row.querySelector('.db-row-custom-unit').value.trim() : '',
+    adSize: row.querySelector('.db-row-size').value === 'big' ? 'big' : 'small',
+    img: photo.dataset.img || null,
+    originalImg: photo.dataset.originalImg || null
+  };
+  const res = await fetch('/api/products/' + encodeURIComponent(oldKey), {
+    method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)
+  });
+  if(!res.ok){ setStatus('Could not save that change.'); return; }
+  const updated = await res.json();
+  row.dataset.key = updated.name_key; // the key changes if the name did
+  row.dataset.originalName = updated.display_name;
+  refreshCategoryDatalist();
+  syncProductOntoFlyer(nameBeforeThisEdit, updated);
+}
+
+// A product edited in the database doesn't otherwise touch flyer cells that
+// already used it (each cell stores its own copy of the data at fill-time) --
+// this pushes the update through to any matching cell so the flyer doesn't
+// go stale the moment you tweak a price or swap a photo in the catalog.
+function syncProductOntoFlyer(oldName, product){
+  const wanted = normalizedFlyerName(oldName);
+  if(!wanted || wanted === 'product name') return;
+  const matches = Array.from(document.querySelectorAll('.cell')).filter(cell =>
+    normalizedFlyerName(cell.querySelector('.pname').textContent) === wanted
+  );
+  matches.forEach(cell => fillCellFromProduct(cell, product));
+}
+
+function onDbRowUnitChange(select){
+  const custom = select.closest('.db-row-unit-wrap').querySelector('.db-row-custom-unit');
+  custom.style.display = select.value === 'other' ? 'block' : 'none';
+  saveDbRowInline(select);
+}
+
+function setDbRowPhoto(input){
+  const file = input.files && input.files[0];
+  if(!file) return;
+  const photo = input.closest('.db-row-photo');
+  const reader = new FileReader();
+  reader.onload = e => openCropper(e.target.result, photo, true);
+  reader.readAsDataURL(file);
+  input.value = '';
+}
+
+function openDbRowPhotoSearch(btn){
+  const row = btn.closest('.db-row');
+  activePhotoTarget = row.querySelector('.db-row-photo');
+  document.getElementById('photoModal').classList.add('open');
+  document.getElementById('photoResults').innerHTML = '';
+  document.getElementById('photoSearchInput').value = row.querySelector('.db-row-name').value.trim();
+  updatePhotoSearchStatus();
+}
+
+// Suggests categories already in use, plus the Store Circular layout's default
+// row names, so a typed category is more likely to actually match a section.
+function refreshCategoryDatalist(rows){
+  const list = document.getElementById('dbCategoryList');
+  if(!list) return;
+  const seed = ['Fresh Produce', 'Pantry Savings', 'Dairy & Frozen', 'Snacks & Drinks'];
+  const fromRows = rows ? rows.map(r => r.category).filter(Boolean) : [];
+  const categories = Array.from(new Set([...seed, ...fromRows]));
+  list.innerHTML = categories.map(c => `<option value="${escapeHtml(c)}">`).join('');
 }
 
 async function renderDbList(){
@@ -3170,29 +3301,49 @@ async function renderDbList(){
     list.innerHTML = `<div class="empty-db">No matching products. Add one below or clear the search.</div>`;
     return;
   }
+  const unitOptionsHtml = UNIT_OPTIONS.map(u => `<option value="${u}">${u === 'other' ? 'Other…' : u}</option>`).join('');
   list.innerHTML = rows.map(v => `
-    <div class="db-row">
-      ${v.img ? `<img src="${escapeHtml(v.img)}">` : `<div class="db-noimg"></div>`}
-      <div class="db-name">${escapeHtml(v.display_name)}</div>
-      <div class="db-description" title="${escapeHtml(v.description)}">${escapeHtml(v.description || '—')}</div>
-      <div class="db-price">$${escapeHtml(v.price)} / ${escapeHtml(v.unit === 'other' ? (v.unit_custom||'') : v.unit)}</div>
-      <span class="db-size-badge ${v.ad_size === 'big' ? 'big' : 'small'}">${v.ad_size === 'big' ? 'Big ad' : 'Small ad'}</span>
-      <div class="db-updated">${new Date(v.updated_at).toLocaleDateString()}</div>
+    <div class="db-row" data-key="${escapeHtml(v.name_key)}" data-original-name="${escapeHtml(v.display_name)}">
+      <div class="db-row-photo-wrap">
+        <label class="db-row-photo ${v.img ? 'has-img' : ''}" ${v.img ? `style="background-image:url(${v.img})"` : ''} title="Click to upload a photo">
+          ${v.img ? '' : 'No<br>photo'}
+          <input type="file" accept="image/*" onchange="setDbRowPhoto(this)">
+        </label>
+        <button type="button" class="db-row-photo-find" title="Find a photo" onclick="openDbRowPhotoSearch(this)">🔎</button>
+      </div>
+      <div class="db-row-fields">
+        <input class="db-row-name" value="${escapeHtml(v.display_name)}" placeholder="Product name" onblur="saveDbRowInline(this)" onkeydown="if(event.key==='Enter') this.blur()">
+        <input class="db-row-desc" value="${escapeHtml(v.description || '')}" placeholder="Size / description" onblur="saveDbRowInline(this)" onkeydown="if(event.key==='Enter') this.blur()">
+        <input class="db-row-category" value="${escapeHtml(v.category || '')}" placeholder="Category" list="dbCategoryList" onblur="saveDbRowInline(this)" onkeydown="if(event.key==='Enter') this.blur()">
+      </div>
+      <select class="db-row-size" title="Ad size" onchange="saveDbRowInline(this)">
+        <option value="small" ${v.ad_size === 'big' ? '' : 'selected'}>S</option>
+        <option value="big" ${v.ad_size === 'big' ? 'selected' : ''}>B</option>
+      </select>
+      <div class="db-row-price-wrap"><span>$</span><input class="db-row-price" value="${escapeHtml(v.price)}" inputmode="decimal" onblur="saveDbRowInline(this)" onkeydown="if(event.key==='Enter') this.blur()"></div>
+      <div class="db-row-unit-wrap">
+        <select class="db-row-unit" onchange="onDbRowUnitChange(this)">${unitOptionsHtml}</select>
+        <input class="db-row-custom-unit" placeholder="custom" value="${escapeHtml(v.unit_custom || '')}" style="display:${v.unit === 'other' ? 'block' : 'none'}" onblur="saveDbRowInline(this)" onkeydown="if(event.key==='Enter') this.blur()">
+      </div>
       <div class="db-row-actions">
-        <button class="db-action add" data-key="${escapeHtml(v.name_key)}" onclick="addDbProductToFlyer(this.dataset.key)">${replaceTargetCell ? 'Replace item' : 'Add to flyer'}</button>
-        <button class="db-action edit" data-key="${escapeHtml(v.name_key)}" onclick="editDbProduct(this.dataset.key)">Edit</button>
-        <button class="db-action delete" data-key="${escapeHtml(v.name_key)}" onclick="deleteDbEntry(this.dataset.key)">Delete</button>
+        <button type="button" class="db-row-add" title="${replaceTargetCell ? 'Replace item' : 'Add to flyer'}" onclick="addDbProductToFlyer(this.closest('.db-row').dataset.key)">+</button>
+        <button type="button" class="db-row-delete" title="Delete" onclick="deleteDbEntry(this.closest('.db-row').dataset.key)">✕</button>
       </div>
       <button type="button" class="price-history-toggle" data-key="${escapeHtml(v.name_key)}" onclick="togglePriceHistory(this)">▾ ${v.lastPrice ? `Price history · last ${escapeHtml(v.lastPrice)}/${escapeHtml(v.lastPriceUnit === 'other' ? '' : (v.lastPriceUnit || ''))} — ${new Date(v.lastPriceAt).toLocaleDateString('en-US',{month:'short',day:'numeric'})}` : 'Price history'}</button>
       <div class="price-history-panel"></div>
     </div>
   `).join('');
+  list.querySelectorAll('.db-row-unit').forEach(sel => {
+    const row = sel.closest('.db-row');
+    const product = rows.find(r => r.name_key === row.dataset.key);
+    sel.value = product ? product.unit : 'lb.';
+  });
+  refreshCategoryDatalist(rows);
 }
 
 async function deleteDbEntry(key){
   if(!confirm('Delete this product from the catalog? It\'ll stay in Trash for 7 days if you change your mind.')) return;
   await fetch('/api/products/' + encodeURIComponent(key), { method:'DELETE' });
-  if(editingDbKey === key) editingDbKey = null;
   renderDbList();
 }
 
@@ -3569,6 +3720,7 @@ function finishCrop(dataUrl){
     if(flyerCell) flyerCell.classList.remove('is-cleared');
     updatePhotoActionState(cropTarget);
     if(flyerCell || cropTarget.classList.contains('logo-photo')) markFlyerDirty();
+    if(cropTarget.classList.contains('db-row-photo')) saveDbRowInline(cropTarget);
   }
   closeCropper();
 }

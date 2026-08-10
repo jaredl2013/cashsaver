@@ -77,6 +77,7 @@ if (!productCols.includes('description')) db.exec("ALTER TABLE products ADD COLU
 if (!productCols.includes('ad_size')) db.exec("ALTER TABLE products ADD COLUMN ad_size TEXT DEFAULT 'small'");
 if (!productCols.includes('original_img')) db.exec('ALTER TABLE products ADD COLUMN original_img TEXT');
 if (!productCols.includes('deleted_at')) db.exec('ALTER TABLE products ADD COLUMN deleted_at INTEGER');
+if (!productCols.includes('category')) db.exec("ALTER TABLE products ADD COLUMN category TEXT DEFAULT ''");
 
 // sensible defaults if not already set
 const seed = db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)');

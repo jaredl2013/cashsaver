@@ -427,6 +427,7 @@ function normalizeProduct(body) {
     key: displayName.toLowerCase().replace(/\s+/g, ' '),
     displayName,
     description: String(body.description || '').trim(),
+    category: String(body.category || '').trim(),
     adSize: body.adSize === 'big' ? 'big' : 'small',
     price,
     unit,
@@ -458,11 +459,12 @@ function withLastPrice(row) {
 }
 
 const saveCatalogProduct = db.prepare(`
-  INSERT INTO products (name_key, display_name, description, ad_size, img, original_img, price, unit, unit_custom, updated_at)
-  VALUES (@key, @displayName, @description, @adSize, @img, @originalImg, @price, @unit, @unitCustom, @updatedAt)
+  INSERT INTO products (name_key, display_name, description, category, ad_size, img, original_img, price, unit, unit_custom, updated_at)
+  VALUES (@key, @displayName, @description, @category, @adSize, @img, @originalImg, @price, @unit, @unitCustom, @updatedAt)
   ON CONFLICT(name_key) DO UPDATE SET
     display_name = excluded.display_name,
     description = excluded.description,
+    category = excluded.category,
     ad_size = excluded.ad_size,
     img = COALESCE(excluded.img, products.img),
     original_img = COALESCE(excluded.original_img, products.original_img),
@@ -662,9 +664,9 @@ app.post('/api/restore', requireAuth, (req, res) => {
     for (const v of flyers) insertFlyer.run(v.name, v.data, Number(v.updated_at) || Date.now(), v.scheduled_start ?? null, v.scheduled_end ?? null, Number(v.notified) || 0, v.rendered_image ?? null, Number(v.broadcast_sent) || 0, v.deleted_at ?? null);
 
     const insertProduct = db.prepare(`INSERT INTO products
-      (name_key, display_name, img, price, unit, unit_custom, updated_at, description, ad_size, original_img, deleted_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
-    for (const v of products) insertProduct.run(v.name_key, v.display_name, v.img ?? null, String(v.price ?? ''), v.unit || 'lb.', v.unit_custom || '', Number(v.updated_at) || Date.now(), v.description || '', v.ad_size === 'big' ? 'big' : 'small', v.original_img ?? null, v.deleted_at ?? null);
+      (name_key, display_name, img, price, unit, unit_custom, updated_at, description, ad_size, original_img, deleted_at, category)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+    for (const v of products) insertProduct.run(v.name_key, v.display_name, v.img ?? null, String(v.price ?? ''), v.unit || 'lb.', v.unit_custom || '', Number(v.updated_at) || Date.now(), v.description || '', v.ad_size === 'big' ? 'big' : 'small', v.original_img ?? null, v.deleted_at ?? null, v.category || '');
 
     const insertSetting = db.prepare('INSERT INTO settings (key, value) VALUES (?, ?)');
     for (const v of settings) insertSetting.run(v.key, v.value == null ? null : String(v.value));
