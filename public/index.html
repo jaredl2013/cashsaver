@@ -596,8 +596,8 @@
      name-size, delete) grouped into one cluster that reveals together on hover,
      instead of being scattered around the cell's corners. */
   .cell-hover-menu{
-    position:absolute; bottom:calc(100% + 6px); left:50%; transform:translateX(-50%);
-    z-index:9; width:max-content;
+    position:absolute; bottom:calc(100% + 2px); left:50%; transform:translateX(-50%);
+    z-index:55; width:max-content;
     display:flex; align-items:stretch; gap:5px;
     background:#fff; border:none; border-radius:10px; padding:6px;
     box-shadow:0 4px 18px rgba(0,0,0,.22);
@@ -667,7 +667,7 @@
 
   /* Free-floating overlays (text or image) -- positioned/sized independent of the
      grid, so they can sit on top of anything, e.g. a "SALE!" burst over a corner. */
-  .overlay-box{ position:absolute; z-index:40; box-sizing:border-box; }
+  .overlay-box{ position:absolute; z-index:56; box-sizing:border-box; }
   .overlay-box.dragging{ opacity:.85; }
   .overlay-box .overlay-drag-handle{
     position:absolute; top:-11px; left:-11px; width:20px; height:20px; border-radius:50%;
@@ -4702,7 +4702,12 @@ function initAutoSaveTracking(){
 // element -- plain CSS :hover loses the cell right then and the menu vanishes
 // before it can be clicked. This gives a short grace period: closing is
 // delayed, and re-entering the cell or the menu within that window cancels it.
-let hoverMenuCloseTimer = null;
+// Each cell tracks its own close timer (not one shared timer) -- a popup can
+// visually overlap the cell above it, and briefly grazing that cell while
+// travelling toward the real target used to force-close the target's popup
+// instantly. Now every cell's open/close is independent, so a stray graze
+// doesn't steal focus from the popup you're actually trying to reach.
+const hoverMenuCloseTimers = new Map();
 function initHoverMenuBridging(){
   const page = document.getElementById('page');
   page.addEventListener('mouseover', e => {
@@ -4710,20 +4715,23 @@ function initHoverMenuBridging(){
     if(!cell) return;
     const menu = cell.querySelector('.cell-hover-menu');
     if(!menu) return;
-    clearTimeout(hoverMenuCloseTimer);
-    document.querySelectorAll('.cell-hover-menu.open').forEach(m => { if(m !== menu) m.classList.remove('open'); });
+    const pending = hoverMenuCloseTimers.get(cell);
+    if(pending){ clearTimeout(pending); hoverMenuCloseTimers.delete(cell); }
     menu.classList.add('open');
   });
   page.addEventListener('mouseout', e => {
     const cell = e.target.closest('.cell');
     if(!cell) return;
+    const menu = cell.querySelector('.cell-hover-menu');
+    if(!menu) return;
     const toCell = e.relatedTarget && e.relatedTarget.closest ? e.relatedTarget.closest('.cell') : null;
     if(toCell === cell) return; // still within the same cell (or its popup) -- not actually leaving
-    clearTimeout(hoverMenuCloseTimer);
-    hoverMenuCloseTimer = setTimeout(() => {
-      const menu = cell.querySelector('.cell-hover-menu');
-      if(menu && !menu.matches(':focus-within')) menu.classList.remove('open');
-    }, 350);
+    const existing = hoverMenuCloseTimers.get(cell);
+    if(existing) clearTimeout(existing);
+    hoverMenuCloseTimers.set(cell, setTimeout(() => {
+      if(!menu.matches(':focus-within')) menu.classList.remove('open');
+      hoverMenuCloseTimers.delete(cell);
+    }, 350));
   });
 }
 
@@ -4731,14 +4739,17 @@ function initHoverMenuBridging(){
 // rotate handles and font-size controls sit at various offsets outside the box
 // itself, so reaching the farther ones (bottom handles, font controls) crosses
 // real dead space and plain CSS :hover drops the box before you can click.
-let overlayControlsCloseTimer = null;
+// Each overlay tracks its own close timer independently, same reasoning as
+// hoverMenuCloseTimers above -- a stray graze over a nearby overlay shouldn't
+// force-close the one you're actually trying to reach.
+const overlayControlsCloseTimers = new Map();
 function initOverlayHoverBridging(){
   const page = document.getElementById('page');
   page.addEventListener('mouseover', e => {
     const box = e.target.closest('.overlay-box');
     if(!box) return;
-    clearTimeout(overlayControlsCloseTimer);
-    document.querySelectorAll('.overlay-box.controls-open').forEach(b => { if(b !== box) b.classList.remove('controls-open'); });
+    const pending = overlayControlsCloseTimers.get(box);
+    if(pending){ clearTimeout(pending); overlayControlsCloseTimers.delete(box); }
     box.classList.add('controls-open');
   });
   page.addEventListener('mouseout', e => {
@@ -4746,10 +4757,12 @@ function initOverlayHoverBridging(){
     if(!box) return;
     const toBox = e.relatedTarget && e.relatedTarget.closest ? e.relatedTarget.closest('.overlay-box') : null;
     if(toBox === box) return; // still within the same overlay (or its controls) -- not actually leaving
-    clearTimeout(overlayControlsCloseTimer);
-    overlayControlsCloseTimer = setTimeout(() => {
+    const existing = overlayControlsCloseTimers.get(box);
+    if(existing) clearTimeout(existing);
+    overlayControlsCloseTimers.set(box, setTimeout(() => {
       if(!box.matches(':focus-within')) box.classList.remove('controls-open');
-    }, 350);
+      overlayControlsCloseTimers.delete(box);
+    }, 350));
   });
 }
 
