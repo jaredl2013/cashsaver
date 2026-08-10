@@ -586,7 +586,8 @@ function buildBackupObject() {
       flyers: db.prepare('SELECT * FROM flyers ORDER BY name').all(),
       products: db.prepare('SELECT * FROM products ORDER BY name_key').all(),
       settings: db.prepare('SELECT * FROM settings ORDER BY key').all(),
-      subscribers: db.prepare('SELECT * FROM subscribers ORDER BY id').all()
+      subscribers: db.prepare('SELECT * FROM subscribers ORDER BY id').all(),
+      imageLibrary: db.prepare('SELECT * FROM image_library ORDER BY id').all()
     }
   };
 }
@@ -634,13 +635,17 @@ app.post('/api/restore', requireAuth, (req, res) => {
   const products = Array.isArray(tables.products) ? tables.products : null;
   const settings = Array.isArray(tables.settings) ? tables.settings : null;
   const subscribers = Array.isArray(tables.subscribers) ? tables.subscribers : null;
-  if (!flyers || !products || !settings || !subscribers || flyers.length > 1000 || products.length > 10000 || settings.length > 200 || subscribers.length > 10000) {
+  // Older backups (from before the image library existed) won't have this key --
+  // default to empty instead of rejecting the whole file as invalid.
+  const imageLibrary = Array.isArray(tables.imageLibrary) ? tables.imageLibrary : [];
+  if (!flyers || !products || !settings || !subscribers || flyers.length > 1000 || products.length > 10000 || settings.length > 200 || subscribers.length > 10000 || imageLibrary.length > 2000) {
     return res.status(400).json({ error: 'invalid_backup_tables' });
   }
   if (flyers.some(v => !v || typeof v.name !== 'string' || typeof v.data !== 'string') ||
       products.some(v => !v || typeof v.name_key !== 'string' || typeof v.display_name !== 'string') ||
       settings.some(v => !v || typeof v.key !== 'string') ||
-      subscribers.some(v => !v || !['email', 'sms'].includes(v.type) || typeof v.contact !== 'string')) {
+      subscribers.some(v => !v || !['email', 'sms'].includes(v.type) || typeof v.contact !== 'string') ||
+      imageLibrary.some(v => !v || typeof v.img !== 'string')) {
     return res.status(400).json({ error: 'invalid_backup_rows' });
   }
 
@@ -649,6 +654,7 @@ app.post('/api/restore', requireAuth, (req, res) => {
     db.prepare('DELETE FROM products').run();
     db.prepare('DELETE FROM settings').run();
     db.prepare('DELETE FROM subscribers').run();
+    db.prepare('DELETE FROM image_library').run();
 
     const insertFlyer = db.prepare(`INSERT INTO flyers
       (name, data, updated_at, scheduled_start, scheduled_end, notified, rendered_image, broadcast_sent, deleted_at)
@@ -665,12 +671,15 @@ app.post('/api/restore', requireAuth, (req, res) => {
 
     const insertSubscriber = db.prepare('INSERT INTO subscribers (id, type, contact, name, active, created_at) VALUES (?, ?, ?, ?, ?, ?)');
     for (const v of subscribers) insertSubscriber.run(Number(v.id), v.type, v.contact, v.name || '', v.active ? 1 : 0, Number(v.created_at) || Date.now());
+
+    const insertImage = db.prepare('INSERT INTO image_library (id, name, img, created_at) VALUES (?, ?, ?, ?)');
+    for (const v of imageLibrary) insertImage.run(Number(v.id), v.name || 'Untitled image', v.img, Number(v.created_at) || Date.now());
     seedDefaultSettings();
   });
 
   try {
     restore();
-    res.json({ ok: true, restored: { flyers: flyers.length, products: products.length, settings: settings.length, subscribers: subscribers.length } });
+    res.json({ ok: true, restored: { flyers: flyers.length, products: products.length, settings: settings.length, subscribers: subscribers.length, imageLibrary: imageLibrary.length } });
   } catch (err) {
     console.error('[restore] failed:', err);
     res.status(400).json({ error: 'restore_failed', message: err.message });
@@ -721,6 +730,24 @@ app.post('/api/subscribers/:id/toggle', requireAuth, (req, res) => {
 
 app.delete('/api/subscribers/:id', requireAuth, (req, res) => {
   db.prepare('DELETE FROM subscribers WHERE id = ?').run(req.params.id);
+  res.json({ ok: true });
+});
+
+/* ---------------- Image library (reusable overlay graphics) ---------------- */
+app.get('/api/image-library', requireAuth, (req, res) => {
+  res.json(db.prepare('SELECT * FROM image_library ORDER BY created_at DESC').all());
+});
+
+app.post('/api/image-library', requireAuth, (req, res) => {
+  const { name, img } = req.body || {};
+  if (!img || typeof img !== 'string') return res.status(400).json({ error: 'bad_input' });
+  const info = db.prepare('INSERT INTO image_library (name, img, created_at) VALUES (?, ?, ?)')
+    .run((name || '').trim() || 'Untitled image', img, Date.now());
+  res.json({ id: info.lastInsertRowid });
+});
+
+app.delete('/api/image-library/:id', requireAuth, (req, res) => {
+  db.prepare('DELETE FROM image_library WHERE id = ?').run(req.params.id);
   res.json({ ok: true });
 });
 

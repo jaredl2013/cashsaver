@@ -15,19 +15,21 @@
     --sidebar-soft:#1f2937;
     --sidebar-line:rgba(255,255,255,.09);
     --sidebar-muted:#9ca3af;
+    --drawer-w:460px;
+    --howto-w:440px;
   }
   *{box-sizing:border-box;}
   body{
     font-family:Arial, Helvetica, sans-serif;
     background:#5a5a5a;
     margin:0;
-    padding:96px 24px 24px 384px;
+    padding:96px 24px 24px calc(var(--drawer-w) + 24px);
     padding-bottom:60px; /* room for the credit bar */
     transition:padding-left .18s ease;
   }
   body.rail-collapsed{ padding-left:24px; }
   #topBar{
-    position:fixed; top:0; left:360px; right:0; min-height:56px; z-index:60;
+    position:fixed; top:0; left:var(--drawer-w); right:0; min-height:56px; z-index:60;
     background:#1f2937; border-bottom:1px solid #2d3748; display:flex; align-items:center;
     padding:10px 16px; gap:14px; transition:left .18s ease;
   }
@@ -163,11 +165,33 @@
     box-shadow:2px 0 8px rgba(0,0,0,.3); letter-spacing:1px;
   }
   #toolsDrawer{
-    position:fixed; top:0; left:0; bottom:0; width:360px; background:var(--sidebar); color:#f9fafb; z-index:70;
+    position:fixed; top:0; left:0; bottom:0; width:var(--drawer-w); background:var(--sidebar); color:#f9fafb; z-index:70;
     transform:none; display:flex; flex-direction:column; overflow-y:auto; overflow-x:hidden;
     scrollbar-width:thin; scrollbar-color:#4b5563 transparent; transition:width .18s ease;
   }
   #toolsDrawer.open{ transform:none; }
+  .no-resize-transition, .no-resize-transition #toolsDrawer, .no-resize-transition #topBar{ transition:none !important; }
+  .drawer-resize-handle{
+    position:absolute; top:0; right:0; width:6px; height:100%; cursor:ew-resize; z-index:5; background:transparent;
+  }
+  .drawer-resize-handle:hover, .drawer-resize-handle.dragging{ background:rgba(255,255,255,.16); }
+
+  #howToDrawer{
+    position:fixed; top:0; right:calc(-1 * var(--howto-w)); bottom:0; width:var(--howto-w); background:#fff; z-index:75;
+    display:flex; flex-direction:column; box-shadow:-4px 0 24px rgba(0,0,0,.35); transition:right .18s ease;
+  }
+  #howToDrawer.open{ right:0; }
+  .no-resize-transition #howToDrawer{ transition:none !important; }
+  .howto-resize-handle{ left:0; right:auto; background:rgba(0,0,0,.06); }
+  .howto-resize-handle:hover, .howto-resize-handle.dragging{ background:rgba(0,0,0,.14); }
+  .howto-head{
+    display:flex; align-items:center; justify-content:space-between; padding:14px 18px;
+    background:#1f2937; color:#fff; border-bottom:1px solid #2d3748; flex:none;
+  }
+  .howto-head strong{ font-size:14px; }
+  .howto-head .drawer-rail-toggle{ color:#fff; font-size:15px; width:26px; height:26px; }
+  .howto-head .drawer-rail-toggle:hover{ background:rgba(255,255,255,.14); }
+  #howToFrame{ flex:1; border:none; width:100%; }
   #drawerBackdrop{
     display:none; position:fixed; inset:0; background:rgba(0,0,0,.25); z-index:65;
   }
@@ -195,6 +219,14 @@
   .drawer-body{ padding:6px 18px 30px; display:flex; flex-direction:column; }
   .drawer-section{ display:flex; flex-direction:column; gap:9px; padding:16px 0; border-bottom:1px solid var(--sidebar-line); }
 
+  .drawer-tabs{ display:flex; gap:6px; padding-top:14px; }
+  .drawer-tab-btn{
+    flex:1; border:1px solid var(--sidebar-line); border-radius:9px; background:transparent; color:var(--sidebar-muted);
+    font-size:12px; font-weight:700; padding:9px 6px; cursor:pointer;
+  }
+  .drawer-tab-btn:hover{ background:rgba(255,255,255,.06); color:#e5e7eb; }
+  .drawer-tab-btn.active{ background:var(--red); border-color:transparent; color:#fff; }
+
   /* The product database's markup/CSS was built for a white modal (dark text on
      light backgrounds) and is reused as-is here rather than re-themed -- wrapping
      it in its own white card keeps all of that legible inside the dark sidebar. */
@@ -207,10 +239,11 @@
     width:100%; border:1px solid #ccc; border-radius:8px; padding:10px 11px; font-size:13.5px;
     margin-bottom:10px; background:#fff; color:#222;
   }
-  .db-sidebar-section .db-editor-grid{ grid-template-columns:1fr !important; }
-  .db-sidebar-section .db-editor-lower{ flex-direction:column; align-items:stretch; gap:12px; }
-  .db-sidebar-section .db-editor-lower .db-size-field{ margin-left:0; }
-  .db-sidebar-section .db-save{ width:100%; }
+  .db-add-product-btn{
+    background:var(--red); color:#fff; border:none; border-radius:8px; padding:12px 14px;
+    font-size:14px; font-weight:bold; cursor:pointer; margin-top:10px;
+  }
+  .db-add-product-btn:hover{ background:var(--red-dark); }
   .drawer-section:last-child{ border-bottom:none; }
   .drawer-section button{ width:100%; }
   .drawer-section select, .drawer-section input[type=date], .drawer-section input[type=time]{ width:100%; }
@@ -278,11 +311,6 @@
   .flyer-card-actions .rename{ width:auto; background:transparent; border-color:rgba(255,255,255,.18); color:#d1d5db; }
   .flyer-card-actions .delete{ width:auto; background:transparent; border-color:rgba(248,113,113,.35); color:#fca5a5; }
   .saved-flyer-empty{ color:#9ca3af; font-size:11px; text-align:center; padding:12px 4px; }
-  .saved-list-label{ color:#9ca3af; font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.08em; margin:8px 0 2px; }
-  .saved-list-label:first-child{ margin-top:0; }
-  .flyer-status-pill.template{ background:#a78bfa; color:#2e1065; }
-  .flyer-card.template-card{ border-color:rgba(167,139,250,.4); }
-  .flyer-card.template-card .open{ background:var(--red); }
 
   .hint{
     max-width:850px; margin:0 auto 18px auto; background:#fff3f2; border:1px solid #f3b9b4;
@@ -321,11 +349,14 @@
   .render-clean .resize-btn{ display:none !important; }
   .render-clean .overlay-drag-handle,
   .render-clean .overlay-remove-btn,
+  .render-clean .overlay-library-btn,
+  .render-clean .overlay-upload-btn,
   .render-clean .overlay-resize-handle,
   .render-clean .overlay-rotate-handle,
   .render-clean .overlay-font-controls{ display:none !important; }
   .render-clean .overlay-text{ border-color:transparent !important; background:transparent !important; }
   .render-clean .overlay-image:not(.has-img){ border-color:transparent !important; background:transparent !important; }
+  .render-clean .overlay-image.has-img{ border-color:transparent !important; }
   .render-clean .overlay-image .overlay-image-lbl{ display:none !important; }
 
   .tagline{ background:var(--red); color:#fff; text-align:center; padding:8px 10px; margin:8px 0; }
@@ -382,6 +413,11 @@
   .photo .undo-photo-btn{ left:3px; color:#234d85; }
   .photo.has-img .remove-photo-btn{ display:grid; }
   .photo.can-undo .undo-photo-btn{ display:grid; }
+  .photo .upload-photo-btn{
+    position:absolute; top:3px; left:28px; z-index:7; width:22px; height:22px; padding:0;
+    display:grid; place-items:center; border:1px solid rgba(0,0,0,.22); border-radius:5px;
+    background:#fff; color:#234d85; font-size:12px; line-height:1; cursor:pointer; box-shadow:0 2px 5px rgba(0,0,0,.2);
+  }
   .photo .undo-container-size-btn{
     position:absolute; top:3px; right:28px; z-index:7; height:22px; padding:0 6px;
     display:none; place-items:center; border:1px solid rgba(0,0,0,.22); border-radius:5px;
@@ -643,6 +679,16 @@
     background:var(--red); color:#fff; border:none; cursor:pointer; font-size:13px; line-height:1;
     display:flex; align-items:center; justify-content:center; z-index:2; opacity:0; transition:opacity .12s;
   }
+  .overlay-box .overlay-library-btn{
+    position:absolute; top:-11px; left:calc(50% - 22px); width:20px; height:20px; border-radius:50%;
+    background:#222; color:#fff; border:none; cursor:pointer; font-size:11px; line-height:1;
+    display:flex; align-items:center; justify-content:center; z-index:2; opacity:0; transition:opacity .12s;
+  }
+  .overlay-box .overlay-upload-btn{
+    position:absolute; top:-11px; left:calc(50% + 2px); width:20px; height:20px; border-radius:50%;
+    background:#222; color:#fff; border:none; cursor:pointer; font-size:11px; line-height:1;
+    display:flex; align-items:center; justify-content:center; z-index:2; opacity:0; transition:opacity .12s;
+  }
   .overlay-box .overlay-resize-handle{
     position:absolute; bottom:-2px; right:-2px; width:16px; height:16px; background:#222; color:#fff;
     border-radius:3px; display:flex; align-items:center; justify-content:center; font-size:10px;
@@ -665,12 +711,23 @@
   .overlay-font-controls label{ color:#ccc; font-size:10px; font-weight:700; padding:0 2px; }
   .overlay-box:hover .overlay-drag-handle,
   .overlay-box:hover .overlay-remove-btn,
+  .overlay-box:hover .overlay-library-btn,
+  .overlay-box:hover .overlay-upload-btn,
   .overlay-box:hover .overlay-resize-handle,
   .overlay-box:hover .overlay-rotate-handle,
-  .overlay-box:hover .overlay-font-controls{ opacity:1; }
+  .overlay-box:hover .overlay-font-controls,
+  .overlay-box.controls-open .overlay-drag-handle,
+  .overlay-box.controls-open .overlay-remove-btn,
+  .overlay-box.controls-open .overlay-library-btn,
+  .overlay-box.controls-open .overlay-upload-btn,
+  .overlay-box.controls-open .overlay-resize-handle,
+  .overlay-box.controls-open .overlay-rotate-handle,
+  .overlay-box.controls-open .overlay-font-controls{ opacity:1; }
   @media (hover:none){
     .overlay-box .overlay-drag-handle,
     .overlay-box .overlay-remove-btn,
+    .overlay-box .overlay-library-btn,
+    .overlay-box .overlay-upload-btn,
     .overlay-box .overlay-resize-handle,
     .overlay-box .overlay-rotate-handle,
     .overlay-box .overlay-font-controls{ opacity:1; }
@@ -685,7 +742,8 @@
     font-size:10px; color:#888; border:2px dashed #bbb; background:#f4f4f4 no-repeat center;
     background-size:contain; cursor:pointer; overflow:hidden;
   }
-  .overlay-image.has-img{ border-style:solid; color:transparent; background-color:#fff; }
+  .overlay-image.has-img{ border-style:solid; border-color:transparent; color:transparent; background-color:transparent; }
+  .overlay-box:hover .overlay-image.has-img{ border-color:#bbb; }
   .overlay-image input[type=file]{ position:absolute; inset:0; opacity:0; cursor:pointer; }
 
   .footer{ background:var(--red); color:#fff; text-align:center; font-weight:900; font-size:15px; padding:9px; margin-top:8px; }
@@ -714,7 +772,7 @@
   .preview-viewport{ height:calc(94vh - 112px); overflow:auto; padding:18px; }
   .preview-stage{ position:relative; margin:0 auto; }
   .preview-page{ position:absolute; top:0; left:0; margin:0; transform-origin:top left; box-shadow:0 8px 30px rgba(0,0,0,.38); }
-  .db-row{ display:flex; align-items:center; flex-wrap:wrap; gap:10px; padding:8px 0; border-bottom:1px solid #f0f0f0; }
+  .db-row{ display:flex; align-items:center; flex-wrap:wrap; gap:12px; padding:12px 0; border-bottom:1px solid #f0f0f0; }
   .db-row .price-history-toggle{
     flex-basis:100%; text-align:left; margin-top:-4px; padding:2px 0 2px 54px;
     background:none; border:none; color:#9ca3af; font-size:10px; font-weight:700; cursor:pointer;
@@ -728,11 +786,11 @@
   .price-history-panel-inner{ padding:8px 10px; display:flex; flex-direction:column; gap:4px; }
   .price-history-row{ display:flex; justify-content:space-between; gap:10px; font-size:11px; color:#555; }
   .price-history-empty{ font-size:11px; color:#999; padding:8px 10px; }
-  .db-row img{ width:44px; height:44px; object-fit:cover; border-radius:4px; border:1px solid #ddd; background:#eee; }
-  .db-row .db-noimg{ width:44px; height:44px; border-radius:4px; border:1px dashed #ccc; background:#f5f5f5; }
-  .db-row .db-name{ font-weight:bold; font-size:13px; flex:1; }
-  .db-row .db-price{ font-size:13px; color:var(--red); font-weight:bold; width:90px; }
-  .db-row .db-updated{ font-size:10px; color:#888; width:110px; }
+  .db-row img{ width:56px; height:56px; object-fit:cover; border-radius:6px; border:1px solid #ddd; background:#eee; }
+  .db-row .db-noimg{ width:56px; height:56px; border-radius:6px; border:1px dashed #ccc; background:#f5f5f5; }
+  .db-row .db-name{ font-weight:bold; font-size:15px; flex:1; }
+  .db-row .db-price{ font-size:15px; color:var(--red); font-weight:bold; width:100px; }
+  .db-row .db-updated{ font-size:11.5px; color:#888; width:110px; }
   .db-row button{ background:#8a1410; color:#fff; border:none; border-radius:6px; padding:7px 12px; font-size:13px; cursor:pointer; }
   .catalog-modal{ width:940px; }
   .db-editor{ margin:8px 0 14px; padding:14px; border:1px solid #e4e4e4; border-radius:10px; background:#fafafa; }
@@ -746,15 +804,15 @@
   .db-size-options label{ display:flex; align-items:center; gap:4px; padding:7px 8px; border:1px solid #ccc; border-radius:6px; background:#fff; font-size:10px; font-weight:bold; cursor:pointer; white-space:nowrap; }
   .db-size-options input{ width:auto; margin:0; }
   .db-editor-lower{ display:flex; align-items:flex-end; gap:18px; margin-top:12px; padding-top:12px; border-top:1px solid #e4e4e4; }
-  .db-photo-editor{ display:flex; align-items:center; gap:9px; }
+  .db-photo-editor{ display:flex; align-items:center; gap:9px; flex-wrap:wrap; }
   .db-photo-editor > label{ font-size:10px; color:#666; font-weight:bold; text-transform:uppercase; letter-spacing:.05em; }
   .db-catalog-photo{ width:112px; height:70px; min-width:112px; min-height:70px; flex:none; resize:none; cursor:default; border-radius:6px; }
   .db-catalog-photo .lbl{ display:block; color:#888; }
   .db-catalog-photo.has-img .lbl{ display:none; }
-  .db-photo-find{ background:#333; color:#fff; }
+  .db-photo-find{ background:#333; color:#fff; width:40px; height:40px; padding:0 !important; font-size:16px; display:flex; align-items:center; justify-content:center; }
   .db-editor-lower .db-size-field{ margin-left:auto; }
   .db-editor-lower .db-save{ min-width:130px; min-height:36px; }
-  .db-editor button, .db-action{ border:none; border-radius:6px; padding:10px 13px; font-size:13px; font-weight:bold; cursor:pointer; white-space:nowrap; }
+  .db-editor button, .db-action{ border:none; border-radius:6px; padding:10px 14px; font-size:14px; font-weight:bold; cursor:pointer; white-space:nowrap; }
   .db-save{ background:var(--red); color:#fff; }
   .db-cancel{ background:#eee; color:#333; }
   .db-list-head{ display:flex; align-items:center; justify-content:space-between; padding:4px 0 7px; border-bottom:1px solid #eee; }
@@ -776,30 +834,19 @@
   .update-panel p{ margin:0 0 8px; color:#1e40af; font-size:11.5px; line-height:1.4; }
   .update-version{ color:#9ca3af; font-size:9.5px; text-align:center; }
   .db-count{ font-size:11px; color:#888; }
-  .db-row .db-description{ width:150px; font-size:11px; color:#666; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .db-row .db-description{ width:190px; font-size:12.5px; color:#666; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .db-row-actions{ display:flex; gap:5px; }
-  .db-size-badge{ width:58px; text-align:center; padding:3px 7px; border-radius:12px; font-size:9px; font-weight:bold; text-transform:uppercase; }
+  .db-size-badge{ width:64px; text-align:center; padding:4px 7px; border-radius:12px; font-size:10px; font-weight:bold; text-transform:uppercase; }
   .db-size-badge.big{ background:#fee2e2; color:#a32720; }
   .db-size-badge.small{ background:#e8eef7; color:#334155; }
   .db-action.add{ background:#287a3d; color:#fff; }
   .db-action.edit{ background:#333; color:#fff; }
   .db-action.delete{ background:#8a1410; color:#fff; }
-  .db-row.db-row-editing{ display:grid; grid-template-columns:76px 1.5fr 1.35fr .65fr .8fr 1.15fr auto; gap:8px; align-items:end; padding:12px 8px; background:#fff8f7; border:1px solid #f2b9b5; border-radius:8px; }
-  .db-inline-field{ display:flex; flex-direction:column; gap:4px; min-width:0; }
-  .db-inline-field label{ font-size:9px; color:#777; font-weight:bold; text-transform:uppercase; }
-  .db-inline-field input, .db-inline-field select{ width:100%; min-width:0; padding:7px; border:1px solid #bbb; border-radius:5px; font-size:11px; background:#fff; }
-  .db-inline-photo-wrap{ display:flex; flex-direction:column; gap:4px; align-items:stretch; }
-  .db-inline-photo{ width:68px; height:48px; min-width:68px; min-height:48px; resize:none; cursor:default; border-radius:5px; }
-  .db-inline-find{ background:#333!important; color:#fff!important; padding:4px!important; font-size:9px!important; }
-  .db-inline-actions{ display:flex; flex-direction:column; gap:5px; }
-  .db-inline-actions .save{ background:var(--red); color:#fff; }
-  .db-inline-actions .cancel{ background:#ddd; color:#333; }
-  .db-inline-size .db-size-options{ gap:3px; }
-  .db-inline-size .db-size-options label{ padding:6px 5px; font-size:9px; }
   #dbEditorStatus{ min-height:15px; margin-top:8px; font-size:11px; font-weight:bold; color:#287a3d; }
-  @media(max-width:820px){ .db-editor-grid{ grid-template-columns:1fr 1fr; } .db-editor-lower{ align-items:stretch; flex-direction:column; gap:10px; } .db-editor-lower .db-size-field{ margin-left:0; } .db-row .db-description,.db-row .db-updated{ display:none; } .db-row.db-row-editing{ grid-template-columns:1fr 1fr; } }
+  @media(max-width:820px){ .db-editor-grid{ grid-template-columns:1fr 1fr; } .db-editor-lower{ align-items:stretch; flex-direction:column; gap:10px; } .db-editor-lower .db-size-field{ margin-left:0; } }
   .modal-foot{ padding:12px 18px; border-top:1px solid #eee; text-align:right; }
   .modal-foot button{ background:#fff; border:1px solid #bbb; border-radius:6px; padding:11px 18px; font-size:14px; font-weight:bold; cursor:pointer; }
+  .modal-foot button.db-save{ background:var(--red); color:#fff; border-color:transparent; }
   .empty-db{ color:#888; font-size:13px; padding:20px 0; text-align:center; }
 
   .layout-option{
@@ -835,6 +882,13 @@
   .photo-search-status{ display:flex; align-items:center; gap:7px; font-size:12px; padding:9px 18px; background:#fafafa; border-bottom:1px solid #eee; color:#666; }
   .photo-search-status::before{ content:'●'; color:#2a7a2a; font-size:10px; }
   .photo-search-status.not-configured::before{ color:#c58a16; }
+  .library-thumb{ position:relative; }
+  .library-thumb img{ background:#fafafa; }
+  .library-thumb-delete{
+    position:absolute; top:3px; right:3px; width:20px; height:20px; border-radius:50%;
+    background:var(--red); color:#fff; border:none; cursor:pointer; font-size:11px; line-height:1;
+    display:flex; align-items:center; justify-content:center;
+  }
 
   /* ---------- Credit bar ---------- */
   #creditBar{
@@ -857,12 +911,9 @@
     @page{ size:letter; margin:0; }
     .photo{ border-style:solid; }
     .price-wrap, .unit-select, .unit-custom{ background:transparent; border-color:transparent; }
-    .db-badge, .cell-hover-menu, .drag-handle, .container-resize-handle, .undo-container-size-btn, .remove-photo-btn, .undo-photo-btn, .store-align-btn, .resize-btn, .overlay-drag-handle, .overlay-remove-btn, .overlay-resize-handle, .overlay-rotate-handle, .overlay-font-controls, .add-box-tile{ display:none !important; }
+    .db-badge, .cell-hover-menu, .drag-handle, .container-resize-handle, .undo-container-size-btn, .remove-photo-btn, .undo-photo-btn, .upload-photo-btn, .store-align-btn, .resize-btn, .overlay-drag-handle, .overlay-remove-btn, .overlay-resize-handle, .overlay-rotate-handle, .overlay-font-controls, .add-box-tile{ display:none !important; }
   }
   @media (max-width:1180px){
-    body{ padding-left:344px; }
-    #toolsDrawer{ width:320px; }
-    #topBar{ left:320px; }
     .db-editor-grid{ grid-template-columns:1fr 1fr !important; }
   }
   /* Touch devices (tablets, phones) have no real hover, so the hover-reveal
@@ -901,6 +952,7 @@
     <button id="drawerTab" onclick="toggleDrawer()">☰ Tools</button>
     <div id="drawerBackdrop" onclick="toggleDrawer()"></div>
     <div id="toolsDrawer">
+      <div class="drawer-resize-handle" id="drawerResizeHandle" title="Drag to resize"></div>
       <div class="drawer-header">
         <div class="drawer-brand">
           <div class="drawer-brand-mark">%</div>
@@ -913,9 +965,15 @@
       </button>
       <div class="drawer-body">
 
-        <div class="drawer-section db-sidebar-section">
+        <div class="drawer-tabs">
+          <button type="button" class="drawer-tab-btn active" id="drawerTabBtnProducts" onclick="switchDrawerTab('products')">📦 Product Database</button>
+          <button type="button" class="drawer-tab-btn" id="drawerTabBtnLibrary" onclick="switchDrawerTab('library')">📚 Image Library</button>
+        </div>
+
+        <div class="drawer-section db-sidebar-section" id="drawerPanelProducts">
           <label class="tlabel">Product database:</label>
           <input type="text" id="dbSearch" placeholder="Search products…" oninput="renderDbList()">
+          <button type="button" class="db-add-product-btn" onclick="openProductEditorModal()">＋ Add product</button>
           <div class="db-replace-banner" id="dbReplaceBanner"><span>Replacing:</span><strong id="dbReplaceName"></strong><button type="button" onclick="cancelCatalogReplace()">Cancel replacement</button></div>
           <div class="db-list-head">
             <strong id="dbCount"></strong>
@@ -927,41 +985,34 @@
           </div>
           <div id="dbImportStatus" class="db-import-status"></div>
           <div id="dbList"></div>
-          <form class="db-editor" onsubmit="saveDbProduct(event)">
-            <div class="db-editor-head">
-              <strong id="dbEditorTitle">Add a product</strong>
-            </div>
-            <div class="db-editor-grid">
-              <div class="db-field"><label>Product name</label><input id="dbProductName" required placeholder="e.g. Boneless Ribeye Steaks"></div>
-              <div class="db-field"><label>Size / description</label><input id="dbProductDescription" placeholder="e.g. USDA Choice, family pack"></div>
-              <div class="db-field"><label>Price</label><input id="dbProductPrice" required inputmode="decimal" placeholder="9.99"></div>
-              <div class="db-field"><label>Unit</label><select id="dbProductUnit" onchange="toggleDbCustomUnit()"></select></div>
-              <div class="db-field" id="dbCustomUnitField" style="display:none;"><label>Custom unit</label><input id="dbProductUnitCustom" placeholder="2 for"></div>
-            </div>
-            <div class="db-editor-lower">
-              <div class="db-photo-editor">
-                <label>Product photo</label>
-                <div class="photo db-catalog-photo" id="dbProductPhotoPreview"><span class="lbl">No photo</span></div>
-                <input type="file" accept="image/*" style="display:none" onchange="uploadDbPhoto(this)">
-                <button type="button" class="db-photo-find" onclick="this.previousElementSibling.click()">⬆ Upload photo</button>
-                <button type="button" class="db-photo-find" onclick="openCatalogPhotoSearch()">🔎 Find / change photo</button>
-              </div>
-              <div class="db-field db-size-field"><label>Default ad size</label><div class="db-size-options"><label><input type="checkbox" id="dbBigAd" onchange="setDbAdSize('big')"> Big ad</label><label><input type="checkbox" id="dbSmallAd" checked onchange="setDbAdSize('small')"> Small ad</label></div></div>
-              <button class="db-save" type="submit">Save product</button>
-            </div>
-            <div id="dbEditorStatus"></div>
-          </form>
+        </div>
+
+        <div class="drawer-section db-sidebar-section" id="drawerPanelLibrary" style="display:none;">
+          <label class="tlabel">Image library:</label>
+          <span style="font-size:11px;color:#888;display:block;margin:-4px 0 10px;">Reusable decorative graphics (badges, seasonal art) — upload once, reuse on any flyer.</span>
+          <button type="button" class="db-import-btn" onclick="document.getElementById('libraryUploadInput').click()">⬆ Upload new image</button>
+          <input type="file" id="libraryUploadInput" accept="image/*" hidden onchange="uploadToImageLibrary(this)">
+          <div class="photo-results" id="imageLibraryGrid" style="margin-top:12px;"></div>
         </div>
 
       </div>
+    </div>
+
+    <div id="howToDrawer">
+      <div class="drawer-resize-handle howto-resize-handle" id="howToResizeHandle" title="Drag to resize"></div>
+      <div class="howto-head">
+        <strong>Quick How-To</strong>
+        <button type="button" class="drawer-rail-toggle" onclick="closeHowTo()" title="Close">✕</button>
+      </div>
+      <iframe id="howToFrame" src="/how-to.html" title="Quick How-To Guide"></iframe>
     </div>
 
     <div id="topBar">
       <div class="topbar-left">
         <button class="drawer-rail-toggle" onclick="toggleDrawerRail()" title="Hide database panel" id="drawerRailToggle">«</button>
         <button class="icon-btn" onclick="openAdminSettings()" title="Settings">⚙</button>
-        <button id="topUndoBtn" onclick="undoLastMove()" title="Undo last move" disabled>↶</button>
-        <button id="topRedoBtn" onclick="redoLastMove()" title="Redo last move" disabled>↷</button>
+        <button class="icon-btn" id="topUndoBtn" onclick="undoLastMove()" title="Undo last move" disabled>↶</button>
+        <button class="icon-btn" id="topRedoBtn" onclick="redoLastMove()" title="Redo last move" disabled>↷</button>
       </div>
       <div class="topbar-center">
         <div class="topbar-title-row">
@@ -1003,6 +1054,7 @@
             <select id="layoutSelect" onchange="onLayoutSelectChange()"></select>
             <button class="secondary" onclick="addTextOverlay(); toggleTopbarMenu('editMenu');">＋ Text overlay</button>
             <button class="secondary" onclick="addImageOverlay(); toggleTopbarMenu('editMenu');">＋ Image overlay</button>
+            <button class="secondary" onclick="openImageLibrary(); toggleTopbarMenu('editMenu');">📚 Image library</button>
           </div>
         </div>
         <button onclick="openAdPreview()">👁 Preview</button>
@@ -1019,7 +1071,7 @@
             <button class="secondary" onclick="downloadFlyerImage('jpeg'); toggleTopbarMenu('exportMenu');">Export as JPEG</button>
           </div>
         </div>
-        <button class="icon-btn" onclick="window.open('/how-to.html','_blank','noopener')" title="Quick how-to guide">❓</button>
+        <button class="icon-btn" onclick="openHowTo()" title="Quick how-to guide">❓</button>
         <button class="primary" onclick="saveFlyer()" title="Save">💾 Save</button>
       </div>
     </div>
@@ -1028,9 +1080,10 @@
     <div class="page" id="page">
 
       <div class="header">
-        <label class="photo logo-photo has-img" id="logoPhoto" style="background-image:url(/assets/cashsaver-logo.png)" data-img="/assets/cashsaver-logo.png" data-original-img="/assets/cashsaver-logo.png">
-          <span class="lbl">Click to<br>upload your logo</span>
+        <label class="photo logo-photo has-img" id="logoPhoto" style="background-image:url(/assets/cashsaver-logo.png)" data-img="/assets/cashsaver-logo.png" data-original-img="/assets/cashsaver-logo.png" onclick="event.preventDefault()">
+          <span class="lbl">Upload your logo</span>
           <input type="file" accept="image/*" onchange="setPhoto(this)">
+          <button type="button" class="upload-photo-btn" title="Upload a new logo" onclick="event.preventDefault();event.stopPropagation();this.closest('.photo').querySelector('input[type=file]').click()">⬆</button>
           <span class="resize-btn" onclick="event.preventDefault(); event.stopPropagation(); reopenCropper(this)">✂️ crop/resize</span>
           <button type="button" class="remove-photo-btn" title="Remove photo" onclick="event.preventDefault();event.stopPropagation();removePhoto(this)">✕</button>
           <button type="button" class="undo-photo-btn" title="Undo last photo change" onclick="event.preventDefault();event.stopPropagation();undoPhotoChange(this)">↶</button>
@@ -1248,6 +1301,42 @@
     </div>
   </div>
 
+  <!-- Product editor modal -- pops out instead of squeezing into the sidebar,
+       shared by both "+ Add product" and each row's "Edit" button -->
+  <div class="modal-overlay" id="productEditorModal">
+    <div class="modal" style="width:900px;max-width:94vw;">
+      <div class="modal-head">
+        <h2 id="dbEditorTitle">Add a product</h2>
+      </div>
+      <div class="modal-body">
+        <form class="db-editor" id="dbEditorForm" onsubmit="submitDbProductModal(event)">
+          <div class="db-editor-grid">
+            <div class="db-field"><label>Product name</label><input id="dbProductName" required placeholder="e.g. Boneless Ribeye Steaks"></div>
+            <div class="db-field"><label>Size / description</label><input id="dbProductDescription" placeholder="e.g. USDA Choice, family pack"></div>
+            <div class="db-field"><label>Price</label><input id="dbProductPrice" required inputmode="decimal" placeholder="9.99"></div>
+            <div class="db-field"><label>Unit</label><select id="dbProductUnit" onchange="toggleDbCustomUnit()"></select></div>
+            <div class="db-field" id="dbCustomUnitField" style="display:none;"><label>Custom unit</label><input id="dbProductUnitCustom" placeholder="2 for"></div>
+          </div>
+          <div class="db-editor-lower">
+            <div class="db-photo-editor">
+              <label>Product photo</label>
+              <div class="photo db-catalog-photo" id="dbProductPhotoPreview"><span class="lbl">No photo</span></div>
+              <input type="file" accept="image/*" style="display:none" onchange="uploadDbPhoto(this)">
+              <button type="button" class="db-photo-find" title="Upload photo" onclick="this.previousElementSibling.click()">⬆</button>
+              <button type="button" class="db-photo-find" title="Find / change photo" onclick="openCatalogPhotoSearch()">🔎</button>
+            </div>
+            <div class="db-field db-size-field"><label>Default ad size</label><div class="db-size-options"><label><input type="checkbox" id="dbBigAd" onchange="setDbAdSize('big')"> Big ad</label><label><input type="checkbox" id="dbSmallAd" checked onchange="setDbAdSize('small')"> Small ad</label></div></div>
+          </div>
+          <div id="dbEditorStatus"></div>
+        </form>
+      </div>
+      <div class="modal-foot">
+        <button class="secondary" onclick="closeProductEditorModal()">Close</button>
+        <button class="db-save" onclick="document.getElementById('dbEditorForm').requestSubmit()">Save product</button>
+      </div>
+    </div>
+  </div>
+
   <div id="creditBar"><a href="https://lockwooditservices.com/" id="creditLink" target="_blank" rel="noopener noreferrer">Made by Lockwood IT Services</a> <span style="opacity:.5;">·</span> <a href="mailto:jared@lockwooditservices.com?subject=CashSaver%20Ad%20Builder%20feedback">Report a bug / request a feature</a></div>
 
 <script>
@@ -1314,6 +1403,103 @@ function expandDrawerRail(){
   drawer.classList.remove('rail');
   document.body.classList.remove('rail-collapsed');
   document.getElementById('drawerRailToggle').textContent = '«';
+}
+
+/* ================= DRAWER RESIZE ================= */
+const DRAWER_MIN_WIDTH = 340;
+function drawerMaxWidth(){ return Math.max(DRAWER_MIN_WIDTH, Math.min(760, window.innerWidth - 260)); }
+
+function setDrawerWidth(width){
+  const clamped = Math.min(drawerMaxWidth(), Math.max(DRAWER_MIN_WIDTH, Math.round(width)));
+  document.documentElement.style.setProperty('--drawer-w', clamped + 'px');
+  return clamped;
+}
+
+function restoreDrawerWidth(){
+  const saved = parseInt(localStorage.getItem('drawerWidth'), 10);
+  setDrawerWidth(Number.isFinite(saved) ? saved : 460);
+}
+
+function initDrawerResize(){
+  const handle = document.getElementById('drawerResizeHandle');
+  handle.addEventListener('pointerdown', e => {
+    if(e.button !== undefined && e.button !== 0) return;
+    e.preventDefault();
+    const drawer = document.getElementById('toolsDrawer');
+    const startX = e.clientX, startWidth = drawer.getBoundingClientRect().width;
+    handle.classList.add('dragging');
+    document.body.classList.add('no-resize-transition');
+    const onMove = ev => setDrawerWidth(startWidth + (ev.clientX - startX));
+    const onUp = () => {
+      handle.classList.remove('dragging');
+      document.body.classList.remove('no-resize-transition');
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
+      document.removeEventListener('pointercancel', onUp);
+      localStorage.setItem('drawerWidth', String(drawer.getBoundingClientRect().width));
+    };
+    document.addEventListener('pointermove', onMove);
+    document.addEventListener('pointerup', onUp);
+    document.addEventListener('pointercancel', onUp);
+  });
+  // keeps the drawer from swallowing the whole window if it's resized narrower
+  // after the user picked a wide drawer width on a bigger screen
+  window.addEventListener('resize', () => {
+    const current = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--drawer-w'));
+    if(current > drawerMaxWidth()) setDrawerWidth(drawerMaxWidth());
+  });
+}
+
+/* ================= HOW-TO SLIDE-OUT ================= */
+const HOWTO_MIN_WIDTH = 320;
+function howToMaxWidth(){ return Math.max(HOWTO_MIN_WIDTH, Math.min(820, window.innerWidth - 200)); }
+
+function setHowToWidth(width){
+  const clamped = Math.min(howToMaxWidth(), Math.max(HOWTO_MIN_WIDTH, Math.round(width)));
+  document.documentElement.style.setProperty('--howto-w', clamped + 'px');
+  return clamped;
+}
+
+function restoreHowToWidth(){
+  const saved = parseInt(localStorage.getItem('howToWidth'), 10);
+  setHowToWidth(Number.isFinite(saved) ? saved : 440);
+}
+
+function openHowTo(){
+  document.getElementById('howToDrawer').classList.add('open');
+}
+function closeHowTo(){
+  document.getElementById('howToDrawer').classList.remove('open');
+}
+
+function initHowToResize(){
+  const handle = document.getElementById('howToResizeHandle');
+  handle.addEventListener('pointerdown', e => {
+    if(e.button !== undefined && e.button !== 0) return;
+    e.preventDefault();
+    const panel = document.getElementById('howToDrawer');
+    const startX = e.clientX, startWidth = panel.getBoundingClientRect().width;
+    handle.classList.add('dragging');
+    document.body.classList.add('no-resize-transition');
+    // panel is anchored to the right edge -- dragging the left-edge handle left
+    // (negative delta) should widen it, so the delta is subtracted, not added
+    const onMove = ev => setHowToWidth(startWidth - (ev.clientX - startX));
+    const onUp = () => {
+      handle.classList.remove('dragging');
+      document.body.classList.remove('no-resize-transition');
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
+      document.removeEventListener('pointercancel', onUp);
+      localStorage.setItem('howToWidth', String(panel.getBoundingClientRect().width));
+    };
+    document.addEventListener('pointermove', onMove);
+    document.addEventListener('pointerup', onUp);
+    document.addEventListener('pointercancel', onUp);
+  });
+  window.addEventListener('resize', () => {
+    const current = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--howto-w'));
+    if(current > howToMaxWidth()) setHowToWidth(howToMaxWidth());
+  });
 }
 
 // Generic dropdown-panel toggler for the top bar (saved-flyers switcher, goes-live
@@ -1423,8 +1609,8 @@ function makeCell(isHero){
       </div>
     </div>
     <div class="cell-top">
-      <label class="photo" title="Click to crop/reposition, or use Upload/Search above to change it" onclick="handlePhotoBoxClick(event, this)">
-        <span class="lbl">Click to<br>add photo</span>
+      <label class="photo" title="Click to crop/reposition -- use ↔ Replace above to set or change the photo" onclick="handlePhotoBoxClick(event, this)">
+        <span class="lbl">↔ Replace<br>to add photo</span>
         <input type="file" accept="image/*" onchange="setPhoto(this)">
         <button type="button" class="remove-photo-btn" title="Remove photo" onclick="event.preventDefault();event.stopPropagation();removePhoto(this)">✕</button>
         <button type="button" class="undo-photo-btn" title="Undo last photo change" onclick="event.preventDefault();event.stopPropagation();undoPhotoChange(this)">↶</button>
@@ -1554,13 +1740,13 @@ function triggerPhotoUpload(btn){
   if(input) input.click();
 }
 
-// A photo box with something in it already opens the crop/reposition editor on
-// click instead of the file picker -- Upload/Search in the hover menu are the
-// explicit way to change what's in it now, so a plain click can be reserved for
-// adjusting the existing image instead of accidentally replacing it.
+// Clicking a photo box no longer opens the raw file picker -- a filled box opens
+// the crop/reposition editor instead, and an empty one does nothing (adding a
+// product photo goes through ↔ Replace / the Product Database, not a direct
+// upload dropped into the cell).
 function handlePhotoBoxClick(e, photo){
+  e.preventDefault();
   if(photo.classList.contains('has-img') && photo.dataset.img){
-    e.preventDefault();
     openCropper(photo.dataset.originalImg || photo.dataset.img, photo, false);
   }
 }
@@ -2190,12 +2376,16 @@ function enableOverlayDrag(overlay){
     const startLeft = overlay.offsetLeft, startTop = overlay.offsetTop;
     const startX = e.clientX, startY = e.clientY;
     overlay.classList.add('dragging');
+    // Badges/graphics often look best bleeding off a corner or edge of the
+    // flyer, so this only keeps a small grabbable sliver on-page instead of
+    // requiring the whole overlay to stay fully inside it.
     const onMove = ev => {
       const dx = ev.clientX - startX, dy = ev.clientY - startY;
-      const maxLeft = Math.max(0, page.clientWidth - overlay.offsetWidth);
-      const maxTop = Math.max(0, page.clientHeight - overlay.offsetHeight);
-      overlay.style.left = Math.min(Math.max(0, startLeft + dx), maxLeft) + 'px';
-      overlay.style.top = Math.min(Math.max(0, startTop + dy), maxTop) + 'px';
+      const margin = 24;
+      const minLeft = margin - overlay.offsetWidth, maxLeftPos = page.clientWidth - margin;
+      const minTop = margin - overlay.offsetHeight, maxTopPos = page.clientHeight - margin;
+      overlay.style.left = Math.min(Math.max(minLeft, startLeft + dx), maxLeftPos) + 'px';
+      overlay.style.top = Math.min(Math.max(minTop, startTop + dy), maxTopPos) + 'px';
     };
     const onUp = () => {
       overlay.classList.remove('dragging');
@@ -2286,7 +2476,10 @@ function readAndDownscaleImage(file, maxDim){
         const canvas = document.createElement('canvas');
         canvas.width = width; canvas.height = height;
         canvas.getContext('2d').drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL('image/jpeg', .88));
+        // Overlay images are small decorative graphics (badges, seasonal art) where
+        // staying see-through matters -- PNG keeps real alpha, unlike JPEG which
+        // has no alpha channel and would flatten transparency to a solid color.
+        resolve(canvas.toDataURL('image/png'));
       };
       img.onerror = () => reject(new Error('Could not read that image.'));
       img.src = reader.result;
@@ -2310,6 +2503,100 @@ async function setOverlayImage(input){
     alert(e.message || 'Could not load that image.');
   }
   input.value = ''; // allow picking the same file again later
+}
+
+// Clicking the image box itself no longer opens the raw file picker -- that's
+// what the explicit ⬆ upload / 📚 library buttons are for now, whether the box
+// is empty or already filled.
+function handleOverlayImageClick(e, label){
+  e.preventDefault();
+}
+
+/* ================= IMAGE LIBRARY (reusable overlay graphics) ================= */
+// Saved once, reused across any flyer -- avoids re-uploading/re-searching for the
+// same badge or seasonal graphic every time. Opened either from the Edit menu
+// (picking there adds a brand new overlay) or from an existing image overlay's
+// own 📚 button (picking there fills just that overlay instead).
+let imageLibraryPickTarget = null;
+let imageLibraryCache = [];
+
+function switchDrawerTab(tab){
+  const isLibrary = tab === 'library';
+  document.getElementById('drawerPanelProducts').style.display = isLibrary ? 'none' : '';
+  document.getElementById('drawerPanelLibrary').style.display = isLibrary ? '' : 'none';
+  document.getElementById('drawerTabBtnProducts').classList.toggle('active', !isLibrary);
+  document.getElementById('drawerTabBtnLibrary').classList.toggle('active', isLibrary);
+}
+
+async function openImageLibrary(targetLabel){
+  imageLibraryPickTarget = targetLabel || null;
+  expandDrawerRail();
+  switchDrawerTab('library');
+  document.getElementById('drawerPanelLibrary').scrollIntoView({ block: 'start', behavior: 'smooth' });
+  await refreshImageLibrary();
+}
+
+async function refreshImageLibrary(){
+  const grid = document.getElementById('imageLibraryGrid');
+  grid.innerHTML = '<p style="grid-column:1/-1;color:#888;">Loading…</p>';
+  try{
+    const res = await fetch('/api/image-library');
+    imageLibraryCache = res.ok ? await res.json() : [];
+  } catch(e){
+    imageLibraryCache = [];
+  }
+  if(!imageLibraryCache.length){
+    grid.innerHTML = '<p style="grid-column:1/-1;color:#888;">No saved images yet — upload one above to reuse it on future ads.</p>';
+    return;
+  }
+  grid.innerHTML = imageLibraryCache.map(row => `
+    <div class="photo-result library-thumb" title="${escapeHtml(row.name)}">
+      <img src="${row.img}" loading="lazy" onclick="pickLibraryImage(${row.id})">
+      <button type="button" class="library-thumb-delete" title="Delete from library" onclick="event.stopPropagation();deleteLibraryImage(${row.id})">✕</button>
+    </div>
+  `).join('');
+}
+
+async function uploadToImageLibrary(input){
+  const file = input.files[0];
+  if(!file) return;
+  const suggested = file.name.replace(/\.[^.]+$/, '');
+  const name = prompt('Name this image (e.g. "4th of July badge"):', suggested);
+  if(name === null){ input.value = ''; return; } // cancelled
+  try{
+    const dataUrl = await readAndDownscaleImage(file, 1000);
+    const res = await fetch('/api/image-library', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ name: name.trim() || 'Untitled image', img: dataUrl })
+    });
+    if(!res.ok){ alert('Could not save that image.'); return; }
+    await refreshImageLibrary();
+  } catch(e){
+    alert(e.message || 'Could not load that image.');
+  }
+  input.value = ''; // allow picking the same file again later
+}
+
+function pickLibraryImage(id){
+  const row = imageLibraryCache.find(r => r.id === id);
+  if(!row) return;
+  if(imageLibraryPickTarget){
+    const label = imageLibraryPickTarget;
+    label.style.backgroundImage = `url(${row.img})`;
+    label.dataset.img = row.img;
+    label.classList.add('has-img');
+    imageLibraryPickTarget = null;
+  } else {
+    createOverlay('image', { img: row.img });
+  }
+  markFlyerDirty();
+  setStatus('Added to the flyer.');
+}
+
+async function deleteLibraryImage(id){
+  if(!confirm('Delete this image from the library? Flyers that already use it keep their own copy.')) return;
+  await fetch('/api/image-library/' + id, { method:'DELETE' });
+  refreshImageLibrary();
 }
 
 function createOverlay(type, opts = {}){
@@ -2341,8 +2628,10 @@ function createOverlay(type, opts = {}){
     overlay.innerHTML = `
       <span class="overlay-drag-handle" title="Drag to move">⠿</span>
       <button type="button" class="overlay-remove-btn" title="Remove this overlay" onclick="removeOverlay(this)">×</button>
-      <label class="overlay-image">
-        <span class="overlay-image-lbl">Click to<br>add image</span>
+      <button type="button" class="overlay-library-btn" title="Choose from image library" onclick="event.preventDefault();event.stopPropagation();openImageLibrary(this.closest('.overlay-box').querySelector('.overlay-image'))">📚</button>
+      <button type="button" class="overlay-upload-btn" title="Upload a photo" onclick="event.preventDefault();event.stopPropagation();this.closest('.overlay-box').querySelector('.overlay-image input[type=file]').click()">⬆</button>
+      <label class="overlay-image" onclick="handleOverlayImageClick(event, this)">
+        <span class="overlay-image-lbl">⬆ or 📚<br>above</span>
         <input type="file" accept="image/*" onchange="setOverlayImage(this)">
       </label>
       <span class="overlay-resize-handle" title="Drag to resize">↘</span>
@@ -2666,6 +2955,7 @@ function sanitizeStoredHtml(html){
 function openProductDB(targetCell = null){
   replaceTargetCell = targetCell;
   expandDrawerRail();
+  switchDrawerTab('products');
   const search = document.getElementById('dbSearch');
   search.value = '';
   search.scrollIntoView({ block: 'start', behavior: 'smooth' });
@@ -2732,7 +3022,7 @@ function setDbPhotoPreview(img, originalImg){
 function uploadDbPhoto(input){
   const file = input.files && input.files[0];
   if(!file) return;
-  const wrap = input.closest('.db-photo-editor, .db-inline-photo-wrap');
+  const wrap = input.closest('.db-photo-editor');
   const target = wrap && wrap.querySelector('.photo');
   if(!target) return;
   const reader = new FileReader();
@@ -2754,7 +3044,22 @@ function resetDbEditor(clearStatus = true){
   if(clearStatus) document.getElementById('dbEditorStatus').textContent = '';
 }
 
-async function saveDbProduct(event){
+function openProductEditorModal(){
+  editingDbKey = null;
+  resetDbEditor();
+  document.getElementById('productEditorModal').classList.add('open');
+  document.getElementById('dbProductName').focus();
+}
+
+function closeProductEditorModal(){
+  document.getElementById('productEditorModal').classList.remove('open');
+  editingDbKey = null;
+}
+
+// Shared by both "+ Add product" and each row's "Edit" -- editingDbKey (null vs
+// a product key) is what decides whether this POSTs a new product or PUTs an
+// update to an existing one.
+async function submitDbProductModal(event){
   event.preventDefault();
   const name = document.getElementById('dbProductName').value.trim();
   const rawPrice = document.getElementById('dbProductPrice').value.trim();
@@ -2775,78 +3080,41 @@ async function saveDbProduct(event){
     img:document.getElementById('dbProductPhotoPreview').dataset.img || null,
     originalImg:document.getElementById('dbProductPhotoPreview').dataset.originalImg || null
   };
-  const res = await fetch('/api/products', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)});
+  const isEdit = !!editingDbKey;
+  const url = isEdit ? '/api/products/' + encodeURIComponent(editingDbKey) : '/api/products';
+  const res = await fetch(url, {method: isEdit ? 'PUT' : 'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)});
   if(!res.ok){
     status.style.color = '#a32720';
-    status.textContent = 'Could not save that product.';
+    status.textContent = `Could not ${isEdit ? 'update' : 'save'} that product.`;
     return;
   }
+  // stays open instead of closing -- adding several products in a row shouldn't
+  // require reopening the modal every time
+  editingDbKey = null;
   resetDbEditor(false);
   status.style.color = '#287a3d';
-  status.textContent = 'Product added.';
+  status.textContent = isEdit ? 'Product updated.' : 'Product added — add another or close when done.';
   document.getElementById('dbSearch').value = '';
+  document.getElementById('dbProductName').focus();
   renderDbList();
 }
 
 async function editDbProduct(key){
+  const res = await fetch('/api/products/' + encodeURIComponent(key));
+  if(!res.ok) return;
+  const v = await res.json();
   editingDbKey = key;
-  await renderDbList();
-  const input = document.querySelector('.db-row-editing .inline-name');
-  if(input) input.focus();
-}
-
-function cancelInlineDbEdit(){
-  editingDbKey = null;
-  renderDbList();
-}
-
-function setInlineAdSize(input, size){
-  const row = input.closest('.db-row-editing');
-  row.querySelector('.inline-big').checked = size === 'big';
-  row.querySelector('.inline-small').checked = size !== 'big';
-}
-
-function inlineUnitChanged(select){
-  const custom = select.closest('.db-row-editing').querySelector('.inline-custom-unit');
-  custom.style.display = select.value === 'other' ? 'block' : 'none';
-}
-
-function openInlineCatalogPhotoSearch(btn){
-  const row = btn.closest('.db-row-editing');
-  activePhotoTarget = row.querySelector('.db-inline-photo');
-  document.getElementById('photoModal').classList.add('open');
-  document.getElementById('photoResults').innerHTML = '';
-  document.getElementById('photoSearchInput').value = row.querySelector('.inline-name').value.trim();
-  updatePhotoSearchStatus();
-}
-
-async function saveInlineDbProduct(btn){
-  const row = btn.closest('.db-row-editing');
-  const name = row.querySelector('.inline-name').value.trim();
-  const price = parseFloat(row.querySelector('.inline-price').value.replace(/[^0-9.]/g,''));
-  if(!name || Number.isNaN(price)){
-    document.getElementById('dbEditorStatus').textContent = 'Enter a valid name and price.';
-    return;
-  }
-  const photo = row.querySelector('.db-inline-photo');
-  const payload = {
-    displayName:name,
-    description:row.querySelector('.inline-description').value.trim(),
-    price:price.toFixed(2),
-    unit:row.querySelector('.inline-unit').value,
-    unitCustom:row.querySelector('.inline-custom-unit').value.trim(),
-    adSize:row.querySelector('.inline-big').checked ? 'big' : 'small',
-    img:photo.dataset.img || null,
-    originalImg:photo.dataset.originalImg || photo.dataset.img || null
-  };
-  const res = await fetch('/api/products/' + encodeURIComponent(editingDbKey), {method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
-  if(!res.ok){
-    document.getElementById('dbEditorStatus').textContent = 'Could not update that product.';
-    return;
-  }
-  editingDbKey = null;
-  document.getElementById('dbEditorStatus').textContent = 'Product updated.';
-  renderDbList();
+  document.getElementById('dbEditorTitle').textContent = 'Edit product';
+  document.getElementById('dbProductName').value = v.display_name;
+  document.getElementById('dbProductDescription').value = v.description || '';
+  document.getElementById('dbProductPrice').value = v.price;
+  document.getElementById('dbProductUnit').value = v.unit || 'lb.';
+  document.getElementById('dbProductUnitCustom').value = v.unit_custom || '';
+  setDbAdSize(v.ad_size === 'big' ? 'big' : 'small');
+  toggleDbCustomUnit();
+  setDbPhotoPreview(v.img || null, v.original_img || v.img || null);
+  document.getElementById('dbEditorStatus').textContent = '';
+  document.getElementById('productEditorModal').classList.add('open');
 }
 
 async function addDbProductToFlyer(key){
@@ -2886,36 +3154,18 @@ async function addDbProductToFlyer(key){
   status.textContent = `${product.display_name} added to the next empty flyer slot.`;
 }
 
-function renderInlineDbEditor(v){
-  const unitOptions = UNIT_OPTIONS.map(unit => `<option value="${unit}" ${v.unit === unit ? 'selected' : ''}>${unit === 'other' ? 'Other…' : unit}</option>`).join('');
-  return `
-    <div class="db-row db-row-editing" data-key="${escapeHtml(v.name_key)}">
-      <div class="db-inline-photo-wrap">
-        <div class="photo db-inline-photo"><span class="lbl">No photo</span></div>
-        <input type="file" accept="image/*" style="display:none" onchange="uploadDbPhoto(this)">
-        <button type="button" class="db-inline-find" onclick="this.previousElementSibling.click()">⬆ Upload</button>
-        <button type="button" class="db-inline-find" onclick="openInlineCatalogPhotoSearch(this)">🔎 Photo</button>
-      </div>
-      <div class="db-inline-field"><label>Product name</label><input class="inline-name" value="${escapeHtml(v.display_name)}"></div>
-      <div class="db-inline-field"><label>Description</label><input class="inline-description" value="${escapeHtml(v.description || '')}"></div>
-      <div class="db-inline-field"><label>Price</label><input class="inline-price" inputmode="decimal" value="${escapeHtml(v.price)}">${v.lastPrice ? `<span style="font-size:9px;color:#a56a00;">${formatLastPrice(v)}</span>` : ''}</div>
-      <div class="db-inline-field"><label>Unit</label><select class="inline-unit" onchange="inlineUnitChanged(this)">${unitOptions}</select><input class="inline-custom-unit" value="${escapeHtml(v.unit_custom || '')}" placeholder="custom unit" style="display:${v.unit === 'other' ? 'block' : 'none'}"></div>
-      <div class="db-inline-field db-inline-size"><label>Ad size</label><div class="db-size-options"><label><input type="checkbox" class="inline-big" ${v.ad_size === 'big' ? 'checked' : ''} onchange="setInlineAdSize(this,'big')"> Big</label><label><input type="checkbox" class="inline-small" ${v.ad_size !== 'big' ? 'checked' : ''} onchange="setInlineAdSize(this,'small')"> Small</label></div></div>
-      <div class="db-inline-actions"><button type="button" class="save" onclick="saveInlineDbProduct(this)">Save</button><button type="button" class="cancel" onclick="cancelInlineDbEdit()">Cancel</button></div>
-    </div>`;
-}
-
 async function renderDbList(){
   const q = document.getElementById('dbSearch').value.trim();
   const res = await fetch('/api/products?q=' + encodeURIComponent(q));
   const rows = await res.json();
+  rows.sort((a,b) => a.display_name.localeCompare(b.display_name));
   const list = document.getElementById('dbList');
   document.getElementById('dbCount').textContent = `${rows.length} product${rows.length === 1 ? '' : 's'}`;
   if(rows.length === 0){
     list.innerHTML = `<div class="empty-db">No matching products. Add one below or clear the search.</div>`;
     return;
   }
-  list.innerHTML = rows.map(v => editingDbKey === v.name_key ? renderInlineDbEditor(v) : `
+  list.innerHTML = rows.map(v => `
     <div class="db-row">
       ${v.img ? `<img src="${escapeHtml(v.img)}">` : `<div class="db-noimg"></div>`}
       <div class="db-name">${escapeHtml(v.display_name)}</div>
@@ -2932,16 +3182,6 @@ async function renderDbList(){
       <div class="price-history-panel"></div>
     </div>
   `).join('');
-  if(editingDbKey){
-    const product = rows.find(v => v.name_key === editingDbKey);
-    const preview = list.querySelector('.db-row-editing .db-inline-photo');
-    if(product && preview && product.img){
-      preview.style.backgroundImage = `url(${product.img})`;
-      preview.dataset.img = product.img;
-      preview.dataset.originalImg = product.original_img || product.img;
-      preview.classList.add('has-img');
-    }
-  }
 }
 
 async function deleteDbEntry(key){
@@ -3667,7 +3907,7 @@ function buildCleanPreviewClone(){
   const clone = document.getElementById('page').cloneNode(true);
   clone.removeAttribute('id');
   clone.classList.add('render-clean', 'preview-page');
-  clone.querySelectorAll('.db-badge,.cell-hover-menu,.drag-handle,.container-resize-handle,.undo-container-size-btn,.remove-photo-btn,.undo-photo-btn,.store-align-btn,.resize-btn,.suggest-list,.overlay-drag-handle,.overlay-remove-btn,.overlay-resize-handle,.overlay-rotate-handle,.overlay-font-controls,.add-box-tile,input[type=file]').forEach(el => el.remove());
+  clone.querySelectorAll('.db-badge,.cell-hover-menu,.drag-handle,.container-resize-handle,.undo-container-size-btn,.remove-photo-btn,.undo-photo-btn,.upload-photo-btn,.store-align-btn,.resize-btn,.suggest-list,.overlay-drag-handle,.overlay-remove-btn,.overlay-library-btn,.overlay-upload-btn,.overlay-resize-handle,.overlay-rotate-handle,.overlay-font-controls,.add-box-tile,input[type=file]').forEach(el => el.remove());
   clone.querySelectorAll('[contenteditable]').forEach(el => el.removeAttribute('contenteditable'));
   clone.querySelectorAll('.price-input').forEach(input => {
     const amount = Number.parseFloat(input.value);
@@ -3759,7 +3999,7 @@ function captureFlyerCanvas(scale = 1.4){
     onclone: clonedDocument => {
       const clonedPage = clonedDocument.getElementById('page');
       clonedPage.classList.add('render-clean');
-      clonedPage.querySelectorAll('.db-badge,.cell-hover-menu,.drag-handle,.container-resize-handle,.undo-container-size-btn,.remove-photo-btn,.undo-photo-btn,.store-align-btn,.resize-btn,.suggest-list,.overlay-drag-handle,.overlay-remove-btn,.overlay-resize-handle,.overlay-rotate-handle,.overlay-font-controls,.add-box-tile,input[type=file]').forEach(el => el.remove());
+      clonedPage.querySelectorAll('.db-badge,.cell-hover-menu,.drag-handle,.container-resize-handle,.undo-container-size-btn,.remove-photo-btn,.undo-photo-btn,.upload-photo-btn,.store-align-btn,.resize-btn,.suggest-list,.overlay-drag-handle,.overlay-remove-btn,.overlay-library-btn,.overlay-upload-btn,.overlay-resize-handle,.overlay-rotate-handle,.overlay-font-controls,.add-box-tile,input[type=file]').forEach(el => el.remove());
       clonedPage.querySelectorAll('[contenteditable]').forEach(el => el.removeAttribute('contenteditable'));
       clonedPage.querySelectorAll('.price-input').forEach((input, index) => {
         const amount = Number.parseFloat(prices[index]);
@@ -4078,32 +4318,16 @@ async function refreshSavedList(){
   const res = await fetch('/api/flyers');
   const allRows = await res.json();
   const list = document.getElementById('savedFlyerList');
-  const templates = allRows.filter(r => isTemplateName(r.name));
+  // Templates are only browsable from the Edit menu's Template/layout dropdown
+  // now -- this switcher just lists actual flyers, no duplicate template listing.
   const rows = allRows.filter(r => !isTemplateName(r.name));
 
   let html = '';
-
-  if(templates.length){
-    templates.sort((a,b) => a.name.localeCompare(b.name));
-    html += `<div class="saved-list-label">Templates</div>` + templates.map(row => {
-      const label = row.name.slice(TEMPLATE_PREFIX.length);
-      return `<div class="flyer-card template-card ${currentName === row.name ? 'is-editing' : ''}" data-name="${escapeHtml(row.name)}">
-        <div class="flyer-card-head"><div class="flyer-card-name" title="${escapeHtml(label)}">${escapeHtml(label)}</div><span class="flyer-status-pill template">Template</span></div>
-        <div class="flyer-card-actions">
-          <button class="open" title="Start a new ad from this template" onclick="useTemplate(this.closest('.flyer-card').dataset.name)">Use</button>
-          <button class="duplicate" title="Open the template itself to edit it" onclick="openSavedFlyer(this.closest('.flyer-card').dataset.name)">Edit template</button>
-          <button class="rename" title="Rename template" onclick="renameSavedFlyer(this.closest('.flyer-card').dataset.name)">✎</button>
-          <button class="delete" title="Delete template" onclick="deleteSavedFlyer(this.closest('.flyer-card').dataset.name)">✕</button>
-        </div>
-      </div>`;
-    }).join('');
-  }
 
   if(rows.length){
     const order = {live:0,scheduled:1,unscheduled:2,past:3};
     rows.sort((a,b) => (order[a.status] - order[b.status]) || ((b.scheduled_start || b.updated_at) - (a.scheduled_start || a.updated_at)));
     const labels = {live:'Current',scheduled:'Upcoming',past:'Past',unscheduled:'No dates'};
-    if(templates.length) html += `<div class="saved-list-label">Flyers</div>`;
     html += rows.map(row => {
       const start = row.scheduled_start ? new Date(row.scheduled_start) : null;
       const end = row.scheduled_end ? new Date(row.scheduled_end) : null;
@@ -4503,10 +4727,40 @@ function initHoverMenuBridging(){
   });
 }
 
+// Same problem, same fix, for overlay boxes -- their drag/remove/library/resize/
+// rotate handles and font-size controls sit at various offsets outside the box
+// itself, so reaching the farther ones (bottom handles, font controls) crosses
+// real dead space and plain CSS :hover drops the box before you can click.
+let overlayControlsCloseTimer = null;
+function initOverlayHoverBridging(){
+  const page = document.getElementById('page');
+  page.addEventListener('mouseover', e => {
+    const box = e.target.closest('.overlay-box');
+    if(!box) return;
+    clearTimeout(overlayControlsCloseTimer);
+    document.querySelectorAll('.overlay-box.controls-open').forEach(b => { if(b !== box) b.classList.remove('controls-open'); });
+    box.classList.add('controls-open');
+  });
+  page.addEventListener('mouseout', e => {
+    const box = e.target.closest('.overlay-box');
+    if(!box) return;
+    const toBox = e.relatedTarget && e.relatedTarget.closest ? e.relatedTarget.closest('.overlay-box') : null;
+    if(toBox === box) return; // still within the same overlay (or its controls) -- not actually leaving
+    clearTimeout(overlayControlsCloseTimer);
+    overlayControlsCloseTimer = setTimeout(() => {
+      if(!box.matches(':focus-within')) box.classList.remove('controls-open');
+    }, 350);
+  });
+}
+
 /* ================= BOOT ================= */
 async function boot(){
   buildGrids();
   enableContainerResize(document.getElementById('logoPhoto'));
+  restoreDrawerWidth();
+  initDrawerResize();
+  restoreHowToWidth();
+  initHowToResize();
   populateLayoutSelect();
   refreshSavedList();
   initWeekPicker();
@@ -4517,6 +4771,7 @@ async function boot(){
   await loadLastFlyerIfAny();
   initAutoSaveTracking();
   initHoverMenuBridging();
+  initOverlayHoverBridging();
   resetFlyerDirtyState();
   setTimeout(() => checkForUpdates(false), 1200);
   seedDefaultTemplatesIfMissing().then(() => { refreshSavedList(); populateLayoutSelect(); });

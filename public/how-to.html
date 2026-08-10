@@ -44,9 +44,15 @@
     <div class="topbar-inner">
       <div class="mark">%</div>
       <div><h1>Weekly Ad Builder</h1><p>Quick How-To Guide</p></div>
-      <a class="back" href="/">← Back to builder</a>
+      <a class="back" id="backLink" href="/">← Back to builder</a>
     </div>
   </header>
+  <script>
+    // When this loads inside the slide-out How-To panel, navigating "back" would
+    // load the whole app a second time inside the small iframe -- hide that link
+    // and let the panel's own ✕ button close it instead.
+    if(window.self !== window.top) document.getElementById('backLink').style.display = 'none';
+  </script>
 
   <main>
     <div class="hero">
@@ -71,7 +77,7 @@
       <section>
         <h3><span>2</span> Add products</h3>
         <ol>
-          <li>The <b>Product Database</b> is the panel on the left — always there, no need to open it.</li>
+          <li>The <b>Product Database</b> panel on the left is always there — drag its right edge to resize it, or click <b>«</b> to collapse it.</li>
           <li>Search for the product and click <b>Add to flyer</b>.</li>
           <li>The product goes into the next open big or small slot based on its catalog setting.</li>
           <li>You can also type a product name directly on the flyer and choose a matching suggestion.</li>
@@ -102,32 +108,34 @@
       <section class="wide">
         <h3><span>▧</span> Work with photos</h3>
         <dl class="control-list">
-          <dt>Click image box</dt><dd>Upload a photo from the computer.</dd>
-          <dt>Find photo</dt><dd>Search the configured stock-photo service.</dd>
+          <dt>Click a filled photo</dt><dd>Opens the crop/reposition editor.</dd>
           <dt>Crop/resize</dt><dd>Zoom and reposition the photo inside its box.</dd>
           <dt>Red ↘ handle</dt><dd>Drag to resize the entire image box. The photo stays snapped to the box.</dd>
           <dt>↶ size</dt><dd>Undo the last image-box resize.</dd>
           <dt>↶</dt><dd>Undo the last crop or photo change.</dd>
           <dt>✕ on photo</dt><dd>Remove only the photo while keeping the product information.</dd>
         </dl>
+        <div class="tip">A flyer slot's photo always comes from its Product Database entry — use <b>↔ Replace</b> on the slot, or <b>Add / Edit product</b> in the database, to set or change a product's photo.</div>
       </section>
 
       <section>
         <h3><span>☰</span> Manage the Product Catalog</h3>
         <ul>
-          <li>Add a product at the bottom of the catalog.</li>
-          <li>Use <b>Edit</b> to change a saved product inline.</li>
-          <li>Upload or search for a catalog photo.</li>
+          <li>Click <b>＋ Add product</b> at the top of the database to open the product editor.</li>
+          <li>Click <b>Edit</b> on any product to open the same editor pre-filled — it stays open after saving, so you can add or edit several products in a row before closing it.</li>
+          <li>Use the <b>⬆</b> button to upload a photo or <b>🔎</b> to search for one.</li>
           <li>Choose whether its default placement is a <b>Big ad</b> or <b>Small ad</b>.</li>
           <li>Use <b>Import Excel / CSV</b> for a product list. Matching names update existing products instead of duplicating them.</li>
+          <li>The list is sorted alphabetically by name.</li>
         </ul>
       </section>
 
       <section class="wide">
-        <h3><span>＋</span> Overlays and templates</h3>
+        <h3><span>＋</span> Overlays, the Image Library, and templates</h3>
         <ul>
-          <li><b>Text or image overlay:</b> in the top bar, open <b>Edit → + Text overlay</b> or <b>+ Image overlay</b> to drop a free-floating box anywhere on the flyer — even on top of a product, for something like a holiday badge or a "SALE!" burst. Drag the round ⠿ handle to move it, the corner ↘ handle to resize it, the ↻ handle to rotate it, and the × to remove it. Text overlays also get a size box for their text.</li>
-          <li><b>Templates:</b> click the ▾ next to the flyer's title and use "📋 Save as template" to save the current ad's content as a reusable starting point. Later, click <b>Use</b> on a template card to start a brand-new ad from it — the template itself never changes. Two starter templates (Christmas, Thanksgiving) are included.</li>
+          <li><b>Text or image overlay:</b> in the top bar, open <b>Edit → + Text overlay</b> or <b>+ Image overlay</b> to drop a free-floating box anywhere on the flyer — even on top of a product, for something like a holiday badge or a "SALE!" burst. Drag the round ⠿ handle to move it, the corner ↘ handle to resize it (it can hang off the edge of the flyer on purpose), the ↻ handle to rotate it, and the × to remove it. Use the ⬆ button to upload a picture or 📚 to pick one already saved in the Image Library. Text overlays also get a size box for their text.</li>
+          <li><b>Image Library:</b> a second tab next to Product Database in the left panel. Upload a graphic once (it keeps real transparency, unlike a plain photo) and reuse it on any future ad instead of re-uploading it every time.</li>
+          <li><b>Templates:</b> click <b>📋 Save as template</b> under the flyer title's ▾ menu to save the current ad as a reusable starting point. To use one, open <b>Edit → Template / layout</b> — saved templates (plus the built-in seasonal ones) are listed there alongside the layout choices. Picking one starts a brand-new ad from it; the template itself never changes.</li>
         </ul>
         <div class="tip">Overlays are also useful for the "Store Circular" layout's labeled category rows (Fresh Produce, Pantry Savings, etc.) — click a red category banner to rename it, and use the <b>+ Add box</b> tile / <b>🗑 remove box</b> to match however many items you actually have that week.</div>
       </section>
@@ -145,7 +153,7 @@
         <h3><span>⤓</span> Backup, restore, or move to another PC</h3>
         <ol>
           <li>Click the <b>⚙</b> icon top-left for <b>Settings</b>, then click <b>Download full backup</b> under Data &amp; backups.</li>
-          <li>Keep the downloaded JSON file somewhere safe. It contains saved flyers, catalog products, photos, settings, and subscribers.</li>
+          <li>Keep the downloaded JSON file somewhere safe. It contains saved flyers, catalog products, photos, settings, subscribers, and the Image Library.</li>
           <li>On another installed copy, log in and click <b>Restore from backup</b>.</li>
           <li>Select the JSON file, review the item counts, and type <b>RESTORE</b> when prompted.</li>
         </ol>

@@ -51,6 +51,15 @@ db.exec(`
     recorded_at INTEGER NOT NULL
   );
   CREATE INDEX IF NOT EXISTS idx_price_history_product ON price_history (product_key, recorded_at);
+
+  -- Reusable decorative graphics (badges, seasonal art) for the overlay picker,
+  -- saved once and reused across flyers instead of re-uploading every time.
+  CREATE TABLE IF NOT EXISTS image_library (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    img TEXT NOT NULL,
+    created_at INTEGER NOT NULL
+  );
 `);
 
 // migration-safe: add scheduling + broadcast columns to flyers if this is an older database
