@@ -755,6 +755,10 @@
     align-items:center; justify-content:center;
   }
   .modal-overlay.open{ display:flex; }
+  /* Photo search and crop can both be opened from inside the product editor
+     modal (Find/Upload photo) without closing it first -- they need to render
+     above it rather than tying on the shared z-index and losing on DOM order. */
+  #cropModal, #photoModal{ z-index:110; }
   .modal{
     background:#fff; border-radius:10px; width:640px; max-width:92vw; max-height:82vh;
     display:flex; flex-direction:column; overflow:hidden;
@@ -2972,6 +2976,7 @@ function openProductDB(targetCell = null){
 function closeProductDB(){
   replaceTargetCell = null;
   updateCatalogReplaceMode();
+  renderDbList();
 }
 
 function openReplaceProduct(button){
