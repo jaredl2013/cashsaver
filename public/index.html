@@ -81,6 +81,8 @@
     width:100%; border:1px solid rgba(255,255,255,.14); border-radius:8px; padding:8px 9px;
     background:#0b1220; color:#f9fafb; font-size:12px; color-scheme:dark;
   }
+  .topbar-menu select option, .topbar-menu select optgroup{ background:#0b1220; color:#f9fafb; }
+  #topBar select option, #topBar select optgroup{ background:#111827; color:#e5e7eb; }
   .topbar-menu .saved-flyer-list{ max-height:280px; overflow-y:auto; margin-top:4px; }
 
   .status-toast{
@@ -566,7 +568,7 @@
     opacity:0; pointer-events:none; transition:opacity .15s;
   }
   .cell-hover-menu .hover-menu-row{ display:flex; align-items:center; gap:5px; }
-  .cell:hover .cell-hover-menu, .cell-hover-menu:focus-within{ opacity:1; pointer-events:auto; }
+  .cell:hover .cell-hover-menu, .cell-hover-menu:focus-within, .cell-hover-menu.open{ opacity:1; pointer-events:auto; }
   .cell-hover-menu button{
     border:1px solid #ddd; border-radius:6px; background:#fafafa; color:#333;
     font-size:14px; font-weight:800; width:32px; height:32px; line-height:1;
@@ -589,10 +591,10 @@
   .add-box-tile:hover{ border-color:var(--red); color:var(--red); background:#fff5f4; }
   .render-clean .add-box-tile{ display:none !important; }
   .name-size-input{
-    width:40px; height:32px; padding:0 2px; border:1px solid #ddd; border-radius:6px;
+    width:34px; height:32px; padding:0 2px; border:1px solid #ddd; border-radius:6px;
     font-size:12px; font-weight:800; color:#333; text-align:center; -moz-appearance:textfield;
   }
-  .name-size-input::-webkit-inner-spin-button, .name-size-input::-webkit-outer-spin-button{ margin:0; }
+  .name-size-input::-webkit-inner-spin-button, .name-size-input::-webkit-outer-spin-button{ -webkit-appearance:none; appearance:none; margin:0; }
   .render-clean .cell-hover-menu{ display:none !important; }
   .render-clean .cell.is-cleared > *{ visibility:hidden !important; }
 
@@ -1867,17 +1869,37 @@ function switchLayout(layoutId){
   setStatus(`Switched to "${LAYOUTS[layoutId].name}" layout.`);
 }
 
-function populateLayoutSelect(){
+async function populateLayoutSelect(){
   const sel = document.getElementById('layoutSelect');
-  sel.innerHTML = Object.entries(LAYOUTS).map(([id, l]) =>
+  let html = '<optgroup label="Layout">' + Object.entries(LAYOUTS).map(([id, l]) =>
     `<option value="${id}">${l.name}</option>`
-  ).join('');
+  ).join('') + '</optgroup>';
+  try{
+    const res = await fetch('/api/flyers');
+    if(res.ok){
+      const rows = await res.json();
+      const templates = rows.filter(r => isTemplateName(r.name)).sort((a,b) => a.name.localeCompare(b.name));
+      if(templates.length){
+        html += '<optgroup label="Templates">' + templates.map(row => {
+          const label = row.name.slice(TEMPLATE_PREFIX.length);
+          return `<option value="tpl:${encodeURIComponent(row.name)}">${escapeHtml(label)}</option>`;
+        }).join('') + '</optgroup>';
+      }
+    }
+  } catch(e){ /* the plain layout list still works fine without templates if this fails */ }
+  sel.innerHTML = html;
   sel.value = currentLayoutId;
 }
 
-function onLayoutSelectChange(){
+async function onLayoutSelectChange(){
   const sel = document.getElementById('layoutSelect');
-  const newId = sel.value;
+  const val = sel.value;
+  if(val.startsWith('tpl:')){
+    const ok = await useTemplate(decodeURIComponent(val.slice(4)));
+    if(!ok) sel.value = currentLayoutId; // they backed out -- applyState never ran, so put the dropdown back
+    return;
+  }
+  const newId = val;
   if(newId === currentLayoutId) return;
   const ok = confirm(
     `Switch to the "${LAYOUTS[newId].name}" layout?\n\n` +
@@ -4126,9 +4148,13 @@ function buildSeedTemplateState(theme){
     foot: 'Plus 10% Added at Checkout.', photoWidth: null, photoHeight: null,
     previousPhotoWidth: null, previousPhotoHeight: null, removed: false
   }));
-  const copy = theme === 'christmas'
-    ? { line1: 'MERRY CHRISTMAS!', line2: 'Holiday savings all season long', wow1: 'HOLIDAY FAVORITES', wow2: 'STOCK UP FOR THE SEASON!', overlay: 'Happy Holidays!' }
-    : { line1: 'HAPPY THANKSGIVING!', line2: 'Everything for your holiday table', wow1: 'TURKEY DAY DEALS', wow2: "DON'T MISS OUT!", overlay: 'Give Thanks & Save!' };
+  const themes = {
+    christmas: { line1: 'MERRY CHRISTMAS!', line2: 'Holiday savings all season long', wow1: 'HOLIDAY FAVORITES', wow2: 'STOCK UP FOR THE SEASON!', overlay: 'Happy Holidays!' },
+    thanksgiving: { line1: 'HAPPY THANKSGIVING!', line2: 'Everything for your holiday table', wow1: 'TURKEY DAY DEALS', wow2: "DON'T MISS OUT!", overlay: 'Give Thanks & Save!' },
+    july4: { line1: 'HAPPY 4TH OF JULY!', line2: 'Red, white & savings all week', wow1: 'SUMMER COOKOUT DEALS', wow2: 'FIRE UP THE GRILL!', overlay: 'Happy 4th of July!' },
+    valentines: { line1: "HAPPY VALENTINE'S DAY!", line2: 'Sweet deals for your sweetheart', wow1: 'VALENTINE FAVORITES', wow2: 'TREAT THEM RIGHT!', overlay: 'Be Mine!' }
+  };
+  const copy = themes[theme] || themes.christmas;
   return {
     header: {
       logoImage: null, logoOriginalImage: null, logoPreviousImage: null,
@@ -4149,9 +4175,9 @@ function buildSeedTemplateState(theme){
   };
 }
 
-// Ships two starter templates (Christmas/Thanksgiving) so there's something to
-// work from out of the box -- only seeds them once; if a store deletes or
-// renames them, this won't recreate them (checks by exact name first).
+// Ships starter templates so there's something to work from out of the box --
+// only seeds them once; if a store deletes or renames one, this won't recreate
+// it (checks by exact name first).
 async function seedDefaultTemplatesIfMissing(){
   const res = await fetch('/api/flyers');
   if(!res.ok) return;
@@ -4159,7 +4185,9 @@ async function seedDefaultTemplatesIfMissing(){
   const names = new Set(rows.map(r => r.name));
   const seeds = [
     { key: 'christmas', name: TEMPLATE_PREFIX + 'Christmas' },
-    { key: 'thanksgiving', name: TEMPLATE_PREFIX + 'Thanksgiving' }
+    { key: 'thanksgiving', name: TEMPLATE_PREFIX + 'Thanksgiving' },
+    { key: 'july4', name: TEMPLATE_PREFIX + '4th of July' },
+    { key: 'valentines', name: TEMPLATE_PREFIX + "Valentine's Day" }
   ];
   for(const seed of seeds){
     if(names.has(seed.name)) continue;
@@ -4171,14 +4199,15 @@ async function seedDefaultTemplatesIfMissing(){
 }
 
 async function useTemplate(name){
-  if(flyerDirty && !confirm('You still have unsaved changes. Start a new ad from this template and discard them?')) return;
+  if(flyerDirty && !confirm('You still have unsaved changes. Start a new ad from this template and discard them?')) return false;
   const res = await fetch('/api/flyers/' + encodeURIComponent(name));
-  if(!res.ok){ alert('Could not load that template.'); return; }
+  if(!res.ok){ alert('Could not load that template.'); return false; }
   const state = await res.json();
   applyState(state);
   setCurrentName(null);
   markFlyerDirty();
   setStatus('Started a new ad from this template — name it to save your own copy.');
+  return true;
 }
 
 function setStatus(msg){
@@ -4444,6 +4473,36 @@ function initAutoSaveTracking(){
   });
 }
 
+// The cell-hover-menu opens a few pixels above its cell, so moving the mouse
+// from the cell up into the menu briefly crosses a gap that's part of neither
+// element -- plain CSS :hover loses the cell right then and the menu vanishes
+// before it can be clicked. This gives a short grace period: closing is
+// delayed, and re-entering the cell or the menu within that window cancels it.
+let hoverMenuCloseTimer = null;
+function initHoverMenuBridging(){
+  const page = document.getElementById('page');
+  page.addEventListener('mouseover', e => {
+    const cell = e.target.closest('.cell');
+    if(!cell) return;
+    const menu = cell.querySelector('.cell-hover-menu');
+    if(!menu) return;
+    clearTimeout(hoverMenuCloseTimer);
+    document.querySelectorAll('.cell-hover-menu.open').forEach(m => { if(m !== menu) m.classList.remove('open'); });
+    menu.classList.add('open');
+  });
+  page.addEventListener('mouseout', e => {
+    const cell = e.target.closest('.cell');
+    if(!cell) return;
+    const toCell = e.relatedTarget && e.relatedTarget.closest ? e.relatedTarget.closest('.cell') : null;
+    if(toCell === cell) return; // still within the same cell (or its popup) -- not actually leaving
+    clearTimeout(hoverMenuCloseTimer);
+    hoverMenuCloseTimer = setTimeout(() => {
+      const menu = cell.querySelector('.cell-hover-menu');
+      if(menu && !menu.matches(':focus-within')) menu.classList.remove('open');
+    }, 350);
+  });
+}
+
 /* ================= BOOT ================= */
 async function boot(){
   buildGrids();
@@ -4457,9 +4516,10 @@ async function boot(){
   renderDbList();
   await loadLastFlyerIfAny();
   initAutoSaveTracking();
+  initHoverMenuBridging();
   resetFlyerDirtyState();
   setTimeout(() => checkForUpdates(false), 1200);
-  seedDefaultTemplatesIfMissing().then(refreshSavedList);
+  seedDefaultTemplatesIfMissing().then(() => { refreshSavedList(); populateLayoutSelect(); });
 }
 
 checkSession();
