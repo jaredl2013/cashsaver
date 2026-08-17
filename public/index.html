@@ -83,6 +83,16 @@
     width:100%; border:1px solid rgba(255,255,255,.14); border-radius:8px; padding:8px 9px;
     background:#0b1220; color:#f9fafb; font-size:12px; color-scheme:dark;
   }
+  .background-controls{ display:grid; grid-template-columns:auto 1fr; align-items:center; gap:8px; }
+  .background-controls input[type=color]{ width:44px; height:34px; padding:2px; border:1px solid rgba(255,255,255,.18); border-radius:7px; background:#0b1220; cursor:pointer; }
+  .background-controls button{ height:34px !important; padding:0 10px !important; font-size:12px !important; }
+  .background-presets{ display:flex; gap:6px; flex-wrap:wrap; }
+  .background-swatch{ width:25px !important; height:25px !important; min-width:25px; padding:0 !important; border:2px solid rgba(255,255,255,.32) !important; border-radius:50% !important; }
+  #cropStage.transparency-preview{ background-color:#fff; background-image:linear-gradient(45deg,#ddd 25%,transparent 25%),linear-gradient(-45deg,#ddd 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#ddd 75%),linear-gradient(-45deg,transparent 75%,#ddd 75%); background-size:18px 18px; background-position:0 0,0 9px,9px -9px,-9px 0; }
+  .remove-bg-controls{ margin-top:12px; padding:10px 12px; border:1px solid #ddd; border-radius:8px; background:#f8fafc; }
+  .remove-bg-controls label{ display:flex; align-items:center; gap:8px; font-size:12px; font-weight:800; color:#334155; }
+  .remove-bg-controls .remove-bg-tolerance{ display:none; align-items:center; gap:8px; margin-top:9px; }
+  .remove-bg-controls.active .remove-bg-tolerance{ display:flex; }
   .topbar-menu select option, .topbar-menu select optgroup{ background:#0b1220; color:#f9fafb; }
   #topBar select option, #topBar select optgroup{ background:#111827; color:#e5e7eb; }
   .topbar-menu .saved-flyer-list{ max-height:280px; overflow-y:auto; margin-top:4px; }
@@ -320,6 +330,7 @@
   /* ---------- Page ---------- */
   .page{
     width:816px; min-height:1032px; margin:0 auto; background:#fff;
+    background-size:cover; background-position:center; background-repeat:no-repeat;
     box-shadow:0 4px 24px rgba(0,0,0,.35); padding:18px; position:relative;
   }
 
@@ -1107,6 +1118,21 @@
           <div class="topbar-menu" id="editMenu">
             <label class="tlabel">Template / layout:</label>
             <select id="layoutSelect" onchange="onLayoutSelectChange()"></select>
+            <label class="tlabel">Flyer background color:</label>
+            <div class="background-controls">
+              <input type="color" id="pageBackgroundColor" value="#ffffff" title="Background color" oninput="setPageBackgroundColor(this.value)">
+              <button class="secondary" onclick="document.getElementById('pageBackgroundUpload').click()">Upload image</button>
+            </div>
+            <div class="background-presets" aria-label="Background color presets">
+              <button class="background-swatch" style="background:#ffffff" title="White" onclick="setBackgroundPreset('#ffffff')"></button>
+              <button class="background-swatch" style="background:#fff7ed" title="Warm cream" onclick="setBackgroundPreset('#fff7ed')"></button>
+              <button class="background-swatch" style="background:#fef2f2" title="Soft red" onclick="setBackgroundPreset('#fef2f2')"></button>
+              <button class="background-swatch" style="background:#eff6ff" title="Soft blue" onclick="setBackgroundPreset('#eff6ff')"></button>
+              <button class="background-swatch" style="background:#f0fdf4" title="Soft green" onclick="setBackgroundPreset('#f0fdf4')"></button>
+              <button class="background-swatch" style="background:#111827" title="Charcoal" onclick="setBackgroundPreset('#111827')"></button>
+            </div>
+            <input type="file" id="pageBackgroundUpload" accept="image/*" hidden onchange="setPageBackgroundImage(this)">
+            <button class="secondary" id="removePageBackgroundImageBtn" onclick="removePageBackgroundImage()" style="display:none;">Remove background image</button>
             <button class="secondary" onclick="addTextOverlay(); toggleTopbarMenu('editMenu');">＋ Text overlay</button>
             <button class="secondary" onclick="addImageOverlay(); toggleTopbarMenu('editMenu');">＋ Image overlay</button>
             <button class="secondary" onclick="openImageLibrary(); toggleTopbarMenu('editMenu');">📚 Image library</button>
@@ -1329,6 +1355,15 @@
         <div style="display:flex;align-items:center;gap:10px;margin-top:12px;">
           <label style="font-size:12px;font-weight:bold;color:#555;">Zoom</label>
           <input type="range" id="cropZoom" min="20" max="300" value="100" style="flex:1;" oninput="onCropZoom(this.value)">
+        </div>
+        <div class="remove-bg-controls" id="removeBgControls">
+          <label><input type="checkbox" id="removeBgToggle" onchange="toggleCropBackgroundRemoval(this.checked)"> Remove image background</label>
+          <div class="remove-bg-tolerance">
+            <span style="font-size:11px;color:#64748b;">Edge sensitivity</span>
+            <input type="range" id="removeBgTolerance" min="10" max="100" value="42" style="flex:1;" oninput="previewCropBackgroundRemoval(this.value)">
+            <span id="removeBgToleranceValue" style="width:24px;font-size:11px;color:#64748b;text-align:right;">42</span>
+          </div>
+          <div style="font-size:10.5px;color:#64748b;margin-top:6px;line-height:1.35;">Best for products photographed against a plain white or solid-color background. Only matching color connected to the image edges is removed.</div>
         </div>
         <p style="font-size:11.5px;color:#888;margin:8px 0 0 0;">Drag the photo to reposition it. Zoom in to crop tighter, or zoom out if the photo is too big to fit — extra space fills in white.</p>
       </div>
@@ -2562,6 +2597,44 @@ async function setOverlayImage(input){
   input.value = ''; // allow picking the same file again later
 }
 
+function applyPageBackground(color = '#ffffff', image = ''){
+  const page = document.getElementById('page');
+  const safeColor = /^#[0-9a-f]{6}$/i.test(color) ? color : '#ffffff';
+  page.style.backgroundColor = safeColor;
+  page.style.backgroundImage = image ? `url(${image})` : '';
+  page.dataset.backgroundImage = image || '';
+  document.getElementById('pageBackgroundColor').value = safeColor;
+  document.getElementById('removePageBackgroundImageBtn').style.display = image ? '' : 'none';
+}
+
+function setPageBackgroundColor(color){
+  applyPageBackground(color, document.getElementById('page').dataset.backgroundImage || '');
+  markFlyerDirty();
+}
+
+function setBackgroundPreset(color){
+  document.getElementById('pageBackgroundColor').value = color;
+  setPageBackgroundColor(color);
+}
+
+async function setPageBackgroundImage(input){
+  const file = input.files[0];
+  if(!file) return;
+  try{
+    const dataUrl = await readAndDownscaleImage(file, 1800);
+    applyPageBackground(document.getElementById('pageBackgroundColor').value, dataUrl);
+    markFlyerDirty();
+  } catch(e){
+    alert(e.message || 'Could not load that background image.');
+  }
+  input.value = '';
+}
+
+function removePageBackgroundImage(){
+  applyPageBackground(document.getElementById('pageBackgroundColor').value, '');
+  markFlyerDirty();
+}
+
 // Clicking the image box itself no longer opens the raw file picker -- that's
 // what the explicit ⬆ upload / 📚 library buttons are for now, whether the box
 // is empty or already filled.
@@ -3602,6 +3675,10 @@ const JPEG_QUALITY = 0.92;
 
 let cropTarget = null;   // the .photo element we're filling in
 let cropOriginalDataUrl = null;
+let cropEditorSourceDataUrl = null;
+let cropHasTransparency = false;
+let removeBgPreviewTimer = null;
+let removeBgRequestId = 0;
 let cropNaturalW = 0, cropNaturalH = 0;
 let cropScaleBase = 1;   // scale at 100% zoom (the "cover" scale)
 let cropScale = 1;
@@ -3610,6 +3687,15 @@ let cropDragging = false, cropDragStartX = 0, cropDragStartY = 0, cropStartOffX 
 
 function openCropper(dataUrl, target, isNewSource = false){
   cropTarget = target;
+  cropEditorSourceDataUrl = dataUrl;
+  cropHasTransparency = false;
+  removeBgRequestId++;
+  clearTimeout(removeBgPreviewTimer);
+  document.getElementById('removeBgToggle').checked = false;
+  document.getElementById('removeBgControls').classList.remove('active');
+  document.getElementById('removeBgTolerance').value = 42;
+  document.getElementById('removeBgToleranceValue').textContent = '42';
+  document.getElementById('cropStage').classList.remove('transparency-preview');
   // Match the editing stage to the actual destination box. A wide logo now gets
   // a wide crop, while portrait or square product boxes keep their own shape.
   const targetWidth = Math.max(1, target.offsetWidth);
@@ -3702,9 +3788,102 @@ function onCropZoom(val){
 })();
 
 function closeCropper(){
+  removeBgRequestId++;
   document.getElementById('cropModal').classList.remove('open');
   cropTarget = null;
   cropOriginalDataUrl = null;
+  cropEditorSourceDataUrl = null;
+  cropHasTransparency = false;
+  clearTimeout(removeBgPreviewTimer);
+}
+
+function toggleCropBackgroundRemoval(enabled){
+  document.getElementById('removeBgControls').classList.toggle('active', enabled);
+  document.getElementById('cropStage').classList.toggle('transparency-preview', enabled);
+  if(enabled) previewCropBackgroundRemoval(document.getElementById('removeBgTolerance').value, true);
+  else restoreCropEditorSource();
+}
+
+function previewCropBackgroundRemoval(value, immediate = false){
+  document.getElementById('removeBgToleranceValue').textContent = value;
+  if(!document.getElementById('removeBgToggle').checked) return;
+  clearTimeout(removeBgPreviewTimer);
+  if(immediate) removeCropImageBackground(Number(value));
+  else removeBgPreviewTimer = setTimeout(() => removeCropImageBackground(Number(value)), 120);
+}
+
+function restoreCropEditorSource(){
+  if(!cropEditorSourceDataUrl) return;
+  cropHasTransparency = false;
+  const img = document.getElementById('cropImg');
+  img.onload = () => {
+    cropNaturalW = img.naturalWidth; cropNaturalH = img.naturalHeight;
+    cropOriginalDataUrl = makeCompressedOriginal(img);
+    cropScaleBase = Math.max(CROP_W / cropNaturalW, CROP_H / cropNaturalH);
+    cropScale = cropScaleBase;
+    cropOffsetX = (CROP_W - cropNaturalW * cropScale) / 2;
+    cropOffsetY = (CROP_H - cropNaturalH * cropScale) / 2;
+    document.getElementById('cropZoom').value = 100;
+    applyCropTransform();
+  };
+  img.src = cropEditorSourceDataUrl;
+}
+
+function removeCropImageBackground(tolerance){
+  if(!cropEditorSourceDataUrl || !cropTarget) return;
+  const requestId = ++removeBgRequestId;
+  const source = new Image();
+  source.onload = () => {
+    if(requestId !== removeBgRequestId || !document.getElementById('removeBgToggle').checked) return;
+    const scale = Math.min(1, 1400 / Math.max(source.naturalWidth, source.naturalHeight));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(source.naturalWidth * scale));
+    canvas.height = Math.max(1, Math.round(source.naturalHeight * scale));
+    const ctx = canvas.getContext('2d', { willReadFrequently:true });
+    ctx.drawImage(source, 0, 0, canvas.width, canvas.height);
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const data = imageData.data, width = canvas.width, height = canvas.height;
+    const corners = [[0,0],[width-1,0],[0,height-1],[width-1,height-1]].map(([x,y]) => {
+      const i = (y * width + x) * 4; return [data[i], data[i+1], data[i+2]];
+    });
+    const thresholdSq = tolerance * tolerance * 3;
+    const seen = new Uint8Array(width * height);
+    const queue = new Uint32Array(width * height);
+    let head = 0, tail = 0;
+    const matches = index => {
+      const i = index * 4, r = data[i], g = data[i+1], b = data[i+2];
+      return corners.some(c => {
+        const dr = r-c[0], dg = g-c[1], db = b-c[2];
+        return dr*dr + dg*dg + db*db <= thresholdSq;
+      });
+    };
+    const add = index => { if(!seen[index] && matches(index)){ seen[index] = 1; queue[tail++] = index; } };
+    for(let x = 0; x < width; x++){ add(x); add((height-1)*width+x); }
+    for(let y = 1; y < height-1; y++){ add(y*width); add(y*width+width-1); }
+    while(head < tail){
+      const index = queue[head++], x = index % width, y = (index / width) | 0;
+      data[index*4+3] = 0;
+      if(x) add(index-1); if(x+1 < width) add(index+1);
+      if(y) add(index-width); if(y+1 < height) add(index+width);
+    }
+    ctx.putImageData(imageData, 0, 0);
+    const processed = canvas.toDataURL('image/png');
+    if(requestId !== removeBgRequestId || !document.getElementById('removeBgToggle').checked) return;
+    cropHasTransparency = true;
+    cropOriginalDataUrl = processed;
+    const img = document.getElementById('cropImg');
+    img.onload = () => {
+      cropNaturalW = img.naturalWidth; cropNaturalH = img.naturalHeight;
+      cropScaleBase = Math.max(CROP_W / cropNaturalW, CROP_H / cropNaturalH);
+      cropScale = cropScaleBase;
+      cropOffsetX = (CROP_W - cropNaturalW * cropScale) / 2;
+      cropOffsetY = (CROP_H - cropNaturalH * cropScale) / 2;
+      document.getElementById('cropZoom').value = 100;
+      applyCropTransform();
+    };
+    img.src = processed;
+  };
+  source.src = cropEditorSourceDataUrl;
 }
 
 function finishCrop(dataUrl){
@@ -3751,8 +3930,7 @@ function useCroppedImage(){
   const ctx = out.getContext('2d');
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, outW, outH);
+  if(!cropHasTransparency){ ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, outW, outH); }
   const scaleX = outW / CROP_W;
   const scaleY = outH / CROP_H;
   ctx.drawImage(
@@ -3779,8 +3957,7 @@ function useWholeImage(){
   const ctx = out.getContext('2d');
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, outW, outH);
+  if(!cropHasTransparency){ ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, outW, outH); }
   const img = document.getElementById('cropImg');
   ctx.drawImage(img, dx, dy, drawW, drawH);
   finishCrop(canvasImageData(out));
@@ -3797,7 +3974,8 @@ function getCropOutputSize(){
 
 function canvasImageData(canvas){
   const isLogo = cropTarget && cropTarget.classList.contains('logo-photo');
-  return canvas.toDataURL(isLogo ? 'image/png' : 'image/jpeg', isLogo ? undefined : JPEG_QUALITY);
+  const usePng = isLogo || cropHasTransparency;
+  return canvas.toDataURL(usePng ? 'image/png' : 'image/jpeg', usePng ? undefined : JPEG_QUALITY);
 }
 
 /* ================= AD SCHEDULE (Wed-Tue by default, editable for holiday runs) ================= */
@@ -4383,6 +4561,8 @@ function serializeState(){
     logoHeight: document.getElementById('logoPhoto').style.height || null,
     logoPreviousWidth: document.getElementById('logoPhoto').dataset.previousWidth || null,
     logoPreviousHeight: document.getElementById('logoPhoto').dataset.previousHeight || null,
+    backgroundColor: document.getElementById('page').style.backgroundColor || '#ffffff',
+    backgroundImage: document.getElementById('page').dataset.backgroundImage || null,
     layoutId: currentLayoutId,
     store: Array.from(document.querySelectorAll('.store-box div')).map(d => d.innerHTML),
     storeAlign: document.querySelector('.store-box').classList.contains('text-centered') ? 'center' : 'left',
@@ -4406,6 +4586,7 @@ function serializeState(){
 }
 
 function applyState(state){
+  applyPageBackground(state.header.backgroundColor || '#ffffff', state.header.backgroundImage || '');
   const logoPhoto = document.getElementById('logoPhoto');
   logoPhoto.style.width = state.header.logoWidth || '';
   logoPhoto.style.height = state.header.logoHeight || '';
