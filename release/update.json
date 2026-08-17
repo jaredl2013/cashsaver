@@ -1,7 +1,7 @@
-﻿{
-    "version":  "1.0.25",
-    "downloadUrl":  "https://github.com/jaredl2013/cashsaver/releases/download/v1.0.25/CashSaver-Ad-Builder-Setup-1.0.25.exe",
-    "sha256":  "d8f47a72cff3647d3cbec6ebfa8035569efebe0d2ff1c9694598babb1ad8bdb7",
-    "releaseNotes":  "Product database is now a fully editable table -- click any field to change it, no separate edit screen. Added product categories (matches labeled ad sections automatically), a photo search button, and a Small/Big dropdown. Editing a product already on your ad now updates it there too.",
-    "publishedAt":  "2026-08-10T14:12:56.7363289Z"
+{
+  "version": "1.0.26",
+  "downloadUrl": "https://github.com/jaredl2013/cashsaver/releases/download/v1.0.26/CashSaver-Ad-Builder-Setup-1.0.26.exe",
+  "sha256": "f1c29b15d68d1314316524683b6327a52511bca08445a65b1f1f6ab392e9f7c7",
+  "releaseNotes": "Added flyer background colors and optional edge-aware product photo background removal with adjustable sensitivity.",
+  "publishedAt": "2026-08-17T18:52:12.2265570Z"
 }
