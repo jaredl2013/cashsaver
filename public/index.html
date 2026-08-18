@@ -1161,7 +1161,7 @@
     <div class="page" id="page">
 
       <div class="header">
-        <label class="photo logo-photo has-img" id="logoPhoto" style="background-image:url(/assets/cashsaver-logo.png)" data-img="/assets/cashsaver-logo.png" data-original-img="/assets/cashsaver-logo.png" onclick="event.preventDefault()">
+        <label class="photo logo-photo has-img" id="logoPhoto" title="Click to upload or replace the store logo" style="background-image:url(/assets/cashsaver-logo-transparent.png)" data-img="/assets/cashsaver-logo-transparent.png" data-original-img="/assets/cashsaver-logo-transparent.png">
           <span class="lbl">Upload your logo</span>
           <input type="file" accept="image/*" onchange="setPhoto(this)">
           <button type="button" class="upload-photo-btn" title="Upload a new logo" onclick="event.preventDefault();event.stopPropagation();this.closest('.photo').querySelector('input[type=file]').click()">⬆</button>
@@ -1433,7 +1433,7 @@
 
 <script>
 const UNIT_OPTIONS = ["lb.","each","oz.","ea.","box","bag","gal.","ct.","pk.","dozen","case","other"];
-const DEFAULT_LOGO_IMG = '/assets/cashsaver-logo.png';
+const DEFAULT_LOGO_IMG = '/assets/cashsaver-logo-transparent.png';
 let activePhotoTarget = null; // which .photo element the photo-search modal is filling in
 
 /* ================= LOGIN ================= */
@@ -2599,7 +2599,11 @@ async function setOverlayImage(input){
 
 function applyPageBackground(color = '#ffffff', image = ''){
   const page = document.getElementById('page');
-  const safeColor = /^#[0-9a-f]{6}$/i.test(color) ? color : '#ffffff';
+  const rgbMatch = String(color).match(/^rgb\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*\)$/i);
+  const rgbHex = rgbMatch && rgbMatch.slice(1).every(value => Number(value) <= 255)
+    ? '#' + rgbMatch.slice(1).map(value => Number(value).toString(16).padStart(2, '0')).join('')
+    : null;
+  const safeColor = /^#[0-9a-f]{6}$/i.test(String(color)) ? String(color) : (rgbHex || '#ffffff');
   page.style.backgroundColor = safeColor;
   page.style.backgroundImage = image ? `url(${image})` : '';
   page.dataset.backgroundImage = image || '';
@@ -4555,13 +4559,14 @@ function serializeState(){
   const cells = collectAllCellData();
   const header = {
     logoImage: document.getElementById('logoPhoto').dataset.img || null,
+    logoRemoved: !document.getElementById('logoPhoto').dataset.img,
     logoOriginalImage: document.getElementById('logoPhoto').dataset.originalImg || document.getElementById('logoPhoto').dataset.img || null,
     logoPreviousImage: document.getElementById('logoPhoto').dataset.previousImg || null,
     logoWidth: document.getElementById('logoPhoto').style.width || null,
     logoHeight: document.getElementById('logoPhoto').style.height || null,
     logoPreviousWidth: document.getElementById('logoPhoto').dataset.previousWidth || null,
     logoPreviousHeight: document.getElementById('logoPhoto').dataset.previousHeight || null,
-    backgroundColor: document.getElementById('page').style.backgroundColor || '#ffffff',
+    backgroundColor: document.getElementById('pageBackgroundColor').value || '#ffffff',
     backgroundImage: document.getElementById('page').dataset.backgroundImage || null,
     layoutId: currentLayoutId,
     store: Array.from(document.querySelectorAll('.store-box div')).map(d => d.innerHTML),
@@ -4594,13 +4599,25 @@ function applyState(state){
   else delete logoPhoto.dataset.previousWidth;
   if(state.header.logoPreviousHeight) logoPhoto.dataset.previousHeight = state.header.logoPreviousHeight;
   else delete logoPhoto.dataset.previousHeight;
-  // Flyers with no explicitly saved logo fall back to the CashSaver logo baked
-  // into the template, so a new flyer starts branded instead of needing a re-upload.
-  const logoImg = state.header.logoImage || DEFAULT_LOGO_IMG;
-  logoPhoto.style.backgroundImage = `url(${logoImg})`;
-  logoPhoto.dataset.img = logoImg;
-  logoPhoto.classList.add('has-img');
-  logoPhoto.dataset.originalImg = state.header.logoOriginalImage || logoImg;
+  // A removed logo is different from an older flyer that never saved logo data.
+  // The legacy check also recognizes flyers saved after removal before the
+  // explicit logoRemoved flag existed (no current image, but an original remained).
+  const logoRemoved = state.header.logoRemoved === true ||
+    (state.header.logoImage === null && !!state.header.logoOriginalImage);
+  if(logoRemoved){
+    logoPhoto.style.backgroundImage = '';
+    delete logoPhoto.dataset.img;
+    delete logoPhoto.dataset.originalImg;
+    logoPhoto.classList.remove('has-img');
+  } else {
+    // Flyers with no explicitly saved logo fall back to the built-in logo, so
+    // genuinely old flyers still open branded instead of appearing broken.
+    const logoImg = state.header.logoImage || DEFAULT_LOGO_IMG;
+    logoPhoto.style.backgroundImage = `url(${logoImg})`;
+    logoPhoto.dataset.img = logoImg;
+    logoPhoto.dataset.originalImg = state.header.logoOriginalImage || logoImg;
+    logoPhoto.classList.add('has-img');
+  }
   if(state.header.logoPreviousImage) logoPhoto.dataset.previousImg = state.header.logoPreviousImage;
   else delete logoPhoto.dataset.previousImg;
   updatePhotoActionState(logoPhoto);
