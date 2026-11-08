@@ -26,6 +26,11 @@ if (-not (Test-Path (Join-Path $appRoot 'node_modules'))) {
   if ($LASTEXITCODE -ne 0) { throw 'npm could not prepare the production dependencies.' }
 }
 
+# The Ad Designer front-end is compiled into public/designer (not committed to git).
+if (-not (Test-Path (Join-Path $appRoot 'public\designer\index.html'))) {
+  throw 'The Ad Designer is not built. Run "npm install" then "npm run build" in the app folder, then run this script again.'
+}
+
 if (Test-Path $stageDir) { Remove-Item -LiteralPath $stageDir -Recurse -Force }
 New-Item -ItemType Directory -Path $stageDir,$outputDir -Force | Out-Null
 

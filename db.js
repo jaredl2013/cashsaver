@@ -88,4 +88,22 @@ seed.run('licenseLastCheck', '0');
 seed.run('licenseMessage', '');
 
 db.dataDir = dataDir;
+// Free-form canvas designs from the Ad Designer editor. `data` holds the whole
+// design document (pages + elements) as JSON so the editor can evolve without
+// schema migrations; the summary columns keep the "Your designs" list fast.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS designs (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    width INTEGER NOT NULL,
+    height INTEGER NOT NULL,
+    data TEXT NOT NULL,
+    thumbnail TEXT,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    deleted_at INTEGER
+  );
+  CREATE INDEX IF NOT EXISTS idx_designs_updated ON designs (deleted_at, updated_at);
+`);
+
 module.exports = db;

@@ -1,4 +1,33 @@
-# Weekly Ad Builder
+# Ad Designer (formerly Weekly Ad Builder)
+
+A drag-and-drop editor for ads, flyers and sales papers for any kind of business,
+plus the original weekly flyer builder.
+
+- **Ad Designer** (home page, `/`): a free-form canvas editor. Pick a size (letter
+  flyer, tabloid sales paper, social posts, banners), then add text, shapes, badges,
+  your own uploads or stock photos from the left sidebar. Drag, resize, rotate, snap
+  to guides, lock, layer, undo/redo, and download as PNG, JPG or a 300 DPI print PDF.
+  Designs autosave to the server.
+- **Classic builder** (`/classic`): the original grid-based weekly flyer builder,
+  kept running while the designer picks up its product-catalog features.
+
+### Building the designer
+
+The designer's source is in `designer/` (React + TypeScript + Konva). It compiles
+into `public/designer/`, which Express serves:
+
+```bash
+npm install
+npm run build          # type-check and build into public/designer
+npm start              # http://localhost:3000
+npm run dev:designer   # optional: live-reload editor on :5173 (run npm start too)
+```
+
+Until `npm run build` has been run, `/` falls back to the classic builder.
+
+---
+
+## Weekly Ad Builder (classic)
 
 A hosted version of the flyer builder: one shared password gets anyone in, flyers and
 the product database are saved on the server (not just one person's browser), and

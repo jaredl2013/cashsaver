@@ -735,6 +735,66 @@ app.delete('/api/subscribers/:id', requireAuth, (req, res) => {
   res.json({ ok: true });
 });
 
+/* ---------------- Ad Designer: canvas designs ---------------- */
+const crypto = require('crypto');
+
+function validDesign(design) {
+  return design && typeof design === 'object'
+    && Number.isFinite(design.width) && Number.isFinite(design.height)
+    && design.width > 0 && design.height > 0
+    && Array.isArray(design.pages) && design.pages.length > 0 && design.pages.length <= 100;
+}
+function cleanThumbnail(thumbnail) {
+  return typeof thumbnail === 'string' && thumbnail.startsWith('data:image/') ? thumbnail : null;
+}
+function designName(design) {
+  return String(design.name || '').trim().slice(0, 200) || 'Untitled design';
+}
+
+app.get('/api/designs', requireAuth, (req, res) => {
+  res.json(db.prepare(`
+    SELECT id, name, width, height, thumbnail, updated_at
+    FROM designs WHERE deleted_at IS NULL ORDER BY updated_at DESC
+  `).all());
+});
+
+app.get('/api/designs/:id', requireAuth, (req, res) => {
+  const row = db.prepare('SELECT id, data FROM designs WHERE id = ? AND deleted_at IS NULL').get(req.params.id);
+  if (!row) return res.status(404).json({ error: 'not_found' });
+  res.json({ ...JSON.parse(row.data), id: row.id });
+});
+
+app.post('/api/designs', requireAuth, (req, res) => {
+  const { design, thumbnail } = req.body || {};
+  if (!validDesign(design)) return res.status(400).json({ error: 'bad_design' });
+  const id = crypto.randomUUID();
+  const now = Date.now();
+  const name = designName(design);
+  db.prepare(`INSERT INTO designs (id, name, width, height, data, thumbnail, created_at, updated_at)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+    .run(id, name, Math.round(design.width), Math.round(design.height),
+      JSON.stringify({ ...design, id, name }), cleanThumbnail(thumbnail), now, now);
+  res.json({ id });
+});
+
+app.put('/api/designs/:id', requireAuth, (req, res) => {
+  const { design, thumbnail } = req.body || {};
+  if (!validDesign(design)) return res.status(400).json({ error: 'bad_design' });
+  const name = designName(design);
+  const info = db.prepare(`UPDATE designs SET name = ?, width = ?, height = ?, data = ?,
+                             thumbnail = COALESCE(?, thumbnail), updated_at = ?
+                           WHERE id = ? AND deleted_at IS NULL`)
+    .run(name, Math.round(design.width), Math.round(design.height),
+      JSON.stringify({ ...design, id: req.params.id, name }), cleanThumbnail(thumbnail), Date.now(), req.params.id);
+  if (!info.changes) return res.status(404).json({ error: 'not_found' });
+  res.json({ id: req.params.id });
+});
+
+app.delete('/api/designs/:id', requireAuth, (req, res) => {
+  db.prepare('UPDATE designs SET deleted_at = ? WHERE id = ? AND deleted_at IS NULL').run(Date.now(), req.params.id);
+  res.json({ ok: true });
+});
+
 /* ---------------- Image library (reusable overlay graphics) ---------------- */
 app.get('/api/image-library', requireAuth, (req, res) => {
   res.json(db.prepare('SELECT * FROM image_library ORDER BY created_at DESC').all());
@@ -921,7 +981,18 @@ function checkScheduledJobs() {
 setInterval(checkScheduledJobs, 5 * 60 * 1000); // check every 5 minutes
 
 /* ---------------- Static frontend ---------------- */
-app.use(express.static(path.join(__dirname, 'public')));
+// The new Ad Designer (built from designer/ into public/designer) is the home page.
+// The original grid flyer builder stays available at /classic while the designer
+// catches up to everything it does.
+const designerIndex = path.join(__dirname, 'public', 'designer', 'index.html');
+const classicIndex = path.join(__dirname, 'public', 'index.html');
+app.get('/', (req, res) => {
+  if (fs.existsSync(designerIndex)) return res.sendFile(designerIndex);
+  res.sendFile(classicIndex); // designer not built yet: fall back to the classic builder
+});
+app.get(['/classic', '/classic/'], (req, res) => res.sendFile(classicIndex));
+app.get(['/designer', '/designer/'], (req, res) => res.redirect('/'));
+app.use(express.static(path.join(__dirname, 'public'), { index: false }));
 
 app.listen(PORT, () => {
   console.log(`Weekly Ad Builder running on http://localhost:${PORT}`);

@@ -1,10 +1,14 @@
 {
   "name": "weekly-ad-builder",
   "version": "1.0.27",
-  "description": "Weekly ad flyer builder with shared-password login, saved flyers, and a searchable product database.",
+  "description": "Ad Designer: a drag-and-drop editor for ads, flyers and sales papers, plus the classic weekly ad builder.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
+    "dev": "node server.js",
+    "dev:designer": "vite --config designer/vite.config.ts",
+    "build": "tsc -p designer/tsconfig.json && vite build --config designer/vite.config.ts",
+    "typecheck": "tsc -p designer/tsconfig.json",
     "build:installer": "powershell -ExecutionPolicy Bypass -File packaging/build-release.ps1"
   },
   "dependencies": {
@@ -16,5 +20,18 @@
   },
   "optionalDependencies": {
     "node-windows": "^1.0.0-beta.8"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.3",
+    "jspdf": "^2.5.2",
+    "konva": "^9.3.16",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-konva": "^18.2.10",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.10",
+    "zustand": "^4.5.5"
   }
 }
