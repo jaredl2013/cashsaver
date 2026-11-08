@@ -12,7 +12,8 @@ const SHARED_PASSWORD = process.env.SHARED_PASSWORD || 'changeme';
 const SESSION_SECRET = process.env.SESSION_SECRET || 'change-this-secret-too';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || SHARED_PASSWORD;
 const PEXELS_API_KEY = process.env.PEXELS_API_KEY || '';
-const UPDATE_MANIFEST_URL = process.env.UPDATE_MANIFEST_URL || 'https://raw.githubusercontent.com/jaredl2013/cashsaver/main/release/update.json';
+// An empty UPDATE_MANIFEST_URL (as in Docker) turns the installer update banner off.
+const UPDATE_MANIFEST_URL = process.env.UPDATE_MANIFEST_URL ?? 'https://raw.githubusercontent.com/jaredl2013/cashsaver/main/release/update.json';
 
 // ---- Kill switch / licensing (optional — blank LICENSE_SERVER_URL disables it entirely) ----
 const LICENSE_SERVER_URL = process.env.LICENSE_SERVER_URL || '';
@@ -37,6 +38,13 @@ const TWILIO_FROM_NUMBER = process.env.TWILIO_FROM_NUMBER || '';
 // the image from a public URL. Leave blank and texts still send fine, just without the picture.
 const PUBLIC_BASE_URL = (process.env.PUBLIC_BASE_URL || '').replace(/\/$/, '');
 
+// Behind a reverse proxy (Coolify/Traefik, Cloudflare tunnel) that terminates HTTPS,
+// SECURE_COOKIES=true marks the login cookie HTTPS-only.
+const SECURE_COOKIES = /^(1|true|yes)$/i.test(process.env.SECURE_COOKIES || '');
+if (SECURE_COOKIES) app.set('trust proxy', 1);
+
+app.get('/healthz', (req, res) => res.json({ ok: true, version: APP_VERSION }));
+
 app.use(express.json({ limit: '100mb' })); // backups and flyers can carry base64 photos
 app.use(session({
   secret: SESSION_SECRET,
@@ -45,8 +53,8 @@ app.use(session({
   cookie: {
     maxAge: 1000 * 60 * 60 * 24 * 30, // 30 days
     httpOnly: true,
-    sameSite: 'lax'
-    // secure:true should be added once this is served over HTTPS (recommended via your Cloudflare tunnel)
+    sameSite: 'lax',
+    secure: SECURE_COOKIES
   }
 }));
 

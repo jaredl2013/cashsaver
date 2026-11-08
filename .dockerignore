@@ -1,0 +1,16 @@
+node_modules
+public/designer
+.env
+.env.*
+!.env.example
+data.sqlite
+data.sqlite-*
+backups
+packaging
+release
+*.log
+.git
+.claude
+*.bat
+install-service.js
+uninstall-service.js
