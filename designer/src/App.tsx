@@ -5,42 +5,89 @@ import ContextToolbar from './components/ContextToolbar';
 import CanvasStage from './components/CanvasStage';
 import ZoomBar from './components/ZoomBar';
 import PageBar from './components/PageBar';
+import TeamDialog from './components/TeamDialog';
 import DesignsDialog from './components/DesignsDialog';
-import { api, ApiError } from './api';
+import { api, ApiError, errorText, type SessionInfo } from './api';
 import { blankDesign, useEditor } from './store';
 import { makeThumbnail } from './exporter';
 
 const AUTOSAVE_MS = 2000;
 
-function Login({ onDone }: { onDone: () => void }) {
-  const [password, setPassword] = useState('');
+function Login({ setupNeeded, onDone }: { setupNeeded: boolean; onDone: () => void }) {
+  const [mode, setMode] = useState<'login' | 'setup'>(setupNeeded ? 'setup' : 'login');
+  const [f, setF] = useState({ email: '', password: '', name: '', businessName: '', sharedPassword: '' });
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: e.target.value });
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setError('');
+    try {
+      if (mode === 'setup') await api.setup(f);
+      else await api.login(f.email, f.password);
+      onDone();
+    } catch (err) {
+      setError(errorText(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <div className="login">
-      <form
-        className="login-card"
-        onSubmit={async (e) => {
-          e.preventDefault();
-          setBusy(true);
-          setError('');
-          try {
-            await api.login(password);
-            onDone();
-          } catch {
-            setError('That password didn’t work.');
-          } finally {
-            setBusy(false);
-          }
-        }}
-      >
+      <form className="login-card" onSubmit={submit}>
         <h1>Ad Designer</h1>
-        <p className="muted">Make flyers, sales papers and social ads for your business.</p>
-        <input type="password" autoFocus placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} />
+        {mode === 'setup' ? (
+          <>
+            <p className="muted">
+              Welcome! Create the first account. It runs this install and owns the existing flyers and products.
+            </p>
+            <label className="field">
+              <span>Business name</span>
+              <input value={f.businessName} onChange={set('businessName')} placeholder="e.g. Crossett Cash Saver" autoFocus />
+            </label>
+            <label className="field">
+              <span>Your name</span>
+              <input value={f.name} onChange={set('name')} autoComplete="name" />
+            </label>
+            <label className="field">
+              <span>Email</span>
+              <input type="email" value={f.email} onChange={set('email')} autoComplete="email" />
+            </label>
+            <label className="field">
+              <span>New password (8+ characters)</span>
+              <input type="password" value={f.password} onChange={set('password')} autoComplete="new-password" />
+            </label>
+            <label className="field">
+              <span>Setup password</span>
+              <input type="password" value={f.sharedPassword} onChange={set('sharedPassword')} autoComplete="off" />
+              <small className="muted">The SHARED_PASSWORD from the server’s .env or Coolify settings.</small>
+            </label>
+          </>
+        ) : (
+          <>
+            <p className="muted">Make flyers, sales papers and social ads for your business.</p>
+            <label className="field">
+              <span>Email</span>
+              <input type="email" value={f.email} onChange={set('email')} autoComplete="username" autoFocus />
+            </label>
+            <label className="field">
+              <span>Password</span>
+              <input type="password" value={f.password} onChange={set('password')} autoComplete="current-password" />
+            </label>
+          </>
+        )}
         {error && <p className="error">{error}</p>}
-        <button className="btn primary block" disabled={busy || !password}>
-          {busy ? 'Signing in…' : 'Sign in'}
+        <button className="btn primary block" disabled={busy}>
+          {busy ? 'One moment…' : mode === 'setup' ? 'Create account' : 'Sign in'}
         </button>
+        {setupNeeded && mode === 'login' && (
+          <button type="button" className="link-btn" onClick={() => setMode('setup')}>
+            First time here? Set up this install
+          </button>
+        )}
       </form>
     </div>
   );
@@ -50,15 +97,30 @@ const hashId = () => new URLSearchParams(location.hash.slice(1)).get('d');
 const setHashId = (id: string | null) => history.replaceState(null, '', id ? `#d=${id}` : location.pathname);
 
 export default function App() {
-  const [authed, setAuthed] = useState<boolean | null>(null);
+  const [sessionInfo, setSessionInfo] = useState<SessionInfo | null>(null);
+  const authed = sessionInfo ? sessionInfo.authed : null;
+  const refreshSession = useCallback(
+    () =>
+      api
+        .session()
+        .then((s) => {
+          setSessionInfo(s);
+          // Coming from the classic builder's sign-in redirect: send them back there.
+          if (s.authed && new URLSearchParams(location.search).get('next') === 'classic') location.href = '/classic';
+        })
+        .catch(() => setSessionInfo({ authed: false })),
+    []
+  );
+  const setAuthed = (v: boolean) => (v ? refreshSession() : setSessionInfo({ authed: false }));
   const [showDesigns, setShowDesigns] = useState(false);
+  const [showTeam, setShowTeam] = useState(false);
   const [notice, setNotice] = useState('');
   const saveTimer = useRef<number>();
   const saveInFlight = useRef<Promise<void> | null>(null);
 
   useEffect(() => {
-    api.session().then((s) => setAuthed(s.authed)).catch(() => setAuthed(false));
-  }, []);
+    refreshSession();
+  }, [refreshSession]);
 
   // Open the design in the URL, or ask what to make.
   useEffect(() => {
@@ -202,11 +264,13 @@ export default function App() {
   };
 
   if (authed === null) return <div className="boot">Loading…</div>;
-  if (!authed) return <Login onDone={() => setAuthed(true)} />;
+  if (!authed) return <Login setupNeeded={!!sessionInfo?.setupNeeded} onDone={() => setAuthed(true)} />;
 
   return (
     <div className="app">
       <TopBar
+        session={sessionInfo!}
+        onOpenTeam={() => setShowTeam(true)}
         onOpenDesigns={() => setShowDesigns(true)}
         onSave={save}
         onLogout={async () => {
@@ -228,6 +292,17 @@ export default function App() {
         <div className="toast" role="status" onClick={() => setNotice('')}>
           {notice}
         </div>
+      )}
+      {showTeam && sessionInfo?.user && (
+        <TeamDialog
+          session={sessionInfo}
+          onClose={() => setShowTeam(false)}
+          onSwitched={async () => {
+            await save();
+            location.href = '/';
+          }}
+          onRenamed={refreshSession}
+        />
       )}
       {showDesigns && (
         <DesignsDialog

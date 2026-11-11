@@ -253,6 +253,40 @@ input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px s
 .fill-box .row select { flex: 1; }
 .sticky-actions { position: sticky; bottom: -24px; background: #fff; padding: 10px 0; display: grid; gap: 6px; }
 
+/* ---------- accounts ---------- */
+.field { display: grid; gap: 4px; font-size: 13px; font-weight: 500; }
+.field input { width: 100%; }
+.field small { font-weight: 400; font-size: 12px; }
+.login-card input[type='email'], .login-card input:not([type]) { border: 1px solid var(--line); border-radius: 7px; padding: 7px 9px; }
+input[type='email'], input:not([type]) { border: 1px solid var(--line); border-radius: 7px; padding: 7px 9px; background: #fff; }
+.topbar input.name-input { border-color: transparent; background: transparent; }
+.link-btn { color: var(--accent-dark); font-size: 13px; text-decoration: underline; justify-self: center; }
+.ok { color: #15803d; }
+.account-btn { display: flex; align-items: center; gap: 8px; padding: 4px 4px 4px 10px; border-radius: 999px; color: #fff; }
+.account-btn:hover { background: rgba(255, 255, 255, 0.12); }
+.biz-name { font-size: 13px; color: rgba(255, 255, 255, 0.8); max-width: 180px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.avatar { width: 30px; height: 30px; border-radius: 50%; background: var(--accent); display: grid; place-items: center; font-size: 12px; font-weight: 700; }
+.menu-head { padding: 8px 12px 10px; border-bottom: 1px solid var(--line); margin-bottom: 4px; display: grid; }
+.menu-head small { color: var(--muted); font-size: 12px; }
+.team-modal { width: min(760px, 100%); }
+.team-section { display: grid; gap: 10px; padding-top: 14px; border-top: 1px solid var(--line); }
+.team-section h3 { font-size: 15px; }
+.team-section .row input { flex: 1; }
+.team-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.team-table td { padding: 8px 6px; border-bottom: 1px solid #f0f1f4; vertical-align: middle; }
+.team-table td strong, .team-table td small { display: block; }
+.team-table td small { color: var(--muted); }
+.team-table tr.disabled { opacity: 0.5; }
+.team-actions { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; }
+.team-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; align-items: center; background: #f8f9fb; padding: 12px; border-radius: 10px; }
+.team-form h4, .team-form p { grid-column: 1 / -1; margin: 0; font-size: 13px; }
+.badge { display: inline-block; font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 999px; background: #ede9fe; color: #5b21b6; white-space: nowrap; }
+.biz-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.biz-list li { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; border-radius: 8px; background: #f8f9fb; }
+.biz-list li.on { background: var(--accent-soft); }
+.biz-list strong, .biz-list small { display: block; }
+.biz-list small { color: var(--muted); font-size: 12px; }
+
 /* ---------- designs dialog ---------- */
 .modal-backdrop { position: fixed; inset: 0; background: rgba(15, 17, 26, 0.5); display: grid; place-items: center; z-index: 50; padding: 16px; }
 .modal { background: #fff; border-radius: 16px; width: min(980px, 100%); max-height: calc(100vh - 32px); overflow-y: auto; padding: 24px; display: grid; gap: 16px; }
@@ -278,7 +312,7 @@ input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px s
 
 @media (max-width: 900px) {
   .panel { position: absolute; left: 74px; top: 54px; bottom: 0; box-shadow: 8px 0 24px rgba(0, 0, 0, 0.12); }
-  .name-input, .save-status, .top-btn.subtle, .brand-name { display: none; }
+  .name-input, .save-status, .top-btn.subtle, .brand-name, .biz-name { display: none; }
   .context-bar { overflow-x: auto; }
   .pagebar { max-width: calc(100% - 32px); bottom: 64px; }
 }

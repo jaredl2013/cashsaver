@@ -34,7 +34,7 @@ if (-not (Test-Path (Join-Path $appRoot 'public\designer\index.html'))) {
 if (Test-Path $stageDir) { Remove-Item -LiteralPath $stageDir -Recurse -Force }
 New-Item -ItemType Directory -Path $stageDir,$outputDir -Force | Out-Null
 
-$files = @('server.js','db.js','files.js','session-store.js','install-service.js','uninstall-service.js','package.json','package-lock.json','README.md')
+$files = @('server.js','db.js','files.js','session-store.js','auth.js','install-service.js','uninstall-service.js','package.json','package-lock.json','README.md')
 foreach ($file in $files) { Copy-Item -LiteralPath (Join-Path $appRoot $file) -Destination $stageDir -Force }
 Copy-Item -LiteralPath (Join-Path $appRoot 'public') -Destination (Join-Path $stageDir 'public') -Recurse -Force
 Copy-Item -LiteralPath (Join-Path $appRoot 'node_modules') -Destination (Join-Path $stageDir 'node_modules') -Recurse -Force

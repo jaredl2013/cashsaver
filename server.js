@@ -6,7 +6,9 @@ const session = require('express-session');
 const db = require('./db');
 const { createFileStore } = require('./files');
 const { SqliteSessionStore } = require('./session-store');
+const { createAccounts, verifyPassword, normalizeEmail, validEmail, MIN_PASSWORD } = require('./auth');
 const files = createFileStore(db.dataDir);
+const accounts = createAccounts(db);
 const { version: APP_VERSION } = require('./package.json');
 
 const app = express();
@@ -99,9 +101,9 @@ function migrateImagesToFiles() {
   if (getSetting('imagesOnDisk') === '1') return;
   const run = db.transaction(() => {
     let moved = 0;
-    const products = db.prepare("SELECT name_key, img, original_img FROM products WHERE img LIKE 'data:%' OR original_img LIKE 'data:%'").all();
-    const updProduct = db.prepare('UPDATE products SET img = ?, original_img = ? WHERE name_key = ?');
-    for (const r of products) { updProduct.run(files.externalize(r.img), files.externalize(r.original_img), r.name_key); moved++; }
+    const products = db.prepare("SELECT business_id, name_key, img, original_img FROM products WHERE img LIKE 'data:%' OR original_img LIKE 'data:%'").all();
+    const updProduct = db.prepare('UPDATE products SET img = ?, original_img = ? WHERE business_id = ? AND name_key = ?');
+    for (const r of products) { updProduct.run(files.externalize(r.img), files.externalize(r.original_img), r.business_id, r.name_key); moved++; }
     const images = db.prepare("SELECT id, img FROM image_library WHERE img LIKE 'data:%'").all();
     const updImage = db.prepare('UPDATE image_library SET img = ? WHERE id = ?');
     for (const r of images) { updImage.run(files.externalize(r.img), r.id); moved++; }
@@ -157,25 +159,186 @@ function isLicensed() {
 checkLicense();
 setInterval(checkLicense, LICENSE_CHECK_INTERVAL_MS);
 
-function requireAuth(req, res, next) {
-  if (!(req.session && req.session.authed)) return res.status(401).json({ error: 'not_authenticated' });
-  const license = isLicensed();
-  if (!license.licensed) return res.status(403).json({ error: 'license_inactive', message: license.message });
-  next();
+/* ---------------- Accounts and sign-in ----------------
+   Each person signs in with their own email and password and belongs to one business.
+   Everything they see (flyers, products, designs, uploads list, subscribers) is that
+   business's. A superadmin runs the install: they can create businesses, switch into any
+   of them, and manage install-wide settings and full backups. */
+function currentUser(req) {
+  const id = req.session && req.session.userId;
+  if (!id) return null;
+  const user = accounts.findById(id);
+  return user && !user.disabled ? user : null;
 }
 
-/* ---------------- Auth ---------------- */
+function requireAuth(req, res, next) {
+  const user = currentUser(req);
+  if (!user) return res.status(401).json({ error: 'not_authenticated' });
+  const license = isLicensed();
+  if (!license.licensed) return res.status(403).json({ error: 'license_inactive', message: license.message });
+  req.user = user;
+  const chosen = user.is_superadmin && req.session.businessId && accounts.business(req.session.businessId);
+  req.biz = chosen ? chosen.id : user.business_id;
+  next();
+}
+const isBizAdmin = (user) => !!(user.is_superadmin || user.role === 'admin');
+function requireBizAdmin(req, res, next) {
+  requireAuth(req, res, () => (isBizAdmin(req.user) ? next() : res.status(403).json({ error: 'admin_only' })));
+}
+function requireSuperadmin(req, res, next) {
+  requireAuth(req, res, () => (req.user.is_superadmin ? next() : res.status(403).json({ error: 'superadmin_only' })));
+}
+
+// Slow down password guessing: 10 failed tries per address+email per 15 minutes.
+const loginFailures = new Map();
+const LOGIN_WINDOW_MS = 15 * 60 * 1000;
+function tooManyFailures(key) {
+  const entry = loginFailures.get(key);
+  if (!entry || Date.now() - entry.first > LOGIN_WINDOW_MS) return false;
+  return entry.count >= 10;
+}
+function noteFailure(key) {
+  const entry = loginFailures.get(key);
+  if (!entry || Date.now() - entry.first > LOGIN_WINDOW_MS) loginFailures.set(key, { first: Date.now(), count: 1 });
+  else entry.count++;
+}
+setInterval(() => {
+  for (const [k, v] of loginFailures) if (Date.now() - v.first > LOGIN_WINDOW_MS) loginFailures.delete(k);
+}, LOGIN_WINDOW_MS).unref();
+
+function startSession(req, user, cb) {
+  req.session.regenerate((err) => {
+    if (err) return cb(err);
+    req.session.userId = user.id;
+    accounts.touchLogin(user.id);
+    cb(null);
+  });
+}
+
+function publicUser(u) {
+  return { id: u.id, email: u.email, name: u.name, role: u.role, superadmin: !!u.is_superadmin, businessId: u.business_id };
+}
+
 app.post('/api/login', (req, res) => {
-  const { password } = req.body || {};
-  if (password && password === SHARED_PASSWORD) {
-    req.session.authed = true;
-    return res.json({ ok: true });
+  const { email, password } = req.body || {};
+  const key = `${req.ip}|${normalizeEmail(email)}`;
+  if (tooManyFailures(key)) return res.status(429).json({ error: 'too_many_attempts' });
+  const user = email ? accounts.findByEmail(email) : null;
+  if (!user || user.disabled || !password || !verifyPassword(password, user.password_hash)) {
+    noteFailure(key);
+    return res.status(401).json({ error: 'wrong_password' });
   }
-  return res.status(401).json({ error: 'wrong_password' });
+  loginFailures.delete(key);
+  startSession(req, user, (err) => (err ? res.status(500).json({ error: 'session_failed' }) : res.json({ ok: true })));
+});
+
+// First run on an install without accounts yet: whoever knows SHARED_PASSWORD (from .env)
+// names the business and becomes its superadmin. Existing flyers/products belong to it.
+app.post('/api/setup', (req, res) => {
+  if (accounts.hasUsers()) return res.status(409).json({ error: 'already_set_up' });
+  const { sharedPassword, businessName, name, email, password } = req.body || {};
+  const key = `${req.ip}|setup`;
+  if (tooManyFailures(key)) return res.status(429).json({ error: 'too_many_attempts' });
+  if (!sharedPassword || sharedPassword !== SHARED_PASSWORD) {
+    noteFailure(key);
+    return res.status(401).json({ error: 'wrong_setup_password' });
+  }
+  const cleanEmail = normalizeEmail(email);
+  if (!validEmail(cleanEmail)) return res.status(400).json({ error: 'bad_email' });
+  if (!password || String(password).length < MIN_PASSWORD) return res.status(400).json({ error: 'password_too_short' });
+  if (!String(businessName || '').trim()) return res.status(400).json({ error: 'business_name_required' });
+  const setup = db.transaction(() => {
+    if (!accounts.business(1)) db.prepare('INSERT INTO businesses (id, name, created_at) VALUES (1, ?, ?)').run('My business', Date.now());
+    accounts.renameBusiness(1, businessName);
+    return accounts.createUser({ email: cleanEmail, name, password, businessId: 1, role: 'admin', superadmin: true });
+  });
+  const id = setup();
+  startSession(req, accounts.findById(id), (err) => (err ? res.status(500).json({ error: 'session_failed' }) : res.json({ ok: true })));
 });
 
 app.post('/api/logout', (req, res) => {
   req.session.destroy(() => res.json({ ok: true }));
+});
+
+app.post('/api/account/password', requireAuth, (req, res) => {
+  const { current, next } = req.body || {};
+  if (!verifyPassword(current || '', req.user.password_hash)) return res.status(401).json({ error: 'wrong_password' });
+  if (!next || String(next).length < MIN_PASSWORD) return res.status(400).json({ error: 'password_too_short' });
+  accounts.setPassword(req.user.id, next);
+  res.json({ ok: true });
+});
+
+/* ---- Team: people in your business (business admins) ---- */
+app.get('/api/team', requireBizAdmin, (req, res) => {
+  res.json(accounts.usersOf(req.biz).map(u => ({ ...u, is_superadmin: !!u.is_superadmin, disabled: !!u.disabled })));
+});
+
+app.post('/api/team', requireBizAdmin, (req, res) => {
+  const { email, name, password, role } = req.body || {};
+  const cleanEmail = normalizeEmail(email);
+  if (!validEmail(cleanEmail)) return res.status(400).json({ error: 'bad_email' });
+  if (!password || String(password).length < MIN_PASSWORD) return res.status(400).json({ error: 'password_too_short' });
+  if (accounts.findByEmail(cleanEmail)) return res.status(409).json({ error: 'email_taken' });
+  const id = accounts.createUser({ email: cleanEmail, name, password, businessId: req.biz, role: role === 'admin' ? 'admin' : 'member' });
+  res.json({ id });
+});
+
+app.patch('/api/team/:id', requireBizAdmin, (req, res) => {
+  const target = accounts.findById(Number(req.params.id));
+  if (!target || (target.business_id !== req.biz && !req.user.is_superadmin)) return res.status(404).json({ error: 'not_found' });
+  const body = req.body || {};
+  const role = body.role === 'admin' || body.role === 'member' ? body.role : target.role;
+  const disabled = typeof body.disabled === 'boolean' ? body.disabled : !!target.disabled;
+  if (target.id === req.user.id && (disabled || role !== target.role)) {
+    return res.status(400).json({ error: 'cannot_change_own_access' });
+  }
+  if (target.is_superadmin && !req.user.is_superadmin) return res.status(403).json({ error: 'superadmin_only' });
+  accounts.updateUser(target.id, { name: typeof body.name === 'string' ? body.name.trim().slice(0, 120) : target.name, role, disabled });
+  if (body.password) {
+    if (String(body.password).length < MIN_PASSWORD) return res.status(400).json({ error: 'password_too_short' });
+    accounts.setPassword(target.id, body.password);
+  }
+  if (disabled || body.password) db.prepare("DELETE FROM sessions WHERE json_extract(sess, '$.userId') = ?").run(target.id);
+  res.json({ ok: true });
+});
+
+/* ---- Businesses (superadmin) ---- */
+app.get('/api/businesses', requireSuperadmin, (req, res) => {
+  res.json(accounts.businesses());
+});
+
+app.post('/api/businesses', requireSuperadmin, (req, res) => {
+  const { name, adminEmail, adminName, adminPassword } = req.body || {};
+  if (!String(name || '').trim()) return res.status(400).json({ error: 'business_name_required' });
+  const cleanEmail = normalizeEmail(adminEmail);
+  if (adminEmail) {
+    if (!validEmail(cleanEmail)) return res.status(400).json({ error: 'bad_email' });
+    if (!adminPassword || String(adminPassword).length < MIN_PASSWORD) return res.status(400).json({ error: 'password_too_short' });
+    if (accounts.findByEmail(cleanEmail)) return res.status(409).json({ error: 'email_taken' });
+  }
+  const create = db.transaction(() => {
+    const id = accounts.createBusiness(name);
+    if (adminEmail) accounts.createUser({ email: cleanEmail, name: adminName, password: adminPassword, businessId: id, role: 'admin' });
+    return id;
+  });
+  res.json({ id: create() });
+});
+
+app.patch('/api/businesses/:id', requireBizAdmin, (req, res) => {
+  const id = Number(req.params.id);
+  if (!accounts.business(id)) return res.status(404).json({ error: 'not_found' });
+  if (id !== req.biz && !req.user.is_superadmin) return res.status(403).json({ error: 'admin_only' });
+  const name = String((req.body && req.body.name) || '').trim();
+  if (!name) return res.status(400).json({ error: 'business_name_required' });
+  accounts.renameBusiness(id, name);
+  res.json({ ok: true });
+});
+
+app.post('/api/businesses/:id/switch', requireSuperadmin, (req, res) => {
+  const b = accounts.business(Number(req.params.id));
+  if (!b) return res.status(404).json({ error: 'not_found' });
+  req.session.businessId = b.id;
+  res.json({ ok: true });
 });
 
 app.get('/api/update-status', requireAuth, async (req, res) => {
@@ -206,20 +369,21 @@ app.get('/api/update-status', requireAuth, async (req, res) => {
 });
 
 app.get('/api/session', (req, res) => {
-  const adFree = getSetting('adFree');
-  res.json({
-    authed: !!(req.session && req.session.authed),
-    adFree: adFree === 'true'
-  });
+  const adFree = getSetting('adFree') === 'true';
+  const user = currentUser(req);
+  if (!user) return res.json({ authed: false, setupNeeded: !accounts.hasUsers(), adFree });
+  const chosen = user.is_superadmin && req.session.businessId && accounts.business(req.session.businessId);
+  const business = chosen || accounts.business(user.business_id);
+  res.json({ authed: true, adFree, user: publicUser(user), business: business && { id: business.id, name: business.name } });
 });
 
 app.get('/api/license-status', (req, res) => {
-  if (!(req.session && req.session.authed)) return res.status(401).json({ error: 'not_authenticated' });
+  if (!currentUser(req)) return res.status(401).json({ error: 'not_authenticated' });
   res.json(isLicensed());
 });
 
 app.post('/api/license-status/recheck', async (req, res) => {
-  if (!(req.session && req.session.authed)) return res.status(401).json({ error: 'not_authenticated' });
+  if (!currentUser(req)) return res.status(401).json({ error: 'not_authenticated' });
   await checkLicense();
   res.json(isLicensed());
 });
@@ -252,14 +416,14 @@ app.post('/api/settings', requireAuth, (req, res) => {
 });
 
 // Admin-password gated (like ad-free) since this is an install-wide setting, not per-user.
-app.post('/api/settings/pexels-key', requireAuth, (req, res) => {
+app.post('/api/settings/pexels-key', requireSuperadmin, (req, res) => {
   const { adminPassword, pexelsKey } = req.body || {};
   if (adminPassword !== ADMIN_PASSWORD) return res.status(401).json({ error: 'wrong_admin_password' });
   setSetting('pexelsKey', String(pexelsKey || '').trim());
   res.json({ ok: true, pexelsConfigured: Boolean(getPexelsApiKey()) });
 });
 
-app.post('/api/settings/email', requireAuth, (req, res) => {
+app.post('/api/settings/email', requireSuperadmin, (req, res) => {
   const { adminPassword, host, port, user, pass, from } = req.body || {};
   if (adminPassword !== ADMIN_PASSWORD) return res.status(401).json({ error: 'wrong_admin_password' });
   setSetting('smtpHost', String(host || '').trim());
@@ -270,7 +434,7 @@ app.post('/api/settings/email', requireAuth, (req, res) => {
   res.json({ ok: true, emailConfigured: isEmailConfigured() });
 });
 
-app.post('/api/settings/sms', requireAuth, (req, res) => {
+app.post('/api/settings/sms', requireSuperadmin, (req, res) => {
   const { adminPassword, sid, token, from } = req.body || {};
   if (adminPassword !== ADMIN_PASSWORD) return res.status(401).json({ error: 'wrong_admin_password' });
   setSetting('twilioSid', String(sid || '').trim());
@@ -332,13 +496,13 @@ app.get('/api/flyers', requireAuth, (req, res) => {
   const rows = db.prepare(`
     SELECT name, updated_at, scheduled_start, scheduled_end, broadcast_sent,
            (rendered_image IS NOT NULL) AS has_image
-    FROM flyers WHERE deleted_at IS NULL ORDER BY updated_at DESC
-  `).all();
+    FROM flyers WHERE business_id = ? AND deleted_at IS NULL ORDER BY updated_at DESC
+  `).all(req.biz);
   res.json(rows.map(r => ({ ...r, status: flyerStatus(r, now) })));
 });
 
 app.get('/api/flyers/:name', requireAuth, (req, res) => {
-  const row = db.prepare('SELECT data, scheduled_start, scheduled_end FROM flyers WHERE name = ? AND deleted_at IS NULL').get(req.params.name);
+  const row = db.prepare('SELECT data, scheduled_start, scheduled_end FROM flyers WHERE business_id = ? AND name = ? AND deleted_at IS NULL').get(req.biz, req.params.name);
   if (!row) return res.status(404).json({ error: 'not_found' });
   const parsed = JSON.parse(row.data);
   parsed.scheduling = { start: row.scheduled_start, end: row.scheduled_end };
@@ -355,9 +519,9 @@ app.post('/api/flyers/:name', requireAuth, (req, res) => {
   const scheduledEnd = scheduling.end || null;
 
   db.prepare(`
-    INSERT INTO flyers (name, data, updated_at, scheduled_start, scheduled_end, notified, rendered_image, broadcast_sent, deleted_at)
-    VALUES (?, ?, ?, ?, ?, 0, ?, 0, NULL)
-    ON CONFLICT(name) DO UPDATE SET
+    INSERT INTO flyers (business_id, name, data, updated_at, scheduled_start, scheduled_end, notified, rendered_image, broadcast_sent, deleted_at)
+    VALUES (?, ?, ?, ?, ?, ?, 0, ?, 0, NULL)
+    ON CONFLICT(business_id, name) DO UPDATE SET
       data = excluded.data,
       updated_at = excluded.updated_at,
       scheduled_start = excluded.scheduled_start,
@@ -366,14 +530,14 @@ app.post('/api/flyers/:name', requireAuth, (req, res) => {
       notified = CASE WHEN flyers.scheduled_start IS excluded.scheduled_start THEN flyers.notified ELSE 0 END,
       broadcast_sent = CASE WHEN flyers.scheduled_start IS excluded.scheduled_start THEN flyers.broadcast_sent ELSE 0 END,
       deleted_at = NULL
-  `).run(name, data, Date.now(), scheduledStart, scheduledEnd, renderedImage || null);
+  `).run(req.biz, name, data, Date.now(), scheduledStart, scheduledEnd, renderedImage || null);
 
   // upsert products found in this flyer's cells so the database stays current
   const cells = body.cells || [];
   const upsert = db.prepare(`
-    INSERT INTO products (name_key, display_name, description, ad_size, img, original_img, price, unit, unit_custom, updated_at, deleted_at)
-    VALUES (@key, @displayName, @description, @adSize, @img, @originalImg, @price, @unit, @unitCustom, @updatedAt, NULL)
-    ON CONFLICT(name_key) DO UPDATE SET
+    INSERT INTO products (business_id, name_key, display_name, description, ad_size, img, original_img, price, unit, unit_custom, updated_at, deleted_at)
+    VALUES (@biz, @key, @displayName, @description, @adSize, @img, @originalImg, @price, @unit, @unitCustom, @updatedAt, NULL)
+    ON CONFLICT(business_id, name_key) DO UPDATE SET
       display_name = excluded.display_name,
       description = excluded.description,
       ad_size = excluded.ad_size,
@@ -393,18 +557,19 @@ app.post('/api/flyers/:name', requireAuth, (req, res) => {
       const price = c.price || '';
       const unit = c.unit || 'lb.';
       upsert.run({
+        biz: req.biz,
         key,
         displayName: nm,
         description: c.size || '',
         adSize: c.adSize === 'big' ? 'big' : 'small',
-        img: c.img || null,
-        originalImg: c.originalImg || c.img || null,
+        img: files.externalize(c.img || null),
+        originalImg: files.externalize(c.originalImg || c.img || null),
         price,
         unit,
         unitCustom: c.unitCustom || '',
         updatedAt: Date.now()
       });
-      recordPriceHistory(key, price, unit);
+      recordPriceHistory(req.biz, key, price, unit);
     }
   });
   tx(cells);
@@ -413,7 +578,7 @@ app.post('/api/flyers/:name', requireAuth, (req, res) => {
 });
 
 app.delete('/api/flyers/:name', requireAuth, (req, res) => {
-  db.prepare('UPDATE flyers SET deleted_at = ? WHERE name = ?').run(Date.now(), req.params.name);
+  db.prepare('UPDATE flyers SET deleted_at = ? WHERE business_id = ? AND name = ?').run(Date.now(), req.biz, req.params.name);
   res.json({ ok: true });
 });
 
@@ -422,17 +587,20 @@ app.post('/api/flyers/:name/rename', requireAuth, (req, res) => {
   const newName = String((req.body && req.body.newName) || '').trim();
   if (!newName) return res.status(400).json({ error: 'name_required' });
   if (newName === oldName) return res.json({ ok: true, name: newName });
-  const clash = db.prepare('SELECT deleted_at FROM flyers WHERE name = ?').get(newName);
+  const clash = db.prepare('SELECT deleted_at FROM flyers WHERE business_id = ? AND name = ?').get(req.biz, newName);
   if (clash) return res.status(409).json({ error: clash.deleted_at ? 'name_taken_in_trash' : 'name_taken' });
-  const info = db.prepare('UPDATE flyers SET name = ? WHERE name = ? AND deleted_at IS NULL').run(newName, oldName);
+  const info = db.prepare('UPDATE flyers SET name = ? WHERE business_id = ? AND name = ? AND deleted_at IS NULL').run(newName, req.biz, oldName);
   if (!info.changes) return res.status(404).json({ error: 'not_found' });
   res.json({ ok: true, name: newName });
 });
 
 // Publicly reachable (no login) so Twilio's servers can fetch it for MMS. Only useful/reachable
 // at all if this server is exposed to the internet (see PUBLIC_BASE_URL note above).
-app.get('/api/public/flyer-image/:name', (req, res) => {
-  const row = db.prepare('SELECT rendered_image FROM flyers WHERE name = ?').get(req.params.name);
+// /:businessId/:name since accounts; the old /:name form still answers for business 1 so
+// links in texts sent before the upgrade keep working.
+app.get(['/api/public/flyer-image/:businessId(\\d+)/:name', '/api/public/flyer-image/:name'], (req, res) => {
+  const businessId = req.params.businessId ? Number(req.params.businessId) : 1;
+  const row = db.prepare('SELECT rendered_image FROM flyers WHERE business_id = ? AND name = ?').get(businessId, req.params.name);
   if (!row || !row.rendered_image) return res.status(404).send('Not found');
   const base64 = row.rendered_image.split(',')[1] || row.rendered_image;
   const buf = Buffer.from(base64, 'base64');
@@ -444,20 +612,20 @@ app.get('/api/public/flyer-image/:name', (req, res) => {
 app.get('/api/products', requireAuth, (req, res) => {
   const q = (req.query.q || '').toLowerCase();
   const rows = q
-    ? db.prepare('SELECT * FROM products WHERE deleted_at IS NULL AND name_key LIKE ? ORDER BY updated_at DESC').all(`%${q}%`)
-    : db.prepare('SELECT * FROM products WHERE deleted_at IS NULL ORDER BY updated_at DESC').all();
+    ? db.prepare('SELECT * FROM products WHERE business_id = ? AND deleted_at IS NULL AND name_key LIKE ? ORDER BY updated_at DESC').all(req.biz, `%${q}%`)
+    : db.prepare('SELECT * FROM products WHERE business_id = ? AND deleted_at IS NULL ORDER BY updated_at DESC').all(req.biz);
   res.json(rows.map(withLastPrice));
 });
 
 app.get('/api/products/:key', requireAuth, (req, res) => {
-  const row = db.prepare('SELECT * FROM products WHERE name_key = ? AND deleted_at IS NULL').get(req.params.key.toLowerCase());
+  const row = db.prepare('SELECT * FROM products WHERE business_id = ? AND name_key = ? AND deleted_at IS NULL').get(req.biz, req.params.key.toLowerCase());
   if (!row) return res.status(404).json({ error: 'not_found' });
   res.json(withLastPrice(row));
 });
 
 app.get('/api/products/:key/price-history', requireAuth, (req, res) => {
-  const rows = db.prepare('SELECT price, unit, recorded_at FROM price_history WHERE product_key = ? ORDER BY recorded_at DESC LIMIT 50')
-    .all(req.params.key.toLowerCase());
+  const rows = db.prepare('SELECT price, unit, recorded_at FROM price_history WHERE business_id = ? AND product_key = ? ORDER BY recorded_at DESC LIMIT 50')
+    .all(req.biz, req.params.key.toLowerCase());
   res.json(rows);
 });
 
@@ -480,30 +648,30 @@ function normalizeProduct(body) {
   };
 }
 
-const insertPriceHistory = db.prepare('INSERT INTO price_history (product_key, price, unit, recorded_at) VALUES (?, ?, ?, ?)');
+const insertPriceHistory = db.prepare('INSERT INTO price_history (business_id, product_key, price, unit, recorded_at) VALUES (?, ?, ?, ?, ?)');
 // Append-only price log — one row every time a product is saved with a price, never overwritten.
-function recordPriceHistory(key, price, unit) {
+function recordPriceHistory(businessId, key, price, unit) {
   if (!key || !price) return;
-  insertPriceHistory.run(key, String(price), unit || null, Date.now());
+  insertPriceHistory.run(businessId, key, String(price), unit || null, Date.now());
 }
 
 // Most recent price this product was saved at that differs from its current price —
 // gives pricing decisions context (e.g. "Last on sale: $1.99/lb — June 17").
 const lastDifferentPriceStmt = db.prepare(`
   SELECT price, unit, recorded_at FROM price_history
-  WHERE product_key = ? AND price != ?
+  WHERE business_id = ? AND product_key = ? AND price != ?
   ORDER BY recorded_at DESC LIMIT 1
 `);
 function withLastPrice(row) {
-  const last = lastDifferentPriceStmt.get(row.name_key, String(row.price));
+  const last = lastDifferentPriceStmt.get(row.business_id, row.name_key, String(row.price));
   if (!last) return row;
   return { ...row, lastPrice: last.price, lastPriceUnit: last.unit, lastPriceAt: last.recorded_at };
 }
 
 const saveCatalogProduct = db.prepare(`
-  INSERT INTO products (name_key, display_name, description, category, ad_size, img, original_img, price, unit, unit_custom, updated_at)
-  VALUES (@key, @displayName, @description, @category, @adSize, @img, @originalImg, @price, @unit, @unitCustom, @updatedAt)
-  ON CONFLICT(name_key) DO UPDATE SET
+  INSERT INTO products (business_id, name_key, display_name, description, category, ad_size, img, original_img, price, unit, unit_custom, updated_at)
+  VALUES (@biz, @key, @displayName, @description, @category, @adSize, @img, @originalImg, @price, @unit, @unitCustom, @updatedAt)
+  ON CONFLICT(business_id, name_key) DO UPDATE SET
     display_name = excluded.display_name,
     description = excluded.description,
     category = excluded.category,
@@ -521,9 +689,9 @@ app.post('/api/products', requireAuth, (req, res) => {
   if (!product.displayName || !product.price || !Number.isFinite(Number(product.price))) {
     return res.status(400).json({ error: 'name_and_price_required' });
   }
-  saveCatalogProduct.run(product);
-  recordPriceHistory(product.key, product.price, product.unit);
-  res.json(withLastPrice(db.prepare('SELECT * FROM products WHERE name_key = ?').get(product.key)));
+  saveCatalogProduct.run({ ...product, biz: req.biz });
+  recordPriceHistory(req.biz, product.key, product.price, product.unit);
+  res.json(withLastPrice(db.prepare('SELECT * FROM products WHERE business_id = ? AND name_key = ?').get(req.biz, product.key)));
 });
 
 app.post('/api/products/import', requireAuth, (req, res) => {
@@ -544,12 +712,12 @@ app.post('/api/products/import', requireAuth, (req, res) => {
   let added = 0;
   let updated = 0;
   const importProducts = db.transaction(() => {
-    const exists = db.prepare('SELECT 1 FROM products WHERE name_key = ?');
+    const exists = db.prepare('SELECT 1 FROM products WHERE business_id = ? AND name_key = ?');
     for (const product of unique.values()) {
-      if (exists.get(product.key)) updated++;
+      if (exists.get(req.biz, product.key)) updated++;
       else added++;
-      saveCatalogProduct.run(product);
-      recordPriceHistory(product.key, product.price, product.unit);
+      saveCatalogProduct.run({ ...product, biz: req.biz });
+      recordPriceHistory(req.biz, product.key, product.price, product.unit);
     }
   });
   importProducts();
@@ -558,7 +726,7 @@ app.post('/api/products/import', requireAuth, (req, res) => {
 
 app.put('/api/products/:key', requireAuth, (req, res) => {
   const oldKey = req.params.key.toLowerCase();
-  const existing = db.prepare('SELECT * FROM products WHERE name_key = ? AND deleted_at IS NULL').get(oldKey);
+  const existing = db.prepare('SELECT * FROM products WHERE business_id = ? AND name_key = ? AND deleted_at IS NULL').get(req.biz, oldKey);
   if (!existing) return res.status(404).json({ error: 'not_found' });
   const body = req.body || {};
   const product = normalizeProduct({ ...body, img: body.img || existing.img });
@@ -566,16 +734,16 @@ app.put('/api/products/:key', requireAuth, (req, res) => {
     return res.status(400).json({ error: 'name_and_price_required' });
   }
   const update = db.transaction(() => {
-    if (oldKey !== product.key) db.prepare('DELETE FROM products WHERE name_key = ?').run(oldKey);
-    saveCatalogProduct.run(product);
-    recordPriceHistory(product.key, product.price, product.unit);
+    if (oldKey !== product.key) db.prepare('DELETE FROM products WHERE business_id = ? AND name_key = ?').run(req.biz, oldKey);
+    saveCatalogProduct.run({ ...product, biz: req.biz });
+    recordPriceHistory(req.biz, product.key, product.price, product.unit);
   });
   update();
-  res.json(withLastPrice(db.prepare('SELECT * FROM products WHERE name_key = ?').get(product.key)));
+  res.json(withLastPrice(db.prepare('SELECT * FROM products WHERE business_id = ? AND name_key = ?').get(req.biz, product.key)));
 });
 
 app.delete('/api/products/:key', requireAuth, (req, res) => {
-  db.prepare('UPDATE products SET deleted_at = ? WHERE name_key = ?').run(Date.now(), req.params.key.toLowerCase());
+  db.prepare('UPDATE products SET deleted_at = ? WHERE business_id = ? AND name_key = ?').run(Date.now(), req.biz, req.params.key.toLowerCase());
   res.json({ ok: true });
 });
 
@@ -583,30 +751,30 @@ app.delete('/api/products/:key', requireAuth, (req, res) => {
 const TRASH_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 
 app.get('/api/trash', requireAuth, (req, res) => {
-  const flyers = db.prepare('SELECT name, updated_at, deleted_at FROM flyers WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC').all();
-  const products = db.prepare('SELECT name_key, display_name, price, unit, updated_at, deleted_at FROM products WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC').all();
+  const flyers = db.prepare('SELECT name, updated_at, deleted_at FROM flyers WHERE business_id = ? AND deleted_at IS NOT NULL ORDER BY deleted_at DESC').all(req.biz);
+  const products = db.prepare('SELECT name_key, display_name, price, unit, updated_at, deleted_at FROM products WHERE business_id = ? AND deleted_at IS NOT NULL ORDER BY deleted_at DESC').all(req.biz);
   res.json({ flyers, products });
 });
 
 app.post('/api/trash/flyers/:name/restore', requireAuth, (req, res) => {
-  const info = db.prepare('UPDATE flyers SET deleted_at = NULL WHERE name = ? AND deleted_at IS NOT NULL').run(req.params.name);
+  const info = db.prepare('UPDATE flyers SET deleted_at = NULL WHERE business_id = ? AND name = ? AND deleted_at IS NOT NULL').run(req.biz, req.params.name);
   if (!info.changes) return res.status(404).json({ error: 'not_found' });
   res.json({ ok: true });
 });
 
 app.delete('/api/trash/flyers/:name', requireAuth, (req, res) => {
-  db.prepare('DELETE FROM flyers WHERE name = ? AND deleted_at IS NOT NULL').run(req.params.name);
+  db.prepare('DELETE FROM flyers WHERE business_id = ? AND name = ? AND deleted_at IS NOT NULL').run(req.biz, req.params.name);
   res.json({ ok: true });
 });
 
 app.post('/api/trash/products/:key/restore', requireAuth, (req, res) => {
-  const info = db.prepare('UPDATE products SET deleted_at = NULL WHERE name_key = ? AND deleted_at IS NOT NULL').run(req.params.key.toLowerCase());
+  const info = db.prepare('UPDATE products SET deleted_at = NULL WHERE business_id = ? AND name_key = ? AND deleted_at IS NOT NULL').run(req.biz, req.params.key.toLowerCase());
   if (!info.changes) return res.status(404).json({ error: 'not_found' });
   res.json({ ok: true });
 });
 
 app.delete('/api/trash/products/:key', requireAuth, (req, res) => {
-  db.prepare('DELETE FROM products WHERE name_key = ? AND deleted_at IS NOT NULL').run(req.params.key.toLowerCase());
+  db.prepare('DELETE FROM products WHERE business_id = ? AND name_key = ? AND deleted_at IS NOT NULL').run(req.biz, req.params.key.toLowerCase());
   res.json({ ok: true });
 });
 
@@ -620,21 +788,36 @@ function purgeOldTrash() {
 purgeOldTrash();
 setInterval(purgeOldTrash, 60 * 60 * 1000);
 
-/* ---------------- Logical database backup / restore ---------------- */
-function buildBackupObject() {
+/* ---------------- Logical database backup / restore ----------------
+   Two scopes:
+   - business backup (any business admin): that business's flyers, products, designs, etc.
+   - full backup (superadmin, and the daily file on disk): every business, the accounts and
+     install-wide settings.
+   Backups from before accounts existed look like a business backup and restore into the
+   business you're working in. */
+function buildBackupObject(businessId = null) {
+  const scoped = businessId != null;
+  const where = scoped ? ' WHERE business_id = ?' : '';
+  const all = (sql) => (scoped ? db.prepare(sql.replace('{W}', where)).all(businessId) : db.prepare(sql.replace('{W}', '')).all());
   const backup = {
     format: 'weekly-ad-builder-backup',
     version: 1,
+    scope: scoped ? 'business' : 'full',
     createdAt: new Date().toISOString(),
     tables: {
-      flyers: db.prepare('SELECT * FROM flyers ORDER BY name').all(),
-      products: db.prepare('SELECT * FROM products ORDER BY name_key').all(),
-      settings: db.prepare('SELECT * FROM settings ORDER BY key').all(),
-      subscribers: db.prepare('SELECT * FROM subscribers ORDER BY id').all(),
-      imageLibrary: db.prepare('SELECT * FROM image_library ORDER BY id').all(),
-      designs: db.prepare('SELECT * FROM designs ORDER BY id').all()
+      flyers: all('SELECT * FROM flyers{W} ORDER BY business_id, name'),
+      products: all('SELECT * FROM products{W} ORDER BY business_id, name_key'),
+      priceHistory: all('SELECT * FROM price_history{W} ORDER BY id'),
+      subscribers: all('SELECT * FROM subscribers{W} ORDER BY id'),
+      imageLibrary: all('SELECT * FROM image_library{W} ORDER BY id'),
+      designs: all('SELECT * FROM designs{W} ORDER BY id'),
+      settings: scoped ? [] : db.prepare('SELECT * FROM settings ORDER BY key').all()
     }
   };
+  if (!scoped) {
+    backup.tables.businesses = db.prepare('SELECT * FROM businesses ORDER BY id').all();
+    backup.tables.users = db.prepare('SELECT * FROM users ORDER BY id').all();
+  }
   // Images live on disk now, so carry every file the tables point at.
   const names = new Set();
   for (const rows of Object.values(backup.tables)) {
@@ -648,11 +831,13 @@ function buildBackupObject() {
   return backup;
 }
 
-app.get('/api/backup', requireAuth, (req, res) => {
-  const backup = buildBackupObject();
+app.get('/api/backup', requireBizAdmin, (req, res) => {
+  // ?scope=full is for the person running the install; everyone else gets their business.
+  const full = req.query.scope === 'full' && req.user.is_superadmin;
+  const backup = buildBackupObject(full ? null : req.biz);
   const stamp = new Date().toISOString().slice(0, 10);
   res.set('Content-Type', 'application/json; charset=utf-8');
-  res.set('Content-Disposition', `attachment; filename="cashsaver-backup-${stamp}.json"`);
+  res.set('Content-Disposition', `attachment; filename="${full ? 'ad-designer-full' : 'cashsaver'}-backup-${stamp}.json"`);
   res.send(JSON.stringify(backup));
 });
 
@@ -681,66 +866,100 @@ function runDailyBackup() {
 runDailyBackup();
 setInterval(runDailyBackup, 24 * 60 * 60 * 1000);
 
-app.post('/api/restore', requireAuth, (req, res) => {
+const arr = (v) => (Array.isArray(v) ? v : []);
+
+app.post('/api/restore', requireBizAdmin, (req, res) => {
   const backup = req.body;
   const tables = backup && backup.tables;
   if (!backup || backup.format !== 'weekly-ad-builder-backup' || backup.version !== 1 || !tables) {
     return res.status(400).json({ error: 'invalid_backup_file' });
   }
+  const full = Array.isArray(tables.businesses);
+  if (full && !req.user.is_superadmin) return res.status(403).json({ error: 'full_backup_needs_superadmin' });
+
   const flyers = Array.isArray(tables.flyers) ? tables.flyers : null;
   const products = Array.isArray(tables.products) ? tables.products : null;
-  const settings = Array.isArray(tables.settings) ? tables.settings : null;
   const subscribers = Array.isArray(tables.subscribers) ? tables.subscribers : null;
-  // Older backups (from before the image library existed) won't have this key --
-  // default to empty instead of rejecting the whole file as invalid.
-  const imageLibrary = Array.isArray(tables.imageLibrary) ? tables.imageLibrary : [];
-  // Designer designs and image files arrived later; older backups simply have none.
-  const designs = Array.isArray(tables.designs) ? tables.designs : [];
+  // Keys added over time (image library, designs, price history, accounts) are optional so
+  // older backup files still restore.
+  const settings = arr(tables.settings);
+  const imageLibrary = arr(tables.imageLibrary);
+  const designs = arr(tables.designs);
+  const priceHistory = arr(tables.priceHistory);
+  const businesses = arr(tables.businesses);
+  const users = arr(tables.users);
   const backupFiles = backup.files && typeof backup.files === 'object' ? backup.files : {};
-  if (designs.length > 5000 || designs.some(v => !v || typeof v.id !== 'string' || typeof v.data !== 'string')) {
-    return res.status(400).json({ error: 'invalid_backup_rows' });
-  }
-  if (!flyers || !products || !settings || !subscribers || flyers.length > 1000 || products.length > 10000 || settings.length > 200 || subscribers.length > 10000 || imageLibrary.length > 2000) {
+
+  if (!flyers || !products || !subscribers || flyers.length > 20000 || products.length > 200000 || settings.length > 200 ||
+      subscribers.length > 200000 || imageLibrary.length > 50000 || designs.length > 50000 || priceHistory.length > 2000000) {
     return res.status(400).json({ error: 'invalid_backup_tables' });
   }
   if (flyers.some(v => !v || typeof v.name !== 'string' || typeof v.data !== 'string') ||
       products.some(v => !v || typeof v.name_key !== 'string' || typeof v.display_name !== 'string') ||
       settings.some(v => !v || typeof v.key !== 'string') ||
       subscribers.some(v => !v || !['email', 'sms'].includes(v.type) || typeof v.contact !== 'string') ||
-      imageLibrary.some(v => !v || typeof v.img !== 'string')) {
+      imageLibrary.some(v => !v || typeof v.img !== 'string') ||
+      designs.some(v => !v || typeof v.id !== 'string' || typeof v.data !== 'string') ||
+      businesses.some(v => !v || !Number.isInteger(Number(v.id)) || typeof v.name !== 'string') ||
+      users.some(v => !v || typeof v.email !== 'string' || typeof v.password_hash !== 'string')) {
     return res.status(400).json({ error: 'invalid_backup_rows' });
   }
+  if (full && !users.some(u => u.is_superadmin && !u.disabled)) {
+    return res.status(400).json({ error: 'backup_has_no_superadmin' });
+  }
+
+  // Full restore keeps each row's business; a business restore puts everything in yours.
+  const biz = (v) => (full ? Number(v.business_id) || 1 : req.biz);
 
   const restore = db.transaction(() => {
-    db.prepare('DELETE FROM flyers').run();
-    db.prepare('DELETE FROM products').run();
-    db.prepare('DELETE FROM settings').run();
-    db.prepare('DELETE FROM subscribers').run();
-    db.prepare('DELETE FROM image_library').run();
-    db.prepare('DELETE FROM designs').run();
+    if (full) {
+      for (const t of ['flyers', 'products', 'price_history', 'subscribers', 'image_library', 'designs', 'settings', 'users', 'businesses', 'sessions']) {
+        db.prepare(`DELETE FROM ${t}`).run();
+      }
+      const insertBiz = db.prepare('INSERT INTO businesses (id, name, created_at) VALUES (?, ?, ?)');
+      for (const v of businesses) insertBiz.run(Number(v.id), v.name, Number(v.created_at) || Date.now());
+      const insertUser = db.prepare(`INSERT INTO users (id, email, name, password_hash, business_id, role, is_superadmin, disabled, created_at, last_login_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+      for (const v of users) insertUser.run(Number(v.id), v.email, v.name || '', v.password_hash, Number(v.business_id) || 1,
+        v.role === 'admin' ? 'admin' : 'member', v.is_superadmin ? 1 : 0, v.disabled ? 1 : 0, Number(v.created_at) || Date.now(), v.last_login_at ?? null);
+    } else {
+      for (const t of ['flyers', 'products', 'price_history', 'subscribers', 'image_library', 'designs']) {
+        db.prepare(`DELETE FROM ${t} WHERE business_id = ?`).run(req.biz);
+      }
+    }
+    // Install-wide settings only come back for the person who runs the install.
+    if (settings.length && req.user.is_superadmin) {
+      if (!full) db.prepare('DELETE FROM settings').run();
+      const insertSetting = db.prepare('INSERT INTO settings (key, value) VALUES (?, ?)');
+      for (const v of settings) insertSetting.run(v.key, v.value == null ? null : String(v.value));
+    }
 
     const insertFlyer = db.prepare(`INSERT INTO flyers
-      (name, data, updated_at, scheduled_start, scheduled_end, notified, rendered_image, broadcast_sent, deleted_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
-    for (const v of flyers) insertFlyer.run(v.name, v.data, Number(v.updated_at) || Date.now(), v.scheduled_start ?? null, v.scheduled_end ?? null, Number(v.notified) || 0, v.rendered_image ?? null, Number(v.broadcast_sent) || 0, v.deleted_at ?? null);
+      (business_id, name, data, updated_at, scheduled_start, scheduled_end, notified, rendered_image, broadcast_sent, deleted_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+    for (const v of flyers) insertFlyer.run(biz(v), v.name, v.data, Number(v.updated_at) || Date.now(), v.scheduled_start ?? null, v.scheduled_end ?? null, Number(v.notified) || 0, v.rendered_image ?? null, Number(v.broadcast_sent) || 0, v.deleted_at ?? null);
 
     const insertProduct = db.prepare(`INSERT INTO products
-      (name_key, display_name, img, price, unit, unit_custom, updated_at, description, ad_size, original_img, deleted_at, category)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
-    for (const v of products) insertProduct.run(v.name_key, v.display_name, files.externalize(v.img ?? null), String(v.price ?? ''), v.unit || 'lb.', v.unit_custom || '', Number(v.updated_at) || Date.now(), v.description || '', v.ad_size === 'big' ? 'big' : 'small', files.externalize(v.original_img ?? null), v.deleted_at ?? null, v.category || '');
+      (business_id, name_key, display_name, img, price, unit, unit_custom, updated_at, description, ad_size, original_img, deleted_at, category)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+    for (const v of products) insertProduct.run(biz(v), v.name_key, v.display_name, files.externalize(v.img ?? null), String(v.price ?? ''), v.unit || 'lb.', v.unit_custom || '', Number(v.updated_at) || Date.now(), v.description || '', v.ad_size === 'big' ? 'big' : 'small', files.externalize(v.original_img ?? null), v.deleted_at ?? null, v.category || '');
 
-    const insertSetting = db.prepare('INSERT INTO settings (key, value) VALUES (?, ?)');
-    for (const v of settings) insertSetting.run(v.key, v.value == null ? null : String(v.value));
+    const insertPrice = db.prepare('INSERT INTO price_history (business_id, product_key, price, unit, recorded_at) VALUES (?, ?, ?, ?, ?)');
+    for (const v of priceHistory) if (v && v.product_key && v.price != null) insertPrice.run(biz(v), String(v.product_key), String(v.price), v.unit ?? null, Number(v.recorded_at) || Date.now());
 
-    const insertSubscriber = db.prepare('INSERT INTO subscribers (id, type, contact, name, active, created_at) VALUES (?, ?, ?, ?, ?, ?)');
-    for (const v of subscribers) insertSubscriber.run(Number(v.id), v.type, v.contact, v.name || '', v.active ? 1 : 0, Number(v.created_at) || Date.now());
+    // Row ids are only kept on a full restore; in a business restore they could collide with
+    // another business's rows.
+    const insertSubscriber = db.prepare('INSERT INTO subscribers (id, business_id, type, contact, name, active, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)');
+    for (const v of subscribers) insertSubscriber.run(full ? Number(v.id) : null, biz(v), v.type, v.contact, v.name || '', v.active ? 1 : 0, Number(v.created_at) || Date.now());
 
-    const insertImage = db.prepare('INSERT INTO image_library (id, name, img, created_at) VALUES (?, ?, ?, ?)');
-    for (const v of imageLibrary) insertImage.run(Number(v.id), v.name || 'Untitled image', files.externalize(v.img), Number(v.created_at) || Date.now());
+    const insertImage = db.prepare('INSERT INTO image_library (id, business_id, name, img, created_at) VALUES (?, ?, ?, ?, ?)');
+    for (const v of imageLibrary) insertImage.run(full ? Number(v.id) : null, biz(v), v.name || 'Untitled image', files.externalize(v.img), Number(v.created_at) || Date.now());
 
-    const insertDesign = db.prepare(`INSERT INTO designs (id, name, width, height, data, thumbnail, created_at, updated_at, deleted_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
-    for (const v of designs) insertDesign.run(v.id, String(v.name || 'Untitled design'), Number(v.width) || 816, Number(v.height) || 1056, JSON.stringify(files.externalizeDesign(JSON.parse(v.data))), v.thumbnail ?? null, Number(v.created_at) || Date.now(), Number(v.updated_at) || Date.now(), v.deleted_at ?? null);
+    const insertDesign = db.prepare(`INSERT INTO designs (id, business_id, name, width, height, data, thumbnail, created_at, updated_at, deleted_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET business_id = excluded.business_id, name = excluded.name, width = excluded.width,
+        height = excluded.height, data = excluded.data, thumbnail = excluded.thumbnail, updated_at = excluded.updated_at, deleted_at = excluded.deleted_at`);
+    for (const v of designs) insertDesign.run(v.id, biz(v), String(v.name || 'Untitled design'), Number(v.width) || 816, Number(v.height) || 1056, JSON.stringify(files.externalizeDesign(JSON.parse(v.data))), v.thumbnail ?? null, Number(v.created_at) || Date.now(), Number(v.updated_at) || Date.now(), v.deleted_at ?? null);
     seedDefaultSettings();
   });
 
@@ -748,7 +967,14 @@ app.post('/api/restore', requireAuth, (req, res) => {
     let filesRestored = 0;
     for (const [name, b64] of Object.entries(backupFiles)) if (files.writeFromBackup(name, b64)) filesRestored++;
     restore();
-    res.json({ ok: true, restored: { files: filesRestored, designs: designs.length, flyers: flyers.length, products: products.length, settings: settings.length, subscribers: subscribers.length, imageLibrary: imageLibrary.length } });
+    const body = { ok: true, scope: full ? 'full' : 'business', restored: { files: filesRestored, designs: designs.length, flyers: flyers.length, products: products.length, settings: req.user.is_superadmin ? settings.length : 0, subscribers: subscribers.length, imageLibrary: imageLibrary.length, businesses: businesses.length, users: users.length } };
+    if (!full) return res.json(body);
+    // A full restore replaced the accounts and cleared every session. Write this person's
+    // session back (if their account is in the backup) so they stay signed in.
+    const me = accounts.findByEmail(req.user.email);
+    if (!me || me.disabled) return res.json(body);
+    req.session.userId = me.id;
+    req.session.save(() => res.json(body));
   } catch (err) {
     console.error('[restore] failed:', err);
     res.status(400).json({ error: 'restore_failed', message: err.message });
@@ -757,14 +983,14 @@ app.post('/api/restore', requireAuth, (req, res) => {
 
 /* ---------------- Subscribers (email + SMS list) ---------------- */
 app.get('/api/subscribers', requireAuth, (req, res) => {
-  res.json(db.prepare('SELECT * FROM subscribers ORDER BY created_at DESC').all());
+  res.json(db.prepare('SELECT * FROM subscribers WHERE business_id = ? ORDER BY created_at DESC').all(req.biz));
 });
 
 app.post('/api/subscribers', requireAuth, (req, res) => {
   const { type, contact, name } = req.body || {};
   if (!['email', 'sms'].includes(type) || !contact) return res.status(400).json({ error: 'bad_input' });
-  const info = db.prepare('INSERT INTO subscribers (type, contact, name, active, created_at) VALUES (?, ?, ?, 1, ?)')
-    .run(type, contact.trim(), (name || '').trim(), Date.now());
+  const info = db.prepare('INSERT INTO subscribers (business_id, type, contact, name, active, created_at) VALUES (?, ?, ?, ?, 1, ?)')
+    .run(req.biz, type, contact.trim(), (name || '').trim(), Date.now());
   res.json({ id: info.lastInsertRowid });
 });
 
@@ -772,7 +998,7 @@ app.post('/api/subscribers', requireAuth, (req, res) => {
 app.post('/api/subscribers/bulk', requireAuth, (req, res) => {
   const { lines } = req.body || {};
   if (!Array.isArray(lines)) return res.status(400).json({ error: 'bad_input' });
-  const insert = db.prepare('INSERT INTO subscribers (type, contact, name, active, created_at) VALUES (?, ?, ?, 1, ?)');
+  const insert = db.prepare('INSERT INTO subscribers (business_id, type, contact, name, active, created_at) VALUES (?, ?, ?, ?, 1, ?)');
   let added = 0;
   const tx = db.transaction(() => {
     for (let line of lines) {
@@ -782,7 +1008,7 @@ app.post('/api/subscribers/bulk', requireAuth, (req, res) => {
       const digits = line.replace(/[^0-9]/g, '');
       const isPhone = !isEmail && digits.length >= 10;
       if (!isEmail && !isPhone) continue;
-      insert.run(isEmail ? 'email' : 'sms', isEmail ? line : digits, '', Date.now());
+      insert.run(req.biz, isEmail ? 'email' : 'sms', isEmail ? line : digits, '', Date.now());
       added++;
     }
   });
@@ -791,14 +1017,14 @@ app.post('/api/subscribers/bulk', requireAuth, (req, res) => {
 });
 
 app.post('/api/subscribers/:id/toggle', requireAuth, (req, res) => {
-  const row = db.prepare('SELECT active FROM subscribers WHERE id = ?').get(req.params.id);
+  const row = db.prepare('SELECT active FROM subscribers WHERE business_id = ? AND id = ?').get(req.biz, req.params.id);
   if (!row) return res.status(404).json({ error: 'not_found' });
-  db.prepare('UPDATE subscribers SET active = ? WHERE id = ?').run(row.active ? 0 : 1, req.params.id);
+  db.prepare('UPDATE subscribers SET active = ? WHERE business_id = ? AND id = ?').run(row.active ? 0 : 1, req.biz, req.params.id);
   res.json({ ok: true });
 });
 
 app.delete('/api/subscribers/:id', requireAuth, (req, res) => {
-  db.prepare('DELETE FROM subscribers WHERE id = ?').run(req.params.id);
+  db.prepare('DELETE FROM subscribers WHERE business_id = ? AND id = ?').run(req.biz, req.params.id);
   res.json({ ok: true });
 });
 
@@ -835,12 +1061,12 @@ function designName(design) {
 app.get('/api/designs', requireAuth, (req, res) => {
   res.json(db.prepare(`
     SELECT id, name, width, height, thumbnail, updated_at
-    FROM designs WHERE deleted_at IS NULL ORDER BY updated_at DESC
-  `).all());
+    FROM designs WHERE business_id = ? AND deleted_at IS NULL ORDER BY updated_at DESC
+  `).all(req.biz));
 });
 
 app.get('/api/designs/:id', requireAuth, (req, res) => {
-  const row = db.prepare('SELECT id, data FROM designs WHERE id = ? AND deleted_at IS NULL').get(req.params.id);
+  const row = db.prepare('SELECT id, data FROM designs WHERE business_id = ? AND id = ? AND deleted_at IS NULL').get(req.biz, req.params.id);
   if (!row) return res.status(404).json({ error: 'not_found' });
   res.json({ ...JSON.parse(row.data), id: row.id });
 });
@@ -852,9 +1078,9 @@ app.post('/api/designs', requireAuth, (req, res) => {
   const id = crypto.randomUUID();
   const now = Date.now();
   const name = designName(design);
-  db.prepare(`INSERT INTO designs (id, name, width, height, data, thumbnail, created_at, updated_at)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
-    .run(id, name, Math.round(design.width), Math.round(design.height),
+  db.prepare(`INSERT INTO designs (id, business_id, name, width, height, data, thumbnail, created_at, updated_at)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+    .run(id, req.biz, name, Math.round(design.width), Math.round(design.height),
       JSON.stringify({ ...design, id, name }), cleanThumbnail(thumbnail), now, now);
   res.json({ id });
 });
@@ -866,21 +1092,21 @@ app.put('/api/designs/:id', requireAuth, (req, res) => {
   const name = designName(design);
   const info = db.prepare(`UPDATE designs SET name = ?, width = ?, height = ?, data = ?,
                              thumbnail = COALESCE(?, thumbnail), updated_at = ?
-                           WHERE id = ? AND deleted_at IS NULL`)
+                           WHERE business_id = ? AND id = ? AND deleted_at IS NULL`)
     .run(name, Math.round(design.width), Math.round(design.height),
-      JSON.stringify({ ...design, id: req.params.id, name }), cleanThumbnail(thumbnail), Date.now(), req.params.id);
+      JSON.stringify({ ...design, id: req.params.id, name }), cleanThumbnail(thumbnail), Date.now(), req.biz, req.params.id);
   if (!info.changes) return res.status(404).json({ error: 'not_found' });
   res.json({ id: req.params.id });
 });
 
 app.delete('/api/designs/:id', requireAuth, (req, res) => {
-  db.prepare('UPDATE designs SET deleted_at = ? WHERE id = ? AND deleted_at IS NULL').run(Date.now(), req.params.id);
+  db.prepare('UPDATE designs SET deleted_at = ? WHERE business_id = ? AND id = ? AND deleted_at IS NULL').run(Date.now(), req.biz, req.params.id);
   res.json({ ok: true });
 });
 
 /* ---------------- Image library (reusable overlay graphics) ---------------- */
 app.get('/api/image-library', requireAuth, (req, res) => {
-  res.json(db.prepare('SELECT * FROM image_library ORDER BY created_at DESC').all());
+  res.json(db.prepare('SELECT * FROM image_library WHERE business_id = ? ORDER BY created_at DESC').all(req.biz));
 });
 
 app.post('/api/image-library', requireAuth, (req, res) => {
@@ -888,13 +1114,13 @@ app.post('/api/image-library', requireAuth, (req, res) => {
   if (!img || typeof img !== 'string') return res.status(400).json({ error: 'bad_input' });
   let stored;
   try { stored = files.externalize(img); } catch { return res.status(400).json({ error: 'bad_image' }); }
-  const info = db.prepare('INSERT INTO image_library (name, img, created_at) VALUES (?, ?, ?)')
-    .run((name || '').trim() || 'Untitled image', stored, Date.now());
+  const info = db.prepare('INSERT INTO image_library (business_id, name, img, created_at) VALUES (?, ?, ?, ?)')
+    .run(req.biz, (name || '').trim() || 'Untitled image', stored, Date.now());
   res.json({ id: info.lastInsertRowid, img: stored });
 });
 
 app.delete('/api/image-library/:id', requireAuth, (req, res) => {
-  db.prepare('DELETE FROM image_library WHERE id = ?').run(req.params.id);
+  db.prepare('DELETE FROM image_library WHERE business_id = ? AND id = ?').run(req.biz, req.params.id);
   res.json({ ok: true });
 });
 
@@ -960,15 +1186,15 @@ async function sendSms(to, body, mediaUrl) {
 }
 
 /* ---------------- Broadcasting a flyer to the subscriber list ---------------- */
-async function broadcastFlyer(name) {
-  const flyer = db.prepare('SELECT rendered_image FROM flyers WHERE name = ?').get(name);
+async function broadcastFlyer(businessId, name) {
+  const flyer = db.prepare('SELECT rendered_image FROM flyers WHERE business_id = ? AND name = ?').get(businessId, name);
   if (!flyer) throw new Error('flyer not found');
 
   const mailTransport = getMailTransport();
   const smsReady = isTwilioConfigured();
   const smtpConfig = getSmtpConfig();
 
-  const subs = db.prepare('SELECT * FROM subscribers WHERE active = 1').all();
+  const subs = db.prepare('SELECT * FROM subscribers WHERE business_id = ? AND active = 1').all(businessId);
   const emailSubs = subs.filter(s => s.type === 'email');
   const smsSubs = subs.filter(s => s.type === 'sms');
   // emailConfigured/smsConfigured let the caller tell "sent to nobody" apart from
@@ -1002,7 +1228,7 @@ async function broadcastFlyer(name) {
 
   if (smsReady && smsSubs.length) {
     const mediaUrl = (PUBLIC_BASE_URL && flyer.rendered_image)
-      ? `${PUBLIC_BASE_URL}/api/public/flyer-image/${encodeURIComponent(name)}`
+      ? `${PUBLIC_BASE_URL}/api/public/flyer-image/${businessId}/${encodeURIComponent(name)}`
       : null;
     for (const s of smsSubs) {
       try {
@@ -1019,7 +1245,7 @@ async function broadcastFlyer(name) {
   // flag would permanently block a retry once SMS/email get set up later, since the
   // scheduled job only looks at flyers where broadcast_sent is still 0.
   if (mailTransport || smsReady) {
-    db.prepare('UPDATE flyers SET broadcast_sent = 1 WHERE name = ?').run(name);
+    db.prepare('UPDATE flyers SET broadcast_sent = 1 WHERE business_id = ? AND name = ?').run(businessId, name);
   }
   return results;
 }
@@ -1027,7 +1253,7 @@ async function broadcastFlyer(name) {
 // Manual trigger — good for testing, or for one-off sends outside the schedule
 app.post('/api/flyers/:name/send-now', requireAuth, async (req, res) => {
   try {
-    const results = await broadcastFlyer(req.params.name);
+    const results = await broadcastFlyer(req.biz, req.params.name);
     res.json({ ok: true, results });
   } catch (err) {
     res.status(500).json({ error: 'send_failed', message: err.message });
@@ -1040,7 +1266,7 @@ function checkScheduledJobs() {
   const mailTransport = getMailTransport();
 
   if (mailTransport && REMINDER_TO.length) {
-    const due = db.prepare('SELECT name FROM flyers WHERE scheduled_start IS NOT NULL AND scheduled_start <= ? AND notified = 0').all(now);
+    const due = db.prepare('SELECT business_id, name FROM flyers WHERE scheduled_start IS NOT NULL AND scheduled_start <= ? AND notified = 0').all(now);
     for (const row of due) {
       mailTransport.sendMail({
         from: getSmtpConfig().from,
@@ -1048,16 +1274,16 @@ function checkScheduledJobs() {
         subject: `Weekly Ad Builder: "${row.name}" is now live`,
         text: `Your scheduled ad "${row.name}" just went live.`
       }).then(() => {
-        db.prepare('UPDATE flyers SET notified = 1 WHERE name = ?').run(row.name);
+        db.prepare('UPDATE flyers SET notified = 1 WHERE business_id = ? AND name = ?').run(row.business_id, row.name);
         console.log(`[reminders] sent go-live email for "${row.name}"`);
       }).catch(err => console.warn('[reminders] failed to send email:', err.message));
     }
   }
 
   if (mailTransport || isTwilioConfigured()) {
-    const due = db.prepare('SELECT name FROM flyers WHERE scheduled_start IS NOT NULL AND scheduled_start <= ? AND broadcast_sent = 0').all(now);
+    const due = db.prepare('SELECT business_id, name FROM flyers WHERE scheduled_start IS NOT NULL AND scheduled_start <= ? AND broadcast_sent = 0').all(now);
     for (const row of due) {
-      broadcastFlyer(row.name)
+      broadcastFlyer(row.business_id, row.name)
         .then(results => console.log(`[broadcast] sent "${row.name}" —`, results))
         .catch(err => console.warn(`[broadcast] failed for "${row.name}":`, err.message));
     }

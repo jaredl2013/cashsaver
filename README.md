@@ -11,6 +11,26 @@ plus the original weekly flyer builder.
 - **Classic builder** (`/classic`): the original grid-based weekly flyer builder,
   kept running while the designer picks up its product-catalog features.
 
+### Accounts and businesses
+
+Everyone signs in with their own email and password, and each person belongs to one
+business. A business's designs, flyers, product catalog, uploads and subscriber list are
+visible only to its own people.
+
+- **First run:** the sign-in page asks for the business name, your name, email and a
+  password, plus the setup password (`SHARED_PASSWORD` from `.env`/Coolify). That first
+  account is the **install owner**, and all existing flyers, products and designs belong to
+  its business.
+- **Install owner:** can add businesses (optionally with an admin login for each), switch
+  into any business, change install-wide settings (photo search, email, SMS) and download
+  or restore a **full** backup of every business and account.
+- **Business admins:** add people to their business, reset passwords, turn people off,
+  rename the business, and back up or restore their own business.
+- **Members:** design and edit; no team or backup access.
+
+Open the account menu (top right) → **Team & businesses**. The classic builder uses the
+same sign-in. `SHARED_PASSWORD` is now only the one-time setup password.
+
 ### Building the designer
 
 The designer's source is in `designer/` (React + TypeScript + Konva). It compiles
