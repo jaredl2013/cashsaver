@@ -1,0 +1,35 @@
+# Works as-is with `docker compose up -d`, and with Coolify's "Docker Compose" build pack.
+# Set the variables below in a .env file next to this one (local) or in Coolify's
+# Environment Variables screen. SHARED_PASSWORD and SESSION_SECRET are required.
+services:
+  ad-designer:
+    build: .
+    image: ad-designer:latest
+    restart: unless-stopped
+    ports:
+      - "${HOST_PORT:-3000}:3000"
+    environment:
+      SHARED_PASSWORD: ${SHARED_PASSWORD:?Set SHARED_PASSWORD}
+      SESSION_SECRET: ${SESSION_SECRET:?Set SESSION_SECRET}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      PEXELS_API_KEY: ${PEXELS_API_KEY:-}
+      # Set to true when served over HTTPS behind a proxy (Coolify/Traefik, Cloudflare).
+      SECURE_COOKIES: ${SECURE_COOKIES:-false}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      REMINDER_TO: ${REMINDER_TO:-}
+      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-}
+      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-}
+      TWILIO_FROM_NUMBER: ${TWILIO_FROM_NUMBER:-}
+      LICENSE_SERVER_URL: ${LICENSE_SERVER_URL:-}
+      LICENSE_KEY: ${LICENSE_KEY:-}
+      UPDATE_MANIFEST_URL: ${UPDATE_MANIFEST_URL:-}
+    volumes:
+      - ad-designer-data:/data
+
+volumes:
+  ad-designer-data:

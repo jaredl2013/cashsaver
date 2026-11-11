@@ -1,4 +1,73 @@
-# Weekly Ad Builder
+# Ad Designer (formerly Weekly Ad Builder)
+
+A drag-and-drop editor for ads, flyers and sales papers for any kind of business,
+plus the original weekly flyer builder.
+
+- **Ad Designer** (home page, `/`): a free-form canvas editor. Pick a size (letter
+  flyer, tabloid sales paper, social posts, banners), then add text, shapes, badges,
+  your own uploads or stock photos from the left sidebar. Drag, resize, rotate, snap
+  to guides, lock, layer, undo/redo, and download as PNG, JPG or a 300 DPI print PDF.
+  Designs autosave to the server.
+- **Classic builder** (`/classic`): the original grid-based weekly flyer builder,
+  kept running while the designer picks up its product-catalog features.
+
+### Building the designer
+
+The designer's source is in `designer/` (React + TypeScript + Konva). It compiles
+into `public/designer/`, which Express serves:
+
+```bash
+npm install
+npm run build          # type-check and build into public/designer
+npm start              # http://localhost:3000
+npm run dev:designer   # optional: live-reload editor on :5173 (run npm start too)
+```
+
+Until `npm run build` has been run, `/` falls back to the classic builder.
+
+### Running in Docker
+
+The `Dockerfile` builds the designer and runs the server as a non-root user. All
+data (designs, flyers, products, uploads) is one SQLite file in `/data`, so mount a
+volume there.
+
+```bash
+cp .env.example .env      # set at least SHARED_PASSWORD and SESSION_SECRET
+docker compose up -d --build
+# open http://localhost:3000  (change with HOST_PORT=8080)
+```
+
+Or without compose:
+
+```bash
+docker build -t ad-designer .
+docker run -d -p 3000:3000 -v ad-designer-data:/data \
+  -e SHARED_PASSWORD=... -e SESSION_SECRET=... ad-designer
+```
+
+`GET /healthz` is the health check. Back up the volume (`/data/data.sqlite`) like
+any client-critical file.
+
+### Deploying with Coolify
+
+Either build pack works:
+
+- **Dockerfile** (simplest): new resource → this repo → build pack "Dockerfile",
+  port `3000`. Add a persistent storage mount at `/data`, set the environment
+  variables below, and set your domain.
+- **Docker Compose**: build pack "Docker Compose" with `docker-compose.yml`. The
+  named volume persists automatically; set the domain on the `ad-designer` service.
+  You can drop the `ports:` mapping since Coolify's proxy routes the domain.
+
+Environment variables: `SHARED_PASSWORD` and `SESSION_SECRET` are required.
+Set `SECURE_COOKIES=true` once the site is on HTTPS (Coolify gives you a
+certificate), and leave `UPDATE_MANIFEST_URL` empty so the Windows installer's
+update banner stays off. Optional: `PEXELS_API_KEY`, the `SMTP_*` and `TWILIO_*`
+settings, and `PUBLIC_BASE_URL` (your Coolify domain, for picture texts).
+
+---
+
+## Weekly Ad Builder (classic)
 
 A hosted version of the flyer builder: one shared password gets anyone in, flyers and
 the product database are saved on the server (not just one person's browser), and
