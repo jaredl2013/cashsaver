@@ -1455,8 +1455,8 @@ async function checkSession(){
     document.getElementById('creditBar').style.display = data.adFree ? 'none' : 'block';
     boot();
   } else {
-    document.getElementById('loginScreen').classList.remove('hidden');
-    document.getElementById('app').classList.remove('visible');
+    // Sign-in (email + password) lives on the Ad Designer home page now.
+    location.href = '/?next=classic';
   }
 }
 

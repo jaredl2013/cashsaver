@@ -2,8 +2,11 @@ import { useEffect, useRef, useState } from 'react';
 import Icon from './Icon';
 import { useEditor } from '../store';
 import { exportImage, exportPdf } from '../exporter';
+import type { SessionInfo } from '../api';
 
 interface Props {
+  session: SessionInfo;
+  onOpenTeam: () => void;
   onOpenDesigns: () => void;
   onSave: () => void;
   onLogout: () => void;
@@ -20,7 +23,7 @@ function useOutsideClose(open: boolean, setOpen: (v: boolean) => void) {
   return ref;
 }
 
-export default function TopBar({ onOpenDesigns, onSave, onLogout }: Props) {
+export default function TopBar({ session, onOpenTeam, onOpenDesigns, onSave, onLogout }: Props) {
   const name = useEditor((s) => s.design.name);
   const canUndo = useEditor((s) => s.past.length > 0);
   const canRedo = useEditor((s) => s.future.length > 0);
@@ -31,6 +34,11 @@ export default function TopBar({ onOpenDesigns, onSave, onLogout }: Props) {
   const [exportOpen, setExportOpen] = useState(false);
   const [busy, setBusy] = useState('');
   const exportRef = useOutsideClose(exportOpen, setExportOpen);
+  const [accountOpen, setAccountOpen] = useState(false);
+  const accountRef = useOutsideClose(accountOpen, setAccountOpen);
+  const user = session.user!;
+  const canManage = user.superadmin || user.role === 'admin';
+  const initials = (user.name || user.email).split(/[\s@.]+/).filter(Boolean).slice(0, 2).map((w) => w[0]!.toUpperCase()).join('');
   useEffect(() => setDraftName(name), [name]);
 
   const run = async (label: string, fn: () => Promise<void>) => {
@@ -108,9 +116,29 @@ export default function TopBar({ onOpenDesigns, onSave, onLogout }: Props) {
             </div>
           )}
         </div>
-        <button className="top-btn icon" title="Sign out" onClick={onLogout}>
-          <Icon name="logout" />
-        </button>
+        <div className="pop-wrap" ref={accountRef}>
+          <button className="account-btn" title={`${user.name || user.email} · ${session.business?.name ?? ''}`} onClick={() => setAccountOpen(!accountOpen)}>
+            <span className="biz-name">{session.business?.name}</span>
+            <span className="avatar">{initials}</span>
+          </button>
+          {accountOpen && (
+            <div className="popover menu right">
+              <div className="menu-head">
+                <strong>{user.name || user.email}</strong>
+                <small>
+                  {user.email} · {user.superadmin ? 'Install owner' : user.role === 'admin' ? 'Admin' : 'Member'}
+                </small>
+              </div>
+              <button onClick={() => { setAccountOpen(false); onOpenTeam(); }}>
+                <strong>{canManage ? (user.superadmin ? 'Team & businesses' : 'Team') : 'My account'}</strong>
+                <small>{canManage ? 'Add people, reset passwords' : 'Change your password'}</small>
+              </button>
+              <button onClick={onLogout}>
+                <strong>Sign out</strong>
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </header>
   );
