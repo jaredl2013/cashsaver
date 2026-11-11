@@ -4,6 +4,9 @@ require('dotenv').config({ path: process.env.CASH_SAVER_CONFIG || path.join(__di
 const express = require('express');
 const session = require('express-session');
 const db = require('./db');
+const { createFileStore } = require('./files');
+const { SqliteSessionStore } = require('./session-store');
+const files = createFileStore(db.dataDir);
 const { version: APP_VERSION } = require('./package.json');
 
 const app = express();
@@ -47,6 +50,7 @@ app.get('/healthz', (req, res) => res.json({ ok: true, version: APP_VERSION }));
 
 app.use(express.json({ limit: '100mb' })); // backups and flyers can carry base64 photos
 app.use(session({
+  store: new SqliteSessionStore(db),
   secret: SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
@@ -86,6 +90,36 @@ function seedDefaultSettings() {
   seed.run('licenseLastCheck', '0');
   seed.run('licenseMessage', '');
 }
+
+/* ---------------- One-time move of embedded images out of the database ----------------
+   Older versions kept every photo as base64 inside rows, which made the database (and every
+   backup and page load) huge. Products, the image library and designer designs now point at
+   files in <data>/uploads. Classic flyer documents are left as they are. */
+function migrateImagesToFiles() {
+  if (getSetting('imagesOnDisk') === '1') return;
+  const run = db.transaction(() => {
+    let moved = 0;
+    const products = db.prepare("SELECT name_key, img, original_img FROM products WHERE img LIKE 'data:%' OR original_img LIKE 'data:%'").all();
+    const updProduct = db.prepare('UPDATE products SET img = ?, original_img = ? WHERE name_key = ?');
+    for (const r of products) { updProduct.run(files.externalize(r.img), files.externalize(r.original_img), r.name_key); moved++; }
+    const images = db.prepare("SELECT id, img FROM image_library WHERE img LIKE 'data:%'").all();
+    const updImage = db.prepare('UPDATE image_library SET img = ? WHERE id = ?');
+    for (const r of images) { updImage.run(files.externalize(r.img), r.id); moved++; }
+    const designs = db.prepare("SELECT id, data FROM designs WHERE data LIKE '%data:image/%'").all();
+    const updDesign = db.prepare('UPDATE designs SET data = ? WHERE id = ?');
+    for (const r of designs) { updDesign.run(JSON.stringify(files.externalizeDesign(JSON.parse(r.data))), r.id); moved++; }
+    setSetting('imagesOnDisk', '1');
+    return moved;
+  });
+  try {
+    const moved = run();
+    if (moved) console.log(`[images] moved images for ${moved} rows into ${files.dir}`);
+    db.exec('VACUUM');
+  } catch (err) {
+    console.warn('[images] migration failed, will retry next start:', err.message);
+  }
+}
+migrateImagesToFiles();
 
 /* ---------------- License check-in ("am I good?") ---------------- */
 async function checkLicense() {
@@ -440,8 +474,8 @@ function normalizeProduct(body) {
     price,
     unit,
     unitCustom: unit === 'other' ? String(body.unitCustom || '').trim() : '',
-    img: typeof body.img === 'string' && body.img ? body.img : null,
-    originalImg: typeof body.originalImg === 'string' && body.originalImg ? body.originalImg : null,
+    img: typeof body.img === 'string' && body.img ? files.externalize(body.img) : null,
+    originalImg: typeof body.originalImg === 'string' && body.originalImg ? files.externalize(body.originalImg) : null,
     updatedAt: Date.now()
   };
 }
@@ -588,7 +622,7 @@ setInterval(purgeOldTrash, 60 * 60 * 1000);
 
 /* ---------------- Logical database backup / restore ---------------- */
 function buildBackupObject() {
-  return {
+  const backup = {
     format: 'weekly-ad-builder-backup',
     version: 1,
     createdAt: new Date().toISOString(),
@@ -597,9 +631,21 @@ function buildBackupObject() {
       products: db.prepare('SELECT * FROM products ORDER BY name_key').all(),
       settings: db.prepare('SELECT * FROM settings ORDER BY key').all(),
       subscribers: db.prepare('SELECT * FROM subscribers ORDER BY id').all(),
-      imageLibrary: db.prepare('SELECT * FROM image_library ORDER BY id').all()
+      imageLibrary: db.prepare('SELECT * FROM image_library ORDER BY id').all(),
+      designs: db.prepare('SELECT * FROM designs ORDER BY id').all()
     }
   };
+  // Images live on disk now, so carry every file the tables point at.
+  const names = new Set();
+  for (const rows of Object.values(backup.tables)) {
+    for (const row of rows) for (const v of Object.values(row)) for (const n of files.referencedNames(v)) names.add(n);
+  }
+  backup.files = {};
+  for (const name of names) {
+    const b64 = files.readAsBase64(name);
+    if (b64) backup.files[name] = b64;
+  }
+  return backup;
 }
 
 app.get('/api/backup', requireAuth, (req, res) => {
@@ -648,6 +694,12 @@ app.post('/api/restore', requireAuth, (req, res) => {
   // Older backups (from before the image library existed) won't have this key --
   // default to empty instead of rejecting the whole file as invalid.
   const imageLibrary = Array.isArray(tables.imageLibrary) ? tables.imageLibrary : [];
+  // Designer designs and image files arrived later; older backups simply have none.
+  const designs = Array.isArray(tables.designs) ? tables.designs : [];
+  const backupFiles = backup.files && typeof backup.files === 'object' ? backup.files : {};
+  if (designs.length > 5000 || designs.some(v => !v || typeof v.id !== 'string' || typeof v.data !== 'string')) {
+    return res.status(400).json({ error: 'invalid_backup_rows' });
+  }
   if (!flyers || !products || !settings || !subscribers || flyers.length > 1000 || products.length > 10000 || settings.length > 200 || subscribers.length > 10000 || imageLibrary.length > 2000) {
     return res.status(400).json({ error: 'invalid_backup_tables' });
   }
@@ -665,6 +717,7 @@ app.post('/api/restore', requireAuth, (req, res) => {
     db.prepare('DELETE FROM settings').run();
     db.prepare('DELETE FROM subscribers').run();
     db.prepare('DELETE FROM image_library').run();
+    db.prepare('DELETE FROM designs').run();
 
     const insertFlyer = db.prepare(`INSERT INTO flyers
       (name, data, updated_at, scheduled_start, scheduled_end, notified, rendered_image, broadcast_sent, deleted_at)
@@ -674,7 +727,7 @@ app.post('/api/restore', requireAuth, (req, res) => {
     const insertProduct = db.prepare(`INSERT INTO products
       (name_key, display_name, img, price, unit, unit_custom, updated_at, description, ad_size, original_img, deleted_at, category)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
-    for (const v of products) insertProduct.run(v.name_key, v.display_name, v.img ?? null, String(v.price ?? ''), v.unit || 'lb.', v.unit_custom || '', Number(v.updated_at) || Date.now(), v.description || '', v.ad_size === 'big' ? 'big' : 'small', v.original_img ?? null, v.deleted_at ?? null, v.category || '');
+    for (const v of products) insertProduct.run(v.name_key, v.display_name, files.externalize(v.img ?? null), String(v.price ?? ''), v.unit || 'lb.', v.unit_custom || '', Number(v.updated_at) || Date.now(), v.description || '', v.ad_size === 'big' ? 'big' : 'small', files.externalize(v.original_img ?? null), v.deleted_at ?? null, v.category || '');
 
     const insertSetting = db.prepare('INSERT INTO settings (key, value) VALUES (?, ?)');
     for (const v of settings) insertSetting.run(v.key, v.value == null ? null : String(v.value));
@@ -683,13 +736,19 @@ app.post('/api/restore', requireAuth, (req, res) => {
     for (const v of subscribers) insertSubscriber.run(Number(v.id), v.type, v.contact, v.name || '', v.active ? 1 : 0, Number(v.created_at) || Date.now());
 
     const insertImage = db.prepare('INSERT INTO image_library (id, name, img, created_at) VALUES (?, ?, ?, ?)');
-    for (const v of imageLibrary) insertImage.run(Number(v.id), v.name || 'Untitled image', v.img, Number(v.created_at) || Date.now());
+    for (const v of imageLibrary) insertImage.run(Number(v.id), v.name || 'Untitled image', files.externalize(v.img), Number(v.created_at) || Date.now());
+
+    const insertDesign = db.prepare(`INSERT INTO designs (id, name, width, height, data, thumbnail, created_at, updated_at, deleted_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+    for (const v of designs) insertDesign.run(v.id, String(v.name || 'Untitled design'), Number(v.width) || 816, Number(v.height) || 1056, JSON.stringify(files.externalizeDesign(JSON.parse(v.data))), v.thumbnail ?? null, Number(v.created_at) || Date.now(), Number(v.updated_at) || Date.now(), v.deleted_at ?? null);
     seedDefaultSettings();
   });
 
   try {
+    let filesRestored = 0;
+    for (const [name, b64] of Object.entries(backupFiles)) if (files.writeFromBackup(name, b64)) filesRestored++;
     restore();
-    res.json({ ok: true, restored: { flyers: flyers.length, products: products.length, settings: settings.length, subscribers: subscribers.length, imageLibrary: imageLibrary.length } });
+    res.json({ ok: true, restored: { files: filesRestored, designs: designs.length, flyers: flyers.length, products: products.length, settings: settings.length, subscribers: subscribers.length, imageLibrary: imageLibrary.length } });
   } catch (err) {
     console.error('[restore] failed:', err);
     res.status(400).json({ error: 'restore_failed', message: err.message });
@@ -743,6 +802,20 @@ app.delete('/api/subscribers/:id', requireAuth, (req, res) => {
   res.json({ ok: true });
 });
 
+/* ---------------- Uploaded images (stored as files, see files.js) ---------------- */
+app.use('/uploads', requireAuth, express.static(files.dir, { immutable: true, maxAge: '365d', index: false }));
+
+app.post('/api/uploads', requireAuth, (req, res) => {
+  const { dataUrl } = req.body || {};
+  try {
+    const url = files.externalize(dataUrl);
+    if (!url || url === dataUrl) return res.status(400).json({ error: 'bad_image' });
+    res.json({ url });
+  } catch {
+    res.status(400).json({ error: 'bad_image' });
+  }
+});
+
 /* ---------------- Ad Designer: canvas designs ---------------- */
 const crypto = require('crypto');
 
@@ -775,6 +848,7 @@ app.get('/api/designs/:id', requireAuth, (req, res) => {
 app.post('/api/designs', requireAuth, (req, res) => {
   const { design, thumbnail } = req.body || {};
   if (!validDesign(design)) return res.status(400).json({ error: 'bad_design' });
+  files.externalizeDesign(design);
   const id = crypto.randomUUID();
   const now = Date.now();
   const name = designName(design);
@@ -788,6 +862,7 @@ app.post('/api/designs', requireAuth, (req, res) => {
 app.put('/api/designs/:id', requireAuth, (req, res) => {
   const { design, thumbnail } = req.body || {};
   if (!validDesign(design)) return res.status(400).json({ error: 'bad_design' });
+  files.externalizeDesign(design);
   const name = designName(design);
   const info = db.prepare(`UPDATE designs SET name = ?, width = ?, height = ?, data = ?,
                              thumbnail = COALESCE(?, thumbnail), updated_at = ?
@@ -811,9 +886,11 @@ app.get('/api/image-library', requireAuth, (req, res) => {
 app.post('/api/image-library', requireAuth, (req, res) => {
   const { name, img } = req.body || {};
   if (!img || typeof img !== 'string') return res.status(400).json({ error: 'bad_input' });
+  let stored;
+  try { stored = files.externalize(img); } catch { return res.status(400).json({ error: 'bad_image' }); }
   const info = db.prepare('INSERT INTO image_library (name, img, created_at) VALUES (?, ?, ?)')
-    .run((name || '').trim() || 'Untitled image', img, Date.now());
-  res.json({ id: info.lastInsertRowid });
+    .run((name || '').trim() || 'Untitled image', stored, Date.now());
+  res.json({ id: info.lastInsertRowid, img: stored });
 });
 
 app.delete('/api/image-library/:id', requireAuth, (req, res) => {

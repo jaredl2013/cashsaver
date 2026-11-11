@@ -11,6 +11,8 @@ interface BaseElement {
   opacity: number;
   locked?: boolean;
   name?: string;
+  /** Elements sharing a groupId select and move together. */
+  groupId?: string;
 }
 
 export interface TextElement extends BaseElement {
@@ -52,6 +54,8 @@ export interface ImageElement extends BaseElement {
   flipX?: boolean;
   flipY?: boolean;
   cornerRadius?: number;
+  /** How the picture fills its box: stretch (default), contain (whole picture) or cover (crop to fill). */
+  fit?: 'stretch' | 'contain' | 'cover';
 }
 
 export type DesignElement = TextElement | ShapeElement | LineElement | ImageElement;

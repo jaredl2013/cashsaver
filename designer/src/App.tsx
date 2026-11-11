@@ -4,6 +4,7 @@ import SidePanel from './components/SidePanel';
 import ContextToolbar from './components/ContextToolbar';
 import CanvasStage from './components/CanvasStage';
 import ZoomBar from './components/ZoomBar';
+import PageBar from './components/PageBar';
 import DesignsDialog from './components/DesignsDialog';
 import { api, ApiError } from './api';
 import { blankDesign, useEditor } from './store';
@@ -79,7 +80,7 @@ export default function App() {
   const save = useCallback(async () => {
     if (saveInFlight.current) await saveInFlight.current;
     const state = useEditor.getState();
-    if (!state.dirty && state.design.id) return;
+    if (!state.dirty) return; // nothing new, including a blank design never touched
     const snapshot = state.design;
     state.setSaving(true);
     const task = (async () => {
@@ -141,6 +142,10 @@ export default function App() {
       } else if (mod && key === 'd') {
         e.preventDefault();
         s.duplicateSelected();
+      } else if (mod && key === 'g') {
+        e.preventDefault();
+        if (e.shiftKey) s.ungroup();
+        else s.group();
       } else if (mod && key === 'c') {
         s.copySelected();
       } else if (mod && key === 'v') {
@@ -215,6 +220,7 @@ export default function App() {
         <main className="editor">
           <ContextToolbar />
           <CanvasStage />
+          <PageBar />
           <ZoomBar />
         </main>
       </div>

@@ -45,7 +45,7 @@ interface EditorState {
   resizeDesign: (width: number, height: number, sizeLabel: string, scaleContent: boolean) => void;
   setBackground: (color: string) => void;
 
-  addElements: (drafts: ElementDraft[], at?: { x: number; y: number }) => void;
+  addElements: (drafts: ElementDraft[], at?: { x: number; y: number }, options?: { scale?: boolean; group?: boolean }) => void;
   updateElements: (ids: string[], patch: Partial<DesignElement> | ((el: DesignElement) => Partial<DesignElement>), coalesceKey?: string) => void;
   deleteSelected: () => void;
   duplicateSelected: () => void;
@@ -56,6 +56,16 @@ interface EditorState {
   nudge: (dx: number, dy: number) => void;
   /** Record a measured text height without creating an undo step. */
   setTextHeight: (id: string, height: number) => void;
+  group: () => void;
+  ungroup: () => void;
+
+  goToPage: (index: number) => void;
+  addPage: (afterIndex?: number) => void;
+  duplicatePage: (index: number) => void;
+  deletePage: (index: number) => void;
+  movePage: (from: number, to: number) => void;
+  /** Append pages of elements in one undo step (used by "fill pages" layouts). */
+  addElementsAcrossPages: (perPage: DesignElement[][], startPage: number) => void;
 
   select: (ids: string[]) => void;
   toggleSelect: (id: string) => void;
@@ -148,7 +158,7 @@ export const useEditor = create<EditorState>((set, get) => {
         d.pages[get().pageIndex].background = color;
       }, 'background'),
 
-    addElements: (drafts, at) => {
+    addElements: (drafts, at, options = {}) => {
       if (!drafts.length) return;
       const { design } = get();
       const minX = Math.min(...drafts.map((e) => e.x));
@@ -158,7 +168,9 @@ export const useEditor = create<EditorState>((set, get) => {
       const groupW = maxX - minX;
       const groupH = maxY - minY;
       // Scale presets so they look right on both a postcard and a poster.
-      const scale = Math.min(1.6, Math.max(0.35, Math.min(design.width, design.height) / 900));
+      const scale = options.scale === false ? 1 : Math.min(1.6, Math.max(0.35, Math.min(design.width, design.height) / 900));
+      // Multi-part presets (badges, combos, product tiles) stay together as a group.
+      const groupId = drafts.length > 1 && options.group !== false ? uid() : undefined;
       const cx = at ? at.x : design.width / 2;
       const cy = at ? at.y : design.height / 2;
       const originX = cx - (groupW * scale) / 2;
@@ -166,6 +178,7 @@ export const useEditor = create<EditorState>((set, get) => {
       const added: DesignElement[] = drafts.map((draft) => {
         const el = clone(draft) as DesignElement;
         el.id = uid();
+        if (groupId) el.groupId = groupId;
         el.x = originX + (draft.x - minX) * scale;
         el.y = originY + (draft.y - minY) * scale;
         el.width = draft.width * scale;
@@ -209,7 +222,7 @@ export const useEditor = create<EditorState>((set, get) => {
     duplicateSelected: () => {
       const els = get().selectedElements();
       if (!els.length) return;
-      const copies = els.map((e) => ({ ...clone(e), id: uid(), x: e.x + 24, y: e.y + 24, locked: false }));
+      const copies = remapGroups(els.map((e) => ({ ...clone(e), id: uid(), x: e.x + 24, y: e.y + 24, locked: false })));
       commit((d) => {
         currentElements(d).push(...copies);
       });
@@ -221,7 +234,7 @@ export const useEditor = create<EditorState>((set, get) => {
     paste: () => {
       const items = get().clipboard;
       if (!items.length) return;
-      const copies = items.map((e) => ({ ...clone(e), id: uid(), x: e.x + 24, y: e.y + 24 }));
+      const copies = remapGroups(items.map((e) => ({ ...clone(e), id: uid(), x: e.x + 24, y: e.y + 24 })));
       commit((d) => {
         currentElements(d).push(...copies);
       });
@@ -296,6 +309,67 @@ export const useEditor = create<EditorState>((set, get) => {
       set({ design: { ...design, pages } });
     },
 
+    group: () => {
+      const ids = get().selectedIds;
+      if (ids.length < 2) return;
+      const groupId = uid();
+      get().updateElements(ids, { groupId });
+    },
+    ungroup: () => {
+      const ids = get().selectedIds;
+      get().updateElements(ids, { groupId: undefined });
+    },
+
+    goToPage: (index) => {
+      const n = get().design.pages.length;
+      set({ pageIndex: Math.max(0, Math.min(n - 1, index)), selectedIds: [], editingTextId: null });
+    },
+    addPage: (afterIndex) => {
+      const at = (afterIndex ?? get().pageIndex) + 1;
+      const background = get().page().background;
+      commit((d) => {
+        d.pages.splice(at, 0, { id: uid(), background, elements: [] });
+      });
+      set({ pageIndex: at, selectedIds: [], editingTextId: null });
+    },
+    duplicatePage: (index) => {
+      commit((d) => {
+        const src = d.pages[index];
+        const copy = clone(src);
+        copy.id = uid();
+        copy.elements = remapGroups(copy.elements.map((e) => ({ ...e, id: uid() })));
+        d.pages.splice(index + 1, 0, copy);
+      });
+      set({ pageIndex: index + 1, selectedIds: [], editingTextId: null });
+    },
+    deletePage: (index) => {
+      if (get().design.pages.length <= 1) return;
+      commit((d) => {
+        d.pages.splice(index, 1);
+      });
+      set({ pageIndex: Math.min(index, get().design.pages.length - 1), selectedIds: [], editingTextId: null });
+    },
+    movePage: (from, to) => {
+      const n = get().design.pages.length;
+      if (to < 0 || to >= n || from === to) return;
+      commit((d) => {
+        const [p] = d.pages.splice(from, 1);
+        d.pages.splice(to, 0, p);
+      });
+      set({ pageIndex: to, selectedIds: [] });
+    },
+    addElementsAcrossPages: (perPage, startPage) => {
+      const background = get().design.pages[startPage]?.background ?? '#ffffff';
+      commit((d) => {
+        perPage.forEach((els, i) => {
+          const idx = startPage + i;
+          if (!d.pages[idx]) d.pages.push({ id: uid(), background, elements: [] });
+          d.pages[idx].elements.push(...els);
+        });
+      });
+      set({ pageIndex: startPage, selectedIds: perPage[0]?.map((e) => e.id) ?? [], editingTextId: null });
+    },
+
     select: (ids) => set({ selectedIds: ids, editingTextId: null }),
     toggleSelect: (id) => {
       const cur = get().selectedIds;
@@ -331,7 +405,18 @@ export const useEditor = create<EditorState>((set, get) => {
     setSaving: (saving) => set({ saving })
   };
 
+  function remapGroups<T extends DesignElement>(els: T[]): T[] {
+    const map = new Map<string, string>();
+    return els.map((e) => {
+      if (!e.groupId) return e;
+      if (!map.has(e.groupId)) map.set(e.groupId, uid());
+      return { ...e, groupId: map.get(e.groupId) };
+    });
+  }
+
   function pruneSelection() {
+    const n = get().design.pages.length;
+    if (get().pageIndex >= n) set({ pageIndex: n - 1 });
     const existing = new Set(get().page().elements.map((e) => e.id));
     set({ selectedIds: get().selectedIds.filter((id) => existing.has(id)) });
   }

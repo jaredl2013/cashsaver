@@ -17,6 +17,7 @@ interface Guide {
 
 export interface DropPayload {
   elements: ElementDraft[];
+  noScale?: boolean;
 }
 
 export default function CanvasStage() {
@@ -34,7 +35,7 @@ export default function CanvasStage() {
   const selectedIds = useEditor((s) => s.selectedIds);
   const editingTextId = useEditor((s) => s.editingTextId);
   const zoom = useEffectiveZoom();
-  const { select, toggleSelect, updateElements, setEditingText, setFitZoom, addElements, setTextHeight } = useEditor.getState();
+  const { select, updateElements, setEditingText, setFitZoom, addElements, setTextHeight } = useEditor.getState();
 
   const page = design.pages[pageIndex];
   const pageW = design.width * zoom;
@@ -106,8 +107,14 @@ export default function CanvasStage() {
   const handleSelect = (el: DesignElement) => (e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) => {
     e.cancelBubble = true;
     const shift = 'shiftKey' in e.evt && (e.evt.shiftKey || e.evt.metaKey || e.evt.ctrlKey);
-    if (shift) toggleSelect(el.id);
-    else if (!selectedIds.includes(el.id)) select([el.id]);
+    // Clicking part of a group picks up the whole group; Alt/Option-click picks just that part.
+    const alone = 'altKey' in e.evt && e.evt.altKey;
+    const members = el.groupId && !alone ? page.elements.filter((x) => x.groupId === el.groupId).map((x) => x.id) : [el.id];
+    if (shift) {
+      const cur = useEditor.getState().selectedIds;
+      const allIn = members.every((id) => cur.includes(id));
+      select(allIn ? cur.filter((id) => !members.includes(id)) : Array.from(new Set([...cur, ...members])));
+    } else if (!selectedIds.includes(el.id)) select(members);
   };
 
   const onStageMouseDown = (e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) => {
@@ -275,7 +282,7 @@ export default function CanvasStage() {
     stageRef.current!.setPointersPositions(e.nativeEvent);
     const pos = stageRef.current!.getPointerPosition();
     const payload = JSON.parse(raw) as DropPayload;
-    addElements(payload.elements, pos ? toPage(pos.x, pos.y) : undefined);
+    addElements(payload.elements, pos ? toPage(pos.x, pos.y) : undefined, { scale: !payload.noScale });
   };
 
   const editingEl = editingTextId ? elementsById.get(editingTextId) : undefined;

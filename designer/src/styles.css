@@ -222,6 +222,37 @@ input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px s
   padding: 10px 16px; border-radius: 10px; z-index: 60; cursor: pointer;
 }
 
+/* ---------- pages ---------- */
+.pagebar {
+  position: absolute; left: 16px; bottom: 14px; display: flex; align-items: center; gap: 6px; max-width: calc(100% - 360px);
+  background: #fff; border-radius: 999px; padding: 5px 8px; box-shadow: 0 4px 16px rgba(20, 22, 35, 0.12);
+}
+.page-tabs { display: flex; gap: 4px; overflow-x: auto; }
+.page-tab { min-width: 28px; height: 28px; border-radius: 999px; font-size: 12px; font-weight: 600; background: #f1f2f5; flex: none; }
+.page-tab.on { background: var(--accent); color: #fff; }
+.pagebar .chip { display: inline-flex; align-items: center; gap: 4px; flex: none; }
+.pagebar-sep { width: 1px; height: 18px; background: var(--line); flex: none; }
+.icon-btn.sm { width: 26px; height: 26px; flex: none; }
+
+/* ---------- products ---------- */
+.product-list { display: grid; gap: 6px; }
+.product-row { display: flex; align-items: center; gap: 8px; padding: 0 0 0 6px; border-radius: 8px; border: 1px solid transparent; }
+.product-main { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; padding: 6px; text-align: left; }
+.product-main > span:not(.pr-price):not(.no-img) { min-width: 0; overflow: hidden; }
+.product-row:hover { background: #f5f6f8; }
+.product-row.on { background: var(--accent-soft); border-color: var(--accent); }
+.product-row img, .product-row .no-img { width: 44px; height: 44px; border-radius: 6px; object-fit: cover; background: #eef0f4; flex: none; }
+.product-row strong { display: block; font-size: 13px; font-weight: 600; }
+.product-row small { color: var(--muted); font-size: 12px; }
+.product-row .pr-price { margin-left: auto; font-weight: 700; color: #b91c1c; font-size: 13px; white-space: nowrap; }
+.product-row input { flex: none; accent-color: var(--accent); }
+.style-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.style-row button { padding: 8px 4px; border-radius: 8px; background: #f5f6f8; font-size: 12px; font-weight: 600; border: 1px solid transparent; }
+.style-row button.on { border-color: var(--accent); background: var(--accent-soft); }
+.fill-box { border: 1px solid var(--line); border-radius: 10px; padding: 12px; display: grid; gap: 10px; }
+.fill-box .row select { flex: 1; }
+.sticky-actions { position: sticky; bottom: -24px; background: #fff; padding: 10px 0; display: grid; gap: 6px; }
+
 /* ---------- designs dialog ---------- */
 .modal-backdrop { position: fixed; inset: 0; background: rgba(15, 17, 26, 0.5); display: grid; place-items: center; z-index: 50; padding: 16px; }
 .modal { background: #fff; border-radius: 16px; width: min(980px, 100%); max-height: calc(100vh - 32px); overflow-y: auto; padding: 24px; display: grid; gap: 16px; }
@@ -249,6 +280,7 @@ input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px s
   .panel { position: absolute; left: 74px; top: 54px; bottom: 0; box-shadow: 8px 0 24px rgba(0, 0, 0, 0.12); }
   .name-input, .save-status, .top-btn.subtle, .brand-name { display: none; }
   .context-bar { overflow-x: auto; }
+  .pagebar { max-width: calc(100% - 32px); bottom: 64px; }
 }
 @media (max-width: 600px) {
   .panel { width: calc(100vw - 74px); }
