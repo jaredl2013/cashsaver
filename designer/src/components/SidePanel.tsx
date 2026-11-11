@@ -7,11 +7,13 @@ import type { ElementDraft, ImageElement } from '../types';
 import { api } from '../api';
 import { readFileAsImage, remoteToDataUrl } from '../images';
 import ColorInput from './ColorInput';
+import { buildProductTile, formatPrice, layoutProductPages, TILE_STYLES, unitLabel, type Product, type TileStyle } from '../productTiles';
 
-export type PanelId = 'design' | 'elements' | 'text' | 'uploads' | 'photos' | 'layers';
+export type PanelId = 'design' | 'products' | 'elements' | 'text' | 'uploads' | 'photos' | 'layers';
 
 const TABS: { id: PanelId; label: string; icon: string }[] = [
   { id: 'design', label: 'Design', icon: 'layout' },
+  { id: 'products', label: 'Products', icon: 'tag' },
   { id: 'elements', label: 'Elements', icon: 'shapes' },
   { id: 'text', label: 'Text', icon: 'text' },
   { id: 'uploads', label: 'Uploads', icon: 'upload' },
@@ -31,17 +33,17 @@ function imageDraft(src: string, w: number, h: number): ElementDraft {
 }
 
 /** Click adds to the middle of the page; drag drops it where you let go. */
-function Draggable({ elements, className, children, title }: { elements: ElementDraft[]; className?: string; children: React.ReactNode; title?: string }) {
+function Draggable({ elements, className, children, title, noScale }: { elements: ElementDraft[]; className?: string; children: React.ReactNode; title?: string; noScale?: boolean }) {
   return (
     <button
       className={className}
       title={title}
       draggable
       onDragStart={(e) => {
-        e.dataTransfer.setData('application/x-ad-element', JSON.stringify({ elements }));
+        e.dataTransfer.setData('application/x-ad-element', JSON.stringify({ elements, noScale }));
         e.dataTransfer.effectAllowed = 'copy';
       }}
-      onClick={() => useEditor.getState().addElements(elements)}
+      onClick={() => useEditor.getState().addElements(elements, undefined, { scale: !noScale })}
     >
       {children}
     </button>
@@ -123,6 +125,113 @@ function DesignPanel() {
   );
 }
 
+function tileDraft(p: Product, style: TileStyle) {
+  const { design } = useEditor.getState();
+  const w = Math.min(design.width, design.height) * 0.32;
+  return buildProductTile(p, { x: 0, y: 0, w, h: w * 1.3 }, style);
+}
+
+function ProductsPanel() {
+  const [q, setQ] = useState('');
+  const [products, setProducts] = useState<Product[] | null>(null);
+  const [error, setError] = useState('');
+  const [picked, setPicked] = useState<string[]>([]);
+  const [style, setStyle] = useState<TileStyle>('classic');
+  const [cols, setCols] = useState(3);
+  const [rows, setRows] = useState(3);
+  const [header, setHeader] = useState(true);
+
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      fetch(`/api/products${q.trim() ? `?q=${encodeURIComponent(q.trim().toLowerCase())}` : ''}`)
+        .then((r) => (r.ok ? r.json() : Promise.reject()))
+        .then((rows: Product[]) => {
+          setProducts(rows);
+          setError('');
+        })
+        .catch(() => setError('Could not load the product catalog.'));
+    }, 200);
+    return () => window.clearTimeout(t);
+  }, [q]);
+
+  const toggle = (key: string) => setPicked((cur) => (cur.includes(key) ? cur.filter((k) => k !== key) : [...cur, key]));
+  const chosen = (products || []).filter((p) => picked.includes(p.name_key));
+
+  const layOut = () => {
+    const st = useEditor.getState();
+    const { design, pageIndex } = st;
+    const pages = layoutProductPages(chosen, design, { columns: cols, rows, headerFraction: header ? 0.18 : 0, style });
+    // Fill the current page if it's empty, otherwise start on a fresh page after it.
+    const start = design.pages[pageIndex].elements.length === 0 ? pageIndex : pageIndex + 1;
+    if (start !== pageIndex) st.addPage(pageIndex);
+    useEditor.getState().addElementsAcrossPages(pages, start);
+    setPicked([]);
+  };
+
+  return (
+    <>
+      <form className="search" onSubmit={(e) => e.preventDefault()}>
+        <Icon name="search" />
+        <input placeholder="Search your products" value={q} onChange={(e) => setQ(e.target.value)} />
+      </form>
+      <h4>Tile style</h4>
+      <div className="style-row">
+        {TILE_STYLES.map((t) => (
+          <button key={t.id} className={style === t.id ? 'on' : ''} onClick={() => setStyle(t.id)}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+      <p className="muted small">Click or drag a product to add its tile. Tick several to lay them out in a grid across pages.</p>
+      {error && <p className="error small">{error}</p>}
+      {products === null && !error && <p className="muted small">Loading…</p>}
+      {products?.length === 0 && (
+        <p className="muted small">
+          No products yet. Add them in the <a href="/classic">classic builder</a>'s product database (one at a time or from Excel).
+        </p>
+      )}
+      <div className="product-list">
+        {products?.map((p) => (
+          <div key={p.name_key} className={`product-row ${picked.includes(p.name_key) ? 'on' : ''}`}>
+            <input type="checkbox" checked={picked.includes(p.name_key)} onChange={() => toggle(p.name_key)} aria-label={`Select ${p.display_name}`} />
+            <Draggable elements={tileDraft(p, style)} className="product-main" title="Add this product's tile" noScale>
+              {p.img ? <img src={p.img} alt="" /> : <span className="no-img" />}
+              <span>
+                <strong>{p.display_name}</strong>
+                <small>{unitLabel(p) || p.category || ''}</small>
+              </span>
+              <span className="pr-price">{formatPrice(p)}</span>
+            </Draggable>
+          </div>
+        ))}
+      </div>
+      {chosen.length > 0 && (
+        <div className="sticky-actions">
+          <div className="fill-box">
+            <strong>{chosen.length} selected</strong>
+            <div className="row">
+              <label>Columns</label>
+              <select value={cols} onChange={(e) => setCols(+e.target.value)}>
+                {[1, 2, 3, 4, 5, 6].map((n) => <option key={n}>{n}</option>)}
+              </select>
+              <label>Rows</label>
+              <select value={rows} onChange={(e) => setRows(+e.target.value)}>
+                {[1, 2, 3, 4, 5, 6].map((n) => <option key={n}>{n}</option>)}
+              </select>
+            </div>
+            <label className="check">
+              <input type="checkbox" checked={header} onChange={(e) => setHeader(e.target.checked)} /> Leave room at the top for a headline
+            </label>
+            <button className="btn primary block" onClick={layOut}>
+              Lay out on {Math.ceil(chosen.length / (cols * rows))} page{Math.ceil(chosen.length / (cols * rows)) > 1 ? 's' : ''}
+            </button>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 function ElementsPanel() {
   return (
     <>
@@ -179,12 +288,13 @@ function UploadsPanel() {
       for (const file of Array.from(files)) {
         if (!file.type.startsWith('image/')) continue;
         const { src, width, height } = await readFileAsImage(file);
-        await fetch('/api/image-library', {
+        const res = await fetch('/api/image-library', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name: file.name, img: src })
         });
-        useEditor.getState().addElements([imageDraft(src, width, height)]);
+        const saved = res.ok ? ((await res.json()) as { img?: string }) : {};
+        useEditor.getState().addElements([imageDraft(saved.img || src, width, height)]);
       }
       await refresh();
     } catch {
@@ -253,7 +363,8 @@ function PhotosPanel() {
     setAdding(p.id);
     try {
       const { src, width, height } = await remoteToDataUrl(p.medium);
-      useEditor.getState().addElements([imageDraft(src, width, height)], at);
+      const url = await api.upload(src).catch(() => src);
+      useEditor.getState().addElements([imageDraft(url, width, height)], at);
     } finally {
       setAdding(null);
     }
@@ -332,6 +443,7 @@ export default function SidePanel() {
           </header>
           <div className="panel-body">
             {tab === 'design' && <DesignPanel />}
+            {tab === 'products' && <ProductsPanel />}
             {tab === 'elements' && <ElementsPanel />}
             {tab === 'text' && <TextPanel />}
             {tab === 'uploads' && <UploadsPanel />}

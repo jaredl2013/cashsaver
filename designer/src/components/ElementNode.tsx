@@ -24,9 +24,40 @@ export function fontStyleFor(style: string) {
 function ImageBody({ el }: { el: Extract<DesignElement, { type: 'image' }> }) {
   const img = useImage(el.src);
   if (!img) return <Rect width={el.width} height={el.height} fill="#e4e4e7" cornerRadius={el.cornerRadius} />;
+  const iw = img.naturalWidth || 1;
+  const ih = img.naturalHeight || 1;
+  if (el.fit === 'contain') {
+    const s = Math.min(el.width / iw, el.height / ih);
+    const w = iw * s;
+    const h = ih * s;
+    return (
+      <Group>
+        {/* invisible hit area so the whole box stays clickable */}
+        <Rect width={el.width} height={el.height} fill="rgba(0,0,0,0)" />
+        <KImage
+          image={img}
+          width={w}
+          height={h}
+          x={(el.width - w) / 2 + (el.flipX ? w : 0)}
+          y={(el.height - h) / 2 + (el.flipY ? h : 0)}
+          scaleX={el.flipX ? -1 : 1}
+          scaleY={el.flipY ? -1 : 1}
+          cornerRadius={el.cornerRadius}
+        />
+      </Group>
+    );
+  }
+  let crop: { x: number; y: number; width: number; height: number } | undefined;
+  if (el.fit === 'cover') {
+    const s = Math.max(el.width / iw, el.height / ih);
+    const cw = el.width / s;
+    const ch = el.height / s;
+    crop = { x: (iw - cw) / 2, y: (ih - ch) / 2, width: cw, height: ch };
+  }
   return (
     <KImage
       image={img}
+      crop={crop}
       width={el.width}
       height={el.height}
       cornerRadius={el.cornerRadius}

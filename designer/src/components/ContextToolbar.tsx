@@ -172,6 +172,16 @@ export default function ContextToolbar() {
           <button className="tool-btn" title="Flip vertical" onClick={() => update({ flipY: !first.flipY })}>
             <Icon name="flipV" />
           </button>
+          <select
+            className="fit-select"
+            title="How the picture fills its box"
+            value={first.fit || 'stretch'}
+            onChange={(e) => update({ fit: e.target.value as 'stretch' | 'contain' | 'cover' })}
+          >
+            <option value="stretch">Stretch</option>
+            <option value="contain">Fit whole picture</option>
+            <option value="cover">Fill and crop</option>
+          </select>
           <Popover title="Corners" label="Corners">
             <Slider label="Rounding" value={first.cornerRadius || 0} min={0} max={Math.min(first.width, first.height) / 2} onChange={(v) => update({ cornerRadius: v }, 'cr')} />
           </Popover>
@@ -180,6 +190,17 @@ export default function ContextToolbar() {
       )}
 
       <div className="spacer" />
+
+      {sel.length > 1 && (sel.some((e) => !e.groupId) || new Set(sel.map((e) => e.groupId)).size > 1) && (
+        <button className="tool-btn" title="Group so they move together (Ctrl+G)" onClick={store.group}>
+          Group
+        </button>
+      )}
+      {sel.some((e) => e.groupId) && (
+        <button className="tool-btn" title="Ungroup (Ctrl+Shift+G)" onClick={store.ungroup}>
+          Ungroup
+        </button>
+      )}
 
       <Popover title="Position" label="Position">
         <div className="pos-grid">

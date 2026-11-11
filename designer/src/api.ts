@@ -33,6 +33,9 @@ export const api = {
     }),
   deleteDesign: (id: string) => request<{ ok: true }>(`/api/designs/${encodeURIComponent(id)}`, { method: 'DELETE' }),
 
+  upload: async (dataUrl: string) =>
+    (await request<{ url: string }>('/api/uploads', { method: 'POST', body: JSON.stringify({ dataUrl }) })).url,
+
   photoSearch: (q: string) =>
     request<{ photos: { id: number; alt: string; small: string; medium: string }[] }>(
       `/api/photo-search?q=${encodeURIComponent(q)}`

@@ -20,7 +20,7 @@ ENV NODE_ENV=production \
 WORKDIR /app
 COPY --from=build --chown=node:node /app/node_modules ./node_modules
 COPY --from=build --chown=node:node /app/public ./public
-COPY --from=build --chown=node:node /app/server.js /app/db.js /app/package.json ./
+COPY --from=build --chown=node:node /app/server.js /app/db.js /app/files.js /app/session-store.js /app/package.json ./
 RUN mkdir -p /data && chown node:node /data
 USER node
 # data.sqlite (designs, flyers, products, uploads) lives here: mount a volume.
